@@ -1,0 +1,781 @@
+@{
+    ViewData["Title"] = "Dashboard";
+}
+
+@section Styles {
+    <style>
+        /* =============================================
+                   GRID
+                ============================================= */
+        .d-grid {
+            display: grid;
+            gap: 20px;
+        }
+
+        .d-cols-4 {
+            grid-template-columns: repeat(4, 1fr);
+        }
+
+        .d-cols-2 {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .d-cols-5-3 {
+            grid-template-columns: 5fr 3fr;
+        }
+
+        .d-section {
+            margin-top: 24px;
+        }
+
+        /* =============================================
+                   GREETING BAR
+                ============================================= */
+        .greeting-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+            .greeting-bar h1 {
+                font-family: var(--font-display);
+                font-size: 24px;
+                font-weight: 800;
+                text-transform: uppercase;
+                letter-spacing: 0.02em;
+                color: var(--white);
+            }
+
+                .greeting-bar h1 span {
+                    color: var(--orange);
+                }
+
+        .greeting-meta {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+            .greeting-meta i {
+                color: var(--orange);
+                font-size: 13px;
+            }
+
+        .greeting-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .g-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 9px 18px;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            font-weight: 600;
+            font-family: var(--font-body);
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s ease;
+            text-decoration: none;
+        }
+
+            .g-btn.primary {
+                background: var(--orange);
+                color: #fff;
+            }
+
+                .g-btn.primary:hover {
+                    background: var(--orange-dim);
+                    transform: translateY(-1px);
+                    box-shadow: 0 4px 14px rgba(249,115,22,0.25);
+                }
+
+            .g-btn.outline {
+                background: var(--bg-surface);
+                color: var(--text-secondary);
+                border: 1px solid var(--border);
+            }
+
+                .g-btn.outline:hover {
+                    border-color: var(--border-light);
+                    color: var(--text-primary);
+                }
+
+        /* =============================================
+                   STAT CARDS
+                ============================================= */
+        .stat {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 22px 24px;
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+            .stat:hover {
+                border-color: var(--border-light);
+                transform: translateY(-2px);
+                box-shadow: 0 8px 24px rgba(0,0,0,0.03);
+            }
+
+        .stat-ic {
+            width: 46px;
+            height: 46px;
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+            .stat-ic.orange {
+                background: var(--orange-subtle);
+                color: var(--orange);
+            }
+
+            .stat-ic.green {
+                background: rgba(22,163,74,0.08);
+                color: #16a34a;
+            }
+
+            .stat-ic.blue {
+                background: rgba(59,130,246,0.08);
+                color: #3b82f6;
+            }
+
+            .stat-ic.purple {
+                background: rgba(147,51,234,0.08);
+                color: #9333ea;
+            }
+
+        .stat-body {
+            flex: 1;
+        }
+
+        .stat-val {
+            font-family: var(--font-display);
+            font-size: 30px;
+            font-weight: 800;
+            color: var(--white);
+            line-height: 1;
+            letter-spacing: -0.01em;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            margin-top: 4px;
+        }
+
+        .stat-accent {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .stat:hover .stat-accent {
+            opacity: 1;
+        }
+
+        .stat-accent.orange {
+            background: linear-gradient(to right, var(--orange), transparent);
+        }
+
+        .stat-accent.green {
+            background: linear-gradient(to right, #16a34a, transparent);
+        }
+
+        .stat-accent.blue {
+            background: linear-gradient(to right, #3b82f6, transparent);
+        }
+
+        .stat-accent.purple {
+            background: linear-gradient(to right, #9333ea, transparent);
+        }
+
+        /* =============================================
+                   PANEL (shared card style)
+                ============================================= */
+        .panel {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+        }
+
+        .panel-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px 24px 16px;
+        }
+
+        .panel-title {
+            font-family: var(--font-display);
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            color: var(--white);
+        }
+
+        .panel-link {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--orange);
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            transition: gap 0.2s ease;
+        }
+
+            .panel-link:hover {
+                gap: 6px;
+            }
+
+        .panel-body {
+            padding: 0 24px 24px;
+        }
+
+        /* =============================================
+                   CHART
+                ============================================= */
+        .chart-wrap {
+            position: relative;
+            height: 240px;
+        }
+
+        .chart-empty {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--text-muted);
+            gap: 6px;
+        }
+
+            .chart-empty i {
+                font-size: 28px;
+                opacity: 0.3;
+            }
+
+            .chart-empty p {
+                font-size: 12px;
+            }
+
+        /* =============================================
+                   ACTIVITY LIST
+                ============================================= */
+        .activity-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 24px;
+            border-top: 1px solid var(--border);
+            transition: background 0.15s ease;
+        }
+
+            .activity-item:hover {
+                background: var(--bg-raised);
+            }
+
+        .activity-dot {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+            .activity-dot.green {
+                background: rgba(22,163,74,0.08);
+                color: #16a34a;
+            }
+
+            .activity-dot.blue {
+                background: rgba(59,130,246,0.08);
+                color: #3b82f6;
+            }
+
+            .activity-dot.orange {
+                background: var(--orange-subtle);
+                color: var(--orange);
+            }
+
+            .activity-dot.red {
+                background: rgba(220,38,38,0.08);
+                color: #dc2626;
+            }
+
+        .activity-text {
+            flex: 1;
+            min-width: 0;
+        }
+
+            .activity-text .primary {
+                font-size: 13px;
+                font-weight: 600;
+                color: var(--text-primary);
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .activity-text .secondary {
+                font-size: 11px;
+                color: var(--text-muted);
+                margin-top: 1px;
+            }
+
+        .activity-time {
+            font-size: 11px;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+
+        .activity-empty {
+            padding: 40px 24px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+
+            .activity-empty i {
+                font-size: 28px;
+                opacity: 0.3;
+                display: block;
+                margin-bottom: 8px;
+            }
+
+        /* =============================================
+                   QUICK LINKS (compact)
+                ============================================= */
+        .quick-links {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            padding: 0 24px 24px;
+        }
+
+        .q-link {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 14px;
+            border-radius: var(--radius-sm);
+            background: var(--bg-raised);
+            color: var(--text-secondary);
+            font-size: 12.5px;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            text-decoration: none;
+        }
+
+            .q-link i {
+                font-size: 15px;
+                color: var(--orange);
+            }
+
+            .q-link:hover {
+                background: var(--bg-hover);
+                color: var(--text-primary);
+                transform: translateX(2px);
+            }
+
+        /* =============================================
+                   RESPONSIVE
+                ============================================= */
+        @@media (max-width: 1200px) {
+            .d-cols-4 {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @@media (max-width: 1024px) {
+            .d-cols-5-3 {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @@media (max-width: 768px) {
+            .d-cols-4, .d-cols-2 {
+                grid-template-columns: 1fr;
+            }
+
+            .greeting-bar {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .greeting-actions {
+                width: 100%;
+            }
+
+            .g-btn {
+                flex: 1;
+                justify-content: center;
+            }
+
+            .quick-links {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+}
+
+<!-- ── GREETING ── -->
+<div class="greeting-bar">
+    <div>
+        <h1>Welcome back, <span>@(User.Identity?.Name ?? "Admin")</span></h1>
+        <div class="greeting-meta">
+            <i class="bi bi-calendar3"></i>
+            @DateTime.Now.ToString("dddd, MMMM d, yyyy")
+        </div>
+    </div>
+    <div class="greeting-actions">
+        <a asp-controller="Members" asp-action="Create" class="g-btn primary">
+            <i class="bi bi-plus-lg"></i> New Member
+        </a>
+        <a asp-controller="Reception" asp-action="Index" class="g-btn outline">
+            <i class="bi bi-display"></i> Reception
+        </a>
+    </div>
+</div>
+
+<!-- ── STATS ── -->
+<div class="d-grid d-cols-4 d-section">
+    <div class="stat">
+        <div class="stat-ic orange"><i class="bi bi-people-fill"></i></div>
+        <div class="stat-body">
+            <div class="stat-val" id="statMembers">—</div>
+            <div class="stat-label">Total Members</div>
+        </div>
+        <div class="stat-accent orange"></div>
+    </div>
+    <div class="stat">
+        <div class="stat-ic green"><i class="bi bi-check-circle-fill"></i></div>
+        <div class="stat-body">
+            <div class="stat-val" id="statActive">—</div>
+            <div class="stat-label">Active Packages</div>
+        </div>
+        <div class="stat-accent green"></div>
+    </div>
+    <div class="stat">
+        <div class="stat-ic blue"><i class="bi bi-qr-code-scan"></i></div>
+        <div class="stat-body">
+            <div class="stat-val" id="statCheckins">—</div>
+            <div class="stat-label">Today's Check-ins</div>
+        </div>
+        <div class="stat-accent blue"></div>
+    </div>
+    <div class="stat">
+        <div class="stat-ic purple"><i class="bi bi-wallet2"></i></div>
+        <div class="stat-body">
+            <div class="stat-val" id="statRevenue">—</div>
+            <div class="stat-label">Monthly Revenue</div>
+        </div>
+        <div class="stat-accent purple"></div>
+    </div>
+</div>
+
+<!-- ── CHARTS ── -->
+<div class="d-grid d-cols-2 d-section">
+    <div class="panel">
+        <div class="panel-head">
+            <span class="panel-title">Attendance Trend</span>
+            <a asp-controller="Attendance" asp-action="Index" class="panel-link">
+                Details <i class="bi bi-arrow-right-short"></i>
+            </a>
+        </div>
+        <div class="panel-body">
+            <div class="chart-wrap">
+                <canvas id="attendanceChart"></canvas>
+                <div class="chart-empty" id="attendanceEmpty" style="display:none;">
+                    <i class="bi bi-graph-up"></i>
+                    <p>Attendance data will appear here</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="panel">
+        <div class="panel-head">
+            <span class="panel-title">Revenue by Package</span>
+            <a asp-controller="Reports" asp-action="Index" class="panel-link">
+                Details <i class="bi bi-arrow-right-short"></i>
+            </a>
+        </div>
+        <div class="panel-body">
+            <div class="chart-wrap">
+                <canvas id="revenueChart"></canvas>
+                <div class="chart-empty" id="revenueEmpty" style="display:none;">
+                    <i class="bi bi-pie-chart"></i>
+                    <p>Revenue data will appear here</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── ACTIVITY + SHORTCUTS ── -->
+<div class="d-grid d-cols-5-3 d-section">
+
+    <!-- Recent Activity -->
+    <div class="panel">
+        <div class="panel-head">
+            <span class="panel-title">Recent Activity</span>
+            <a asp-controller="AuditLogs" asp-action="Index" class="panel-link">
+                View All <i class="bi bi-arrow-right-short"></i>
+            </a>
+        </div>
+        <div id="activityList">
+            <div class="activity-empty" id="activityEmpty">
+                <i class="bi bi-clock-history"></i>
+                Activity will show up here as members check in, register, or purchase packages.
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Links -->
+    <div class="panel">
+        <div class="panel-head">
+            <span class="panel-title">Quick Links</span>
+        </div>
+        <div class="quick-links">
+            <a asp-controller="Members" asp-action="Create" class="q-link">
+                <i class="bi bi-person-plus"></i> Add Member
+            </a>
+            <a asp-controller="MemberPackages" asp-action="Create" class="q-link">
+                <i class="bi bi-ticket-perforated"></i> New Package
+            </a>
+            <a asp-controller="Attendance" asp-action="Index" class="q-link">
+                <i class="bi bi-qr-code-scan"></i> Scan QR
+            </a>
+            <a asp-controller="Reports" asp-action="Index" class="q-link">
+                <i class="bi bi-bar-chart-line"></i> Reports
+            </a>
+            <a asp-controller="Branches" asp-action="Index" class="q-link">
+                <i class="bi bi-building"></i> Branches
+            </a>
+            <a asp-controller="PackageDefinitions" asp-action="Index" class="q-link">
+                <i class="bi bi-box-seam"></i> Catalog
+            </a>
+        </div>
+    </div>
+
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+
+    <script>
+        /*
+         * ─── API CONTRACT ───
+         * Create: GET /api/dashboard
+         * Response:
+         * {
+         *   totalMembers: number,
+         *   activePackages: number,
+         *   todayCheckins: number,
+         *   monthlyRevenue: number,
+         *   attendance: { labels: string[], data: number[] },
+         *   revenue: { labels: string[], data: number[], colors: string[] },
+         *   recentActivity: [
+         *     { type: "checkin"|"register"|"purchase"|"expired",
+         *       name: string, description: string, time: string }
+         *   ]
+         * }
+         */
+
+        Chart.defaults.font.family = "'Barlow', sans-serif";
+
+        const iconMap = {
+            checkin:  { icon: 'bi-box-arrow-in-right', color: 'green' },
+            register: { icon: 'bi-person-plus',        color: 'blue' },
+            purchase: { icon: 'bi-bag-check',          color: 'orange' },
+            expired:  { icon: 'bi-exclamation-triangle', color: 'red' }
+        };
+
+        async function loadDashboard() {
+            try {
+                const res = await fetch('/api/dashboard');
+                if (!res.ok) throw new Error();
+                const d = await res.json();
+
+                // Stats
+                setText('statMembers',  formatNum(d.totalMembers));
+                setText('statActive',   formatNum(d.activePackages));
+                setText('statCheckins', formatNum(d.todayCheckins));
+                setText('statRevenue',  '$' + formatNum(d.monthlyRevenue));
+
+                // Attendance chart
+                if (d.attendance?.data?.length) {
+                    buildLineChart('attendanceChart', d.attendance.labels, d.attendance.data);
+                } else {
+                    showEmpty('attendanceChart', 'attendanceEmpty');
+                }
+
+                // Revenue chart
+                if (d.revenue?.data?.length) {
+                    buildDonutChart('revenueChart', d.revenue.labels, d.revenue.data, d.revenue.colors);
+                } else {
+                    showEmpty('revenueChart', 'revenueEmpty');
+                }
+
+                // Activity
+                if (d.recentActivity?.length) {
+                    const list = document.getElementById('activityList');
+                    list.innerHTML = d.recentActivity.slice(0, 6).map(a => {
+                        const m = iconMap[a.type] || iconMap.checkin;
+                        return `
+                            <div class="activity-item">
+                                <div class="activity-dot ${m.color}"><i class="bi ${m.icon}"></i></div>
+                                <div class="activity-text">
+                                    <div class="primary">${esc(a.name)}</div>
+                                    <div class="secondary">${esc(a.description)}</div>
+                                </div>
+                                <span class="activity-time">${esc(a.time)}</span>
+                            </div>`;
+                    }).join('');
+                }
+
+            } catch {
+                // API not wired yet — keep dashes and empty states
+                showEmpty('attendanceChart', 'attendanceEmpty');
+                showEmpty('revenueChart', 'revenueEmpty');
+            }
+        }
+
+        // ── Chart builders ──
+
+        function buildLineChart(canvasId, labels, data) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            const grad = ctx.createLinearGradient(0, 0, 0, 240);
+            grad.addColorStop(0, 'rgba(249,115,22,0.10)');
+            grad.addColorStop(1, 'rgba(249,115,22,0)');
+
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [{
+                        data,
+                        borderColor: '#f97316',
+                        backgroundColor: grad,
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.35,
+                        pointRadius: 3,
+                        pointBackgroundColor: '#f97316',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointHoverRadius: 5
+                    }]
+                },
+                options: chartOpts(true)
+            });
+        }
+
+        function buildDonutChart(canvasId, labels, data, colors) {
+            const fallback = ['#f97316','#3b82f6','#16a34a','#9333ea','#a1a1aa','#f59e0b','#ec4899'];
+            new Chart(document.getElementById(canvasId), {
+                type: 'doughnut',
+                data: {
+                    labels,
+                    datasets: [{
+                        data,
+                        backgroundColor: colors || fallback.slice(0, labels.length),
+                        borderWidth: 0,
+                        spacing: 3,
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '68%',
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                padding: 14,
+                                usePointStyle: true,
+                                pointStyle: 'circle',
+                                font: { size: 12, weight: 500 }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => ` $${ctx.parsed.toLocaleString()}`
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function chartOpts(showX) {
+            return {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                interaction: { intersect: false, mode: 'index' },
+                scales: {
+                    x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+                    y: { grid: { color: 'rgba(0,0,0,0.04)' }, beginAtZero: true, ticks: { font: { size: 11 } } }
+                }
+            };
+        }
+
+        // ── Helpers ──
+
+        function setText(id, val) {
+            const el = document.getElementById(id);
+            if (el) el.textContent = val;
+        }
+
+        function formatNum(n) {
+            if (n == null) return '0';
+            return n >= 1000 ? n.toLocaleString() : String(n);
+        }
+
+        function showEmpty(canvasId, emptyId) {
+            const c = document.getElementById(canvasId);
+            const e = document.getElementById(emptyId);
+            if (c) c.style.display = 'none';
+            if (e) e.style.display = 'flex';
+        }
+
+        function esc(s) {
+            const d = document.createElement('div');
+            d.textContent = s || '';
+            return d.innerHTML;
+        }
+
+        // ── Init ──
+        loadDashboard();
+    </script>
+}

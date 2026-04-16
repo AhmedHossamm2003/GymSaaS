@@ -1,0 +1,583 @@
+@model List<GymSaaS.Models.MemberListItem>
+@using GymSaaS.Persistence.Entities
+@{
+    ViewData["Title"] = "Members";
+    var search     = ViewData["Search"]     as string ?? "";
+    var status     = ViewData["Status"]     as string ?? "";
+    var branchId   = ViewData["BranchId"]   as Guid?;
+    var statuses   = ViewData["Statuses"]   as List<MemberStatus> ?? new();
+    var branches   = ViewData["Branches"]   as List<Branch> ?? new();
+    var total      = (int)(ViewData["TotalCount"] ?? 0);
+    var page       = (int)(ViewData["Page"]       ?? 1);
+    var totalPages = (int)(ViewData["TotalPages"] ?? 1);
+    var pageSize   = (int)(ViewData["PageSize"]   ?? 20);
+    var from       = total == 0 ? 0 : (page - 1) * pageSize + 1;
+    var to         = Math.Min(page * pageSize, total);
+}
+
+@section Styles {
+<style>
+    /* ── Toolbar ── */
+    .toolbar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+    }
+
+    .filter-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 5px 13px;
+        border-radius: 20px;
+        font-size: 12.5px;
+        font-weight: 600;
+        border: 1px solid var(--border);
+        background: var(--surface);
+        color: var(--t2);
+        transition: all .12s;
+        white-space: nowrap;
+        cursor: pointer;
+    }
+    .filter-pill:hover  { border-color: var(--border-strong); color: var(--t1); }
+    .filter-pill.active { background: var(--fire-soft); border-color: var(--fire-border); color: var(--fire-text); }
+
+    /* ── Table card ── */
+    .table-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--r-lg);
+        box-shadow: var(--sh-sm);
+        overflow: hidden;
+    }
+
+    .table-card table { margin: 0; }
+
+    thead tr { background: var(--canvas); }
+
+    thead th {
+        font-size: 10.5px;
+        font-weight: 700;
+        letter-spacing: .12em;
+        text-transform: uppercase;
+        color: var(--t3);
+        padding: 11px 16px;
+        text-align: left;
+        white-space: nowrap;
+        border-bottom: 1px solid var(--border);
+    }
+
+    tbody tr {
+        border-bottom: 1px solid var(--border);
+        transition: background .1s;
+        cursor: pointer;
+    }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--fire-soft); }
+
+    tbody td {
+        padding: 12px 16px;
+        vertical-align: middle;
+    }
+
+    /* Member cell */
+    .member-cell {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+    }
+
+    .m-avatar {
+        width: 36px; height: 36px;
+        border-radius: 50%;
+        flex-shrink: 0;
+        overflow: hidden;
+        border: 1.5px solid var(--border);
+        display: flex; align-items: center; justify-content: center;
+        font-family: var(--font-display);
+        font-size: 13px; font-weight: 800;
+        background: var(--fire-soft);
+        color: var(--fire-text);
+        position: relative;
+    }
+    .m-avatar img { width:100%; height:100%; object-fit:cover; border-radius:50%; }
+
+    /* Status ring on avatar */
+    .m-avatar::after {
+        content: '';
+        position: absolute;
+        inset: -2px;
+        border-radius: 50%;
+        border: 2px solid transparent;
+    }
+    .m-avatar.active::after    { border-color: var(--green); }
+    .m-avatar.suspended::after { border-color: var(--red); }
+    .m-avatar.frozen::after    { border-color: var(--blue); }
+    .m-avatar.expired::after   { border-color: var(--yellow); }
+
+    .m-name {
+        font-size: 13.5px;
+        font-weight: 600;
+        color: var(--t1);
+        white-space: nowrap;
+    }
+
+    .m-number {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: .08em;
+        color: var(--t3);
+        margin-top: 1px;
+        font-family: monospace;
+    }
+
+    /* Package cell */
+    .pkg-cell { max-width: 200px; }
+    .pkg-name  { font-size: 13px; font-weight: 500; color: var(--t1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pkg-expiry {
+        font-size: 11px; font-weight: 600; margin-top: 2px;
+    }
+    .pkg-expiry.ok     { color: var(--t3); }
+    .pkg-expiry.soon   { color: var(--yellow); }
+    .pkg-expiry.expired { color: var(--red); }
+
+    /* Session pill */
+    .session-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 8px;
+        border-radius: 20px;
+        font-size: 11.5px;
+        font-weight: 700;
+        border: 1px solid;
+    }
+    .session-pill.ok      { background: var(--green-bg);  color: var(--green-text);  border-color: var(--green-border); }
+    .session-pill.warn    { background: var(--yellow-bg); color: var(--yellow-text); border-color: var(--yellow-border); }
+    .session-pill.danger  { background: var(--red-bg);    color: var(--red-text);    border-color: var(--red-border); }
+    .session-pill.unlimited { background: var(--blue-bg); color: var(--blue-text);   border-color: var(--blue-border); }
+
+    /* Checkin cell */
+    .checkin-cell { font-size: 12.5px; color: var(--t2); white-space: nowrap; }
+    .checkin-cell.never { color: var(--t4); font-style: italic; }
+
+    /* ── Pagination ── */
+    .pagination-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 20px;
+        border-top: 1px solid var(--border);
+        background: var(--surface-2);
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .pagination-info {
+        font-size: 12.5px;
+        color: var(--t2);
+    }
+
+    .pagination-info strong { color: var(--t1); }
+
+    .pagination-pages {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .page-btn {
+        width: 32px; height: 32px;
+        border-radius: var(--r-sm);
+        border: 1px solid var(--border);
+        background: var(--surface);
+        color: var(--t2);
+        font-size: 13px;
+        font-weight: 500;
+        display: flex; align-items: center; justify-content: center;
+        transition: all .12s;
+        text-decoration: none;
+    }
+    .page-btn:hover:not(.disabled):not(.active) {
+        background: var(--canvas);
+        border-color: var(--border-strong);
+        color: var(--t1);
+    }
+    .page-btn.active {
+        background: var(--fire);
+        border-color: var(--fire);
+        color: #fff;
+        font-weight: 700;
+    }
+    .page-btn.disabled {
+        opacity: .35;
+        pointer-events: none;
+    }
+
+    /* Empty */
+    .empty-row td {
+        padding: 60px 24px;
+        text-align: center;
+        color: var(--t3);
+    }
+    .empty-row i { font-size: 32px; display: block; margin-bottom: 10px; color: var(--t4); }
+</style>
+}
+
+<!-- Page header -->
+<div class="page-header">
+    <div>
+        <div class="page-title">Members</div>
+        <div class="page-sub">
+            @if (total > 0)
+            {
+                @:Showing @from–@to of @total member@(total != 1 ? "s" : "")
+            }
+            else
+            {
+                @:No members found
+            }
+        </div>
+    </div>
+    <a asp-action="Create" class="btn btn-primary">
+        <i class="bi bi-person-plus"></i> New Member
+    </a>
+</div>
+
+<!-- Toolbar -->
+<div class="toolbar">
+
+    <!-- Search -->
+    <form method="get" asp-action="Index" id="filterForm" style="display:contents;">
+        <input type="hidden" name="status"   value="@status" id="hStatus" />
+        <input type="hidden" name="branchId" value="@branchId" id="hBranch" />
+        <input type="hidden" name="page"     value="1" />
+
+        <div class="search-bar" style="width:260px; flex-shrink:0;">
+            <i class="bi bi-search"></i>
+            <input type="text" name="search" value="@search"
+                   placeholder="Name, #, phone, email..."
+                   onchange="this.form.submit()" />
+        </div>
+    </form>
+
+    <!-- Status filters -->
+    <a asp-action="Index"
+       asp-route-search="@search" asp-route-branchId="@branchId" asp-route-page="1"
+       class="filter-pill @(string.IsNullOrEmpty(status) ? "active" : "")">
+        All <span style="font-size:11px; opacity:.6;">@total</span>
+    </a>
+    @foreach (var s in statuses)
+    {
+        <a asp-action="Index"
+           asp-route-search="@search" asp-route-status="@s.StatusCode" asp-route-branchId="@branchId" asp-route-page="1"
+           class="filter-pill @(status == s.StatusCode ? "active" : "")">
+            @s.StatusName
+        </a>
+    }
+
+    <!-- Branch filter -->
+    @if (branches.Count > 0)
+    {
+        <select onchange="applyBranch(this.value)"
+                style="height:34px; min-width:150px; padding:0 32px 0 10px; font-size:12.5px; border-radius:20px; border:1px solid var(--border); background:var(--surface); color:var(--t2); cursor:pointer;">
+            <option value="">All Branches</option>
+            @foreach (var b in branches)
+            {
+                if (branchId == b.BranchId)
+                {
+                    <option value="@b.BranchId" selected>@b.BranchName</option>
+                }
+                else
+                {
+                    <option value="@b.BranchId">@b.BranchName</option>
+                }
+            }
+        </select>
+    }
+
+    <!-- Clear filters -->
+    @if (!string.IsNullOrEmpty(search) || !string.IsNullOrEmpty(status) || branchId.HasValue)
+    {
+        <a asp-action="Index" class="btn btn-ghost" style="font-size:12px; padding:5px 12px;">
+            <i class="bi bi-x"></i> Clear
+        </a>
+    }
+
+</div>
+
+<!-- Table -->
+<div class="table-card">
+    <div class="tbl-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:36px;"></th>
+                    <th>Member</th>
+                    <th>Phone</th>
+                    <th>Branch</th>
+                    <th>Package</th>
+                    <th>Sessions</th>
+                    <th>Status</th>
+                    <th>Last Check-in</th>
+                    <th style="width:60px;"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Model.Any())
+                {
+                    <tr class="empty-row">
+                        <td colspan="9">
+                            <i class="bi bi-people"></i>
+                            @(string.IsNullOrEmpty(search) && string.IsNullOrEmpty(status)
+                                ? "No members yet. Add your first member."
+                                : "No members match your filters.")
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var m in Model)
+                    {
+                        var avatarClass = m.StatusCode.ToLower();
+
+                        <tr onclick="window.location='@Url.Action("Details", new { id = m.MemberId })'">
+
+                            <!-- Avatar -->
+                            <td style="padding:12px 8px 12px 16px;">
+                                <div class="m-avatar @avatarClass">
+                                    @if (!string.IsNullOrEmpty(m.ProfileImageUrl))
+                                    {
+                                        <img src="@m.ProfileImageUrl" alt="@m.FullName" />
+                                    }
+                                    else
+                                    {
+                                        @m.Initials
+                                    }
+                                </div>
+                            </td>
+
+                            <!-- Name + number -->
+                            <td>
+                                <div class="m-name">@m.FullName</div>
+                                <div class="m-number">#@m.MembershipNumber</div>
+                            </td>
+
+                            <!-- Phone -->
+                            <td style="font-size:13px; color:var(--t2);">@m.PhoneNumber</td>
+
+                            <!-- Branch -->
+                            <td style="font-size:13px; color:var(--t2); white-space:nowrap;">
+                                <i class="bi bi-building" style="font-size:11px; color:var(--t3); margin-right:4px;"></i>
+                                @m.HomeBranchName
+                            </td>
+
+                            <!-- Package(s) -->
+                            <td class="pkg-cell">
+                                @if (m.HasAnyPackage)
+                                {
+                                    @foreach (var pkg in m.ActivePackages.Take(2))
+                                    {
+                                        var pkgExpClass = pkg.IsExpired ? "expired" : pkg.IsExpiringSoon ? "soon" : "ok";
+                                        <div style="display:flex; align-items:center; gap:5px; margin-bottom:2px;">
+                                            @if (pkg.IsSessionBased)
+                                            {
+                                                <i class="bi bi-ticket-perforated" style="font-size:10px; color:var(--fire); flex-shrink:0;"></i>
+                                            }
+                                            else
+                                            {
+                                                <i class="bi bi-door-open" style="font-size:10px; color:var(--blue); flex-shrink:0;"></i>
+                                            }
+                                            <span class="pkg-name" style="font-size:12px;" title="@pkg.PackageName">@pkg.PackageName</span>
+                                        </div>
+                                        <div class="pkg-expiry @pkgExpClass" style="padding-left:15px;">@pkg.ExpiryLabel</div>
+                                    }
+                                    @if (m.ActivePackages.Count > 2)
+                                    {
+                                        <div style="font-size:11px; color:var(--t3); margin-top:2px;">+@(m.ActivePackages.Count - 2) more</div>
+                                    }
+                                }
+                                else
+                                {
+                                    <span style="font-size:12px; color:var(--t4); font-style:italic;">No package</span>
+                                }
+                            </td>
+
+                            <!-- Sessions -->
+                            <td>
+                                @{
+                                    var sp = m.SessionPackage;
+                                    var gp = m.OpenGymPackage;
+                                }
+                                @if (sp != null)
+                                {
+                                    var sc = sp.SessionsRemaining <= 2 ? "danger" : sp.SessionsRemaining <= 5 ? "warn" : "ok";
+                                    <span class="session-pill @sc" style="display:block; margin-bottom:3px;">
+                                        @sp.SessionsRemaining left
+                                    </span>
+                                }
+                                @if (gp != null)
+                                {
+                                    <span class="session-pill unlimited" style="display:block;">
+                                        <i class="bi bi-door-open" style="font-size:10px;"></i> Gym
+                                    </span>
+                                }
+                                @if (sp == null && gp == null)
+                                {
+                                    <span style="color:var(--t4); font-size:12px;">—</span>
+                                }
+                            </td>
+
+                            <!-- Status -->
+                            <td>
+                                @if (m.StatusCode == "ACTIVE")
+                                {
+                                    <span class="badge badge-active">Active</span>
+                                }
+                                else if (m.StatusCode == "SUSPENDED")
+                                {
+                                    <span class="badge badge-inactive">Suspended</span>
+                                }
+                                else if (m.StatusCode == "FROZEN")
+                                {
+                                    <span class="badge badge-info">Frozen</span>
+                                }
+                                else
+                                {
+                                    <span class="badge badge-pending">@m.StatusName</span>
+                                }
+                            </td>
+
+                            <!-- Last check-in -->
+                            <td class="checkin-cell @(m.LastCheckIn == null ? "never" : "")">
+                                @if (m.LastCheckIn.HasValue)
+                                {
+                                    <i class="bi bi-clock" style="font-size:11px; margin-right:3px;"></i>
+                                    @m.TimeAgoCheckIn
+                                }
+                                else
+                                {
+                                    @:Never
+                                }
+                            </td>
+
+                            <!-- Actions -->
+                            <td onclick="event.stopPropagation()" style="padding:12px 10px;">
+                                <a asp-action="Edit" asp-route-id="@m.MemberId"
+                                   class="btn btn-ghost" style="padding:5px 8px; font-size:13px;"
+                                   title="Edit">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                            </td>
+
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    @if (totalPages > 1)
+    {
+        <div class="pagination-bar">
+            <div class="pagination-info">
+                Showing <strong>@from–@to</strong> of <strong>@total</strong> members
+            </div>
+            <div class="pagination-pages">
+
+                <!-- Prev -->
+                @if (page > 1)
+                {
+                    <a asp-action="Index"
+                       asp-route-search="@search" asp-route-status="@status"
+                       asp-route-branchId="@branchId" asp-route-page="@(page - 1)"
+                       class="page-btn">
+                        <i class="bi bi-chevron-left" style="font-size:11px;"></i>
+                    </a>
+                }
+                else
+                {
+                    <span class="page-btn disabled">
+                        <i class="bi bi-chevron-left" style="font-size:11px;"></i>
+                    </span>
+                }
+
+                <!-- Page numbers -->
+                @{
+                    int startPage = Math.Max(1, page - 2);
+                    int endPage   = Math.Min(totalPages, page + 2);
+                }
+
+                @if (startPage > 1)
+                {
+                    <a asp-action="Index"
+                       asp-route-search="@search" asp-route-status="@status"
+                       asp-route-branchId="@branchId" asp-route-page="1"
+                       class="page-btn">1</a>
+                    if (startPage > 2)
+                    {
+                        <span style="font-size:13px; color:var(--t3); padding:0 2px;">…</span>
+                    }
+                }
+
+                @for (int p = startPage; p <= endPage; p++)
+                {
+                    if (p == page)
+                    {
+                        <span class="page-btn active">@p</span>
+                    }
+                    else
+                    {
+                        <a asp-action="Index"
+                           asp-route-search="@search" asp-route-status="@status"
+                           asp-route-branchId="@branchId" asp-route-page="@p"
+                           class="page-btn">@p</a>
+                    }
+                }
+
+                @if (endPage < totalPages)
+                {
+                    if (endPage < totalPages - 1)
+                    {
+                        <span style="font-size:13px; color:var(--t3); padding:0 2px;">…</span>
+                    }
+                    <a asp-action="Index"
+                       asp-route-search="@search" asp-route-status="@status"
+                       asp-route-branchId="@branchId" asp-route-page="@totalPages"
+                       class="page-btn">@totalPages</a>
+                }
+
+                <!-- Next -->
+                @if (page < totalPages)
+                {
+                    <a asp-action="Index"
+                       asp-route-search="@search" asp-route-status="@status"
+                       asp-route-branchId="@branchId" asp-route-page="@(page + 1)"
+                       class="page-btn">
+                        <i class="bi bi-chevron-right" style="font-size:11px;"></i>
+                    </a>
+                }
+                else
+                {
+                    <span class="page-btn disabled">
+                        <i class="bi bi-chevron-right" style="font-size:11px;"></i>
+                    </span>
+                }
+
+            </div>
+        </div>
+    }
+
+</div>
+
+@section Scripts {
+<script>
+    function applyBranch(val) {
+        document.getElementById('hBranch').value = val;
+        document.getElementById('filterForm').submit();
+    }
+</script>
+}

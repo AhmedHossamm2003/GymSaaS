@@ -3,47 +3,1209 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - GymSaaS</title>
-    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
-    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/GymSaaS.styles.css" asp-append-version="true" />
+    <title>@ViewData["Title"] — Ideal Wellness</title>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet" />
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+
+    <style>
+        /* =============================================
+                   CSS VARIABLES
+                ============================================= */
+        :root {
+            --bg-body: #f4f4f5;
+            --bg-surface: #ffffff;
+            --bg-raised: #f4f4f5;
+            --bg-hover: #ececee;
+            --bg-inset: #e9e9ec;
+            --border: rgba(0,0,0,0.06);
+            --border-strong: rgba(0,0,0,0.10);
+            --orange: #f97316;
+            --orange-dim: #ea650a;
+            --orange-glow: rgba(249,115,22,0.12);
+            --orange-subtle: rgba(249,115,22,0.06);
+            --black: #09090b;
+            --text-primary: #18181b;
+            --text-secondary: #52525b;
+            --text-muted: #a1a1aa;
+            --text-faint: #d4d4d8;
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.06);
+            --shadow-lg: 0 12px 40px rgba(0,0,0,0.08);
+            --shadow-glow: 0 0 0 3px var(--orange-glow);
+            --sidebar-width: 256px;
+            --topbar-height: 60px;
+            --radius-xs: 4px;
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --radius-xl: 20px;
+            --font-display: 'Barlow Condensed', sans-serif;
+            --font-body: 'Inter', sans-serif;
+            --ease: cubic-bezier(0.4, 0, 0.2, 1);
+            --transition: 0.15s var(--ease);
+        }
+
+        /* =============================================
+                   RESET & BASE
+                ============================================= */
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html, body {
+            height: 100%;
+            background: var(--bg-body);
+            color: var(--text-primary);
+            font-family: var(--font-body);
+            font-size: 13.5px;
+            line-height: 1.6;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        ul {
+            list-style: none;
+        }
+
+        ::selection {
+            background: var(--orange-glow);
+            color: var(--black);
+        }
+
+        /* =============================================
+                   LAYOUT SHELL
+                ============================================= */
+        .app-shell {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* =============================================
+                   SIDEBAR
+                ============================================= */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: var(--sidebar-width);
+            height: 100vh;
+            background: var(--bg-surface);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            z-index: 100;
+            transition: transform 0.25s var(--ease), box-shadow 0.25s var(--ease);
+            overflow: hidden;
+        }
+
+        /* ── Logo ── */
+        .sidebar-logo {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            padding: 0 18px;
+            height: var(--topbar-height);
+            flex-shrink: 0;
+        }
+
+        .logo-mark {
+            width: 34px;
+            height: 34px;
+            background: var(--orange);
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            box-shadow: 0 2px 8px rgba(249,115,22,0.25);
+        }
+
+            .logo-mark svg {
+                width: 18px;
+                height: 18px;
+                fill: #fff;
+            }
+
+        .logo-text {
+            display: flex;
+            flex-direction: column;
+            line-height: 1.1;
+        }
+
+            .logo-text .name {
+                font-family: var(--font-display);
+                font-size: 15.5px;
+                font-weight: 800;
+                letter-spacing: 0.04em;
+                text-transform: uppercase;
+                color: var(--black);
+            }
+
+            .logo-text .tag {
+                font-size: 9.5px;
+                font-weight: 600;
+                letter-spacing: 0.12em;
+                text-transform: uppercase;
+                color: var(--orange);
+            }
+
+        /* ── Nav ── */
+        .sidebar-nav {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px 0;
+            scrollbar-width: none;
+        }
+
+            .sidebar-nav::-webkit-scrollbar {
+                display: none;
+            }
+
+        .nav-section {
+            margin-bottom: 2px;
+        }
+
+        .nav-section-label {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            padding: 14px 18px 6px;
+            display: block;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 14px;
+            color: var(--text-secondary);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all var(--transition);
+            position: relative;
+            margin: 1px 8px;
+            border-radius: var(--radius-sm);
+        }
+
+            .nav-item i {
+                font-size: 16px;
+                width: 20px;
+                text-align: center;
+                flex-shrink: 0;
+                opacity: 0.7;
+                transition: opacity var(--transition);
+            }
+
+            .nav-item:hover {
+                background: var(--bg-raised);
+                color: var(--text-primary);
+            }
+
+                .nav-item:hover i {
+                    opacity: 1;
+                }
+
+            .nav-item.active {
+                background: var(--orange-subtle);
+                color: var(--orange);
+                font-weight: 600;
+            }
+
+                .nav-item.active i {
+                    opacity: 1;
+                }
+
+                .nav-item.active::before {
+                    content: '';
+                    position: absolute;
+                    left: -8px;
+                    top: 25%;
+                    bottom: 25%;
+                    width: 3px;
+                    background: var(--orange);
+                    border-radius: 0 3px 3px 0;
+                }
+
+        .nav-badge {
+            margin-left: auto;
+            background: var(--orange);
+            color: #fff;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 1px 6px;
+            border-radius: 20px;
+            line-height: 1.5;
+            min-width: 20px;
+            text-align: center;
+        }
+
+        /* ── Sidebar Footer ── */
+        .sidebar-footer {
+            border-top: 1px solid var(--border);
+            padding: 12px;
+            flex-shrink: 0;
+        }
+
+        .user-card {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 10px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: background var(--transition);
+        }
+
+            .user-card:hover {
+                background: var(--bg-raised);
+            }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--orange);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 700;
+            color: #fff;
+            flex-shrink: 0;
+        }
+
+        .user-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+            .user-info .user-name {
+                font-size: 12.5px;
+                font-weight: 600;
+                color: var(--text-primary);
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .user-info .user-role {
+                font-size: 11px;
+                color: var(--text-muted);
+            }
+
+        .user-card .bi-three-dots {
+            color: var(--text-faint);
+            font-size: 16px;
+            transition: color var(--transition);
+        }
+
+        .user-card:hover .bi-three-dots {
+            color: var(--text-muted);
+        }
+
+        /* =============================================
+                   TOPBAR
+                ============================================= */
+        .topbar {
+            position: fixed;
+            top: 0;
+            left: var(--sidebar-width);
+            right: 0;
+            height: var(--topbar-height);
+            background: rgba(244,244,245,0.8);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            padding: 0 24px;
+            z-index: 90;
+            gap: 12px;
+        }
+
+        .topbar-hamburger {
+            display: none;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 20px;
+            cursor: pointer;
+            padding: 4px;
+        }
+
+        .topbar-breadcrumb {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .breadcrumb-page {
+            font-family: var(--font-display);
+            font-size: 19px;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
+            color: var(--black);
+        }
+
+        .breadcrumb-sep {
+            color: var(--text-faint);
+            font-size: 14px;
+        }
+
+        .breadcrumb-sub {
+            font-size: 13px;
+            color: var(--text-muted);
+            font-weight: 400;
+        }
+
+        /* ── Topbar Actions ── */
+        .topbar-actions {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .topbar-btn {
+            width: 34px;
+            height: 34px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            background: var(--bg-surface);
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all var(--transition);
+            position: relative;
+            font-size: 15px;
+        }
+
+            .topbar-btn:hover {
+                background: var(--bg-raised);
+                color: var(--text-primary);
+                border-color: var(--border-strong);
+                box-shadow: var(--shadow-sm);
+            }
+
+        .notif-dot {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            width: 7px;
+            height: 7px;
+            background: var(--orange);
+            border-radius: 50%;
+            border: 1.5px solid var(--bg-surface);
+        }
+
+        .topbar-branch {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            padding: 0 12px;
+            height: 34px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            background: var(--bg-surface);
+            color: var(--text-secondary);
+            font-size: 12.5px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all var(--transition);
+        }
+
+            .topbar-branch:hover {
+                border-color: var(--border-strong);
+                color: var(--text-primary);
+                box-shadow: var(--shadow-sm);
+            }
+
+            .topbar-branch i {
+                font-size: 13px;
+                color: var(--orange);
+            }
+
+            .topbar-branch .chevron {
+                font-size: 10px;
+                color: var(--text-faint);
+            }
+
+        /* ── Search ── */
+        .search-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 0 12px;
+            width: 220px;
+            transition: all var(--transition);
+        }
+
+            .search-bar:focus-within {
+                border-color: var(--orange);
+                box-shadow: var(--shadow-glow);
+            }
+
+            .search-bar i {
+                color: var(--text-faint);
+                font-size: 14px;
+            }
+
+            .search-bar input {
+                background: none;
+                border: none;
+                outline: none;
+                flex: 1;
+                padding: 7px 0;
+                font-size: 12.5px;
+                font-family: var(--font-body);
+                color: var(--text-primary);
+            }
+
+                .search-bar input::placeholder {
+                    color: var(--text-muted);
+                }
+
+        /* =============================================
+                   MAIN CONTENT
+                ============================================= */
+        .main-content {
+            margin-left: var(--sidebar-width);
+            margin-top: var(--topbar-height);
+            min-height: calc(100vh - var(--topbar-height));
+            padding: 24px;
+            background: var(--bg-body);
+            animation: fadeIn 0.25s var(--ease);
+        }
+
+        /* =============================================
+                   PAGE HEADER
+                ============================================= */
+        .page-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            margin-bottom: 24px;
+            gap: 16px;
+        }
+
+        .page-title {
+            font-family: var(--font-display);
+            font-size: 26px;
+            font-weight: 800;
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
+            color: var(--black);
+            line-height: 1;
+        }
+
+        .page-subtitle {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        /* =============================================
+                   CARDS
+                ============================================= */
+        .card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .card-title {
+            font-family: var(--font-display);
+            font-size: 15px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: var(--black);
+        }
+
+        /* Stat card */
+        .stat-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 20px 22px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            box-shadow: var(--shadow-sm);
+            transition: all 0.2s var(--ease);
+        }
+
+            .stat-card:hover {
+                box-shadow: var(--shadow-md);
+                transform: translateY(-1px);
+            }
+
+            .stat-card.highlight {
+                border-color: rgba(249,115,22,0.2);
+                background: linear-gradient(135deg, var(--bg-surface) 0%, rgba(249,115,22,0.03) 100%);
+            }
+
+        .stat-icon {
+            width: 46px;
+            height: 46px;
+            border-radius: var(--radius-md);
+            background: var(--bg-raised);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            color: var(--orange);
+            flex-shrink: 0;
+        }
+
+        .stat-card.highlight .stat-icon {
+            background: var(--orange-glow);
+        }
+
+        .stat-value {
+            font-family: var(--font-display);
+            font-size: 28px;
+            font-weight: 800;
+            color: var(--black);
+            line-height: 1;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 3px;
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+
+        .stat-delta {
+            font-size: 11px;
+            font-weight: 600;
+            margin-top: 4px;
+        }
+
+            .stat-delta.up {
+                color: #16a34a;
+            }
+
+            .stat-delta.down {
+                color: #dc2626;
+            }
+
+        /* =============================================
+                   BUTTONS
+                ============================================= */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 8px 16px;
+            border-radius: var(--radius-sm);
+            font-family: var(--font-body);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all var(--transition);
+            white-space: nowrap;
+        }
+
+        .btn-primary {
+            background: var(--orange);
+            color: #fff;
+            box-shadow: 0 1px 3px rgba(249,115,22,0.2);
+        }
+
+            .btn-primary:hover {
+                background: var(--orange-dim);
+                box-shadow: 0 4px 12px rgba(249,115,22,0.25);
+                transform: translateY(-1px);
+            }
+
+        .btn-secondary {
+            background: var(--bg-surface);
+            color: var(--text-primary);
+            border: 1px solid var(--border-strong);
+        }
+
+            .btn-secondary:hover {
+                background: var(--bg-raised);
+                box-shadow: var(--shadow-sm);
+            }
+
+        .btn-ghost {
+            background: transparent;
+            color: var(--text-secondary);
+        }
+
+            .btn-ghost:hover {
+                background: var(--bg-raised);
+                color: var(--text-primary);
+            }
+
+        .btn-danger {
+            background: rgba(220,38,38,0.06);
+            color: #dc2626;
+            border: 1px solid rgba(220,38,38,0.12);
+        }
+
+            .btn-danger:hover {
+                background: rgba(220,38,38,0.1);
+            }
+
+        /* =============================================
+                   TABLE
+                ============================================= */
+        .table-wrap {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead th {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            padding: 10px 16px;
+            border-bottom: 1px solid var(--border-strong);
+            text-align: left;
+            white-space: nowrap;
+        }
+
+        tbody tr {
+            border-bottom: 1px solid var(--border);
+            transition: background var(--transition);
+        }
+
+            tbody tr:last-child {
+                border-bottom: none;
+            }
+
+            tbody tr:hover {
+                background: var(--bg-raised);
+            }
+
+        tbody td {
+            padding: 12px 16px;
+            font-size: 13px;
+            color: var(--text-primary);
+            vertical-align: middle;
+        }
+
+        /* =============================================
+                   BADGES
+                ============================================= */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 9px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+        }
+
+        .badge-active {
+            background: rgba(22,163,74,.08);
+            color: #16a34a;
+        }
+
+        .badge-inactive {
+            background: rgba(220,38,38,.08);
+            color: #dc2626;
+        }
+
+        .badge-pending {
+            background: rgba(202,138,4,.08);
+            color: #ca8a04;
+        }
+
+        .badge-orange {
+            background: var(--orange-subtle);
+            color: var(--orange);
+        }
+
+        /* =============================================
+                   FORM ELEMENTS
+                ============================================= */
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+
+        input[type=text], input[type=email], input[type=password],
+        input[type=number], input[type=date], select, textarea {
+            width: 100%;
+            background: var(--bg-surface);
+            border: 1px solid var(--border-strong);
+            border-radius: var(--radius-sm);
+            color: var(--text-primary);
+            font-family: var(--font-body);
+            font-size: 13px;
+            padding: 9px 12px;
+            transition: all var(--transition);
+            outline: none;
+        }
+
+            input:focus, select:focus, textarea:focus {
+                border-color: var(--orange);
+                box-shadow: var(--shadow-glow);
+            }
+
+        select {
+            cursor: pointer;
+        }
+
+        /* =============================================
+                   DIVIDER
+                ============================================= */
+        .divider {
+            border: none;
+            border-top: 1px solid var(--border);
+            margin: 20px 0;
+        }
+
+        /* =============================================
+                   ACCENT LINE
+                ============================================= */
+        .accent-line {
+            height: 2px;
+            background: linear-gradient(to right, var(--orange), transparent 50%);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 200;
+        }
+
+        /* =============================================
+                   SIDEBAR OVERLAY
+                ============================================= */
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.3);
+            backdrop-filter: blur(4px);
+            z-index: 99;
+        }
+
+        /* =============================================
+                   RESPONSIVE
+                ============================================= */
+        @@media (max-width: 1024px) {
+            .sidebar {
+                transform: translateX(calc(-1 * var(--sidebar-width)));
+            }
+
+                .sidebar.open {
+                    transform: translateX(0);
+                    box-shadow: var(--shadow-lg);
+                }
+
+            .sidebar-overlay.show {
+                display: block;
+            }
+
+            .topbar {
+                left: 0;
+            }
+
+            .main-content {
+                margin-left: 0;
+            }
+
+            .topbar-hamburger {
+                display: flex;
+            }
+        }
+
+        @@media (max-width: 640px) {
+            .main-content {
+                padding: 16px;
+            }
+
+            .page-title {
+                font-size: 22px;
+            }
+
+            .topbar {
+                padding: 0 16px;
+            }
+
+            .topbar-branch span {
+                display: none;
+            }
+
+            .search-bar {
+                display: none;
+            }
+        }
+
+        /* =============================================
+                   SCROLLBAR
+                ============================================= */
+        ::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--text-faint);
+            border-radius: 10px;
+        }
+
+            ::-webkit-scrollbar-thumb:hover {
+                background: var(--text-muted);
+            }
+
+        /* =============================================
+                   TOAST
+                ============================================= */
+        .toast-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 300;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .toast {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 16px;
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            font-size: 13px;
+            color: var(--text-primary);
+            box-shadow: var(--shadow-lg);
+            animation: slideUp 0.3s var(--ease);
+            min-width: 260px;
+        }
+
+            .toast.success {
+                border-left: 3px solid #16a34a;
+            }
+
+            .toast.error {
+                border-left: 3px solid #dc2626;
+            }
+
+            .toast.warning {
+                border-left: 3px solid #ca8a04;
+            }
+
+            .toast.info {
+                border-left: 3px solid var(--orange);
+            }
+
+        @@keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(12px) scale(0.97);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        @@keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(3px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+
+    @await RenderSectionAsync("Styles", required: false)
 </head>
 <body>
-    <header>
-        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
-            <div class="container-fluid">
-                <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">GymSaaS</a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
-                        aria-expanded="false" aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
-                <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
-                    <ul class="navbar-nav flex-grow-1">
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index">Home</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
-                        </li>
-                    </ul>
+
+    <div class="accent-line"></div>
+
+    <div class="app-shell">
+
+        <!-- SIDEBAR -->
+        <aside class="sidebar" id="sidebar">
+
+            <div class="sidebar-logo">
+                <div class="logo-mark">
+                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M20.57 14.86L22 13.43 20.57 12 17 15.57 8.43 7 12 3.43 10.57 2 9.14 3.43 7.71 2 5.57 4.14 4.14 2.71 2.71 4.14l1.43 1.43L2 7.71l1.43 1.43L2 10.57 3.43 12 7 8.43 15.57 17 12 20.57 13.43 22l1.43-1.43L16.29 22l2.14-2.14 1.43 1.43 1.43-1.43-1.43-1.43L22 16.29l-1.43-1.43z" />
+                    </svg>
+                </div>
+                <div class="logo-text">
+                    <span class="name">Ideal Wellness</span>
+                    <span class="tag">Management</span>
                 </div>
             </div>
-        </nav>
-    </header>
-    <div class="container">
-        <main role="main" class="pb-3">
+
+            <nav class="sidebar-nav">
+
+                <div class="nav-section">
+                    <span class="nav-section-label">Overview</span>
+                    <a asp-controller="Dashboard" asp-action="Index"
+                       class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Dashboard" ? "active" : "")">
+                        <i class="bi bi-grid-1x2"></i> Dashboard
+                    </a>
+                </div>
+
+                <div class="nav-section">
+                    <span class="nav-section-label">Operations</span>
+                    <a asp-controller="Reception" asp-action="Index"
+                       class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Reception" ? "active" : "")">
+                        <i class="bi bi-display"></i> Live Reception
+                        <span class="nav-badge" id="liveCount">0</span>
+                    </a>
+                    <a asp-controller="Attendance" asp-action="Index"
+                       class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Attendance" ? "active" : "")">
+                        <i class="bi bi-qr-code-scan"></i> Attendance Logs
+                    </a>
+                </div>
+
+                <div class="nav-section">
+                    <span class="nav-section-label">Members</span>
+                    <a asp-controller="Members" asp-action="Index"
+                       class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Members" ? "active" : "")">
+                        <i class="bi bi-people"></i> All Members
+                    </a>
+                    <a asp-controller="MemberPackages" asp-action="Index"
+                       class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "MemberPackages" ? "active" : "")">
+                        <i class="bi bi-ticket-perforated"></i> Packages
+                    </a>
+                </div>
+
+                <div class="nav-section">
+                    <span class="nav-section-label">Management</span>
+                    <a asp-controller="Branches" asp-action="Index"
+                       class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Branches" ? "active" : "")">
+                        <i class="bi bi-building"></i> Branches
+                    </a>
+                    <a asp-controller="PackageDefinitions" asp-action="Index"
+                       class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "PackageDefinitions" ? "active" : "")">
+                        <i class="bi bi-box-seam"></i> Package Catalog
+                    </a>
+                    <a asp-controller="Users" asp-action="Index"
+                       class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Users" ? "active" : "")">
+                        <i class="bi bi-person-gear"></i> Staff & Roles
+                    </a>
+                </div>
+
+                <div class="nav-section">
+                    <span class="nav-section-label">Reports</span>
+                    <a asp-controller="Reports" asp-action="Index"
+                       class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Reports" ? "active" : "")">
+                        <i class="bi bi-bar-chart-line"></i> Reports
+                    </a>
+                    <a asp-controller="Notifications" asp-action="Index"
+                       class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Notifications" ? "active" : "")">
+                        <i class="bi bi-bell"></i> Notifications
+                    </a>
+                </div>
+
+                <div class="nav-section">
+                    <span class="nav-section-label">Content</span>
+                    <a asp-controller="Exercises" asp-action="Index"
+                       class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Exercises" ? "active" : "")">
+                        <i class="bi bi-activity"></i> Exercise Library
+                    </a>
+                </div>
+
+                <div class="nav-section">
+                    <span class="nav-section-label">System</span>
+                    <a asp-controller="AuditLogs" asp-action="Index"
+                       class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "AuditLogs" ? "active" : "")">
+                        <i class="bi bi-journal-text"></i> Audit Logs
+                    </a>
+                    <a asp-controller="Settings" asp-action="Index"
+                       class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Settings" ? "active" : "")">
+                        <i class="bi bi-gear"></i> Settings
+                    </a>
+                </div>
+
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="user-card">
+                    <div class="user-avatar">
+                        @{
+                            var name = User.Identity?.Name ?? "A";
+                        }
+                        @name.Substring(0, 1).ToUpper()
+                    </div>
+                    <div class="user-info">
+                        <div class="user-name">@(User.Identity?.Name ?? "Admin")</div>
+                        <div class="user-role">@(User.IsInRole("SuperAdmin") ? "Super Admin" : User.IsInRole("Admin") ? "Admin" : User.IsInRole("BranchManager") ? "Branch Manager" : "Receptionist")</div>
+                    </div>
+                    <i class="bi bi-three-dots"></i>
+                </div>
+            </div>
+
+        </aside>
+
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+        <!-- TOPBAR -->
+        <header class="topbar">
+            <button class="topbar-hamburger" id="hamburgerBtn">
+                <i class="bi bi-list"></i>
+            </button>
+
+            <div class="topbar-breadcrumb">
+                <span class="breadcrumb-page">@(ViewData["Title"] ?? "Dashboard")</span>
+                @if (ViewData["Subtitle"] != null)
+                {
+                    <i class="bi bi-chevron-right breadcrumb-sep"></i>
+                    <span class="breadcrumb-sub">@ViewData["Subtitle"]</span>
+                }
+            </div>
+
+            <div class="topbar-actions">
+                <div class="search-bar">
+                    <i class="bi bi-search"></i>
+                    <input type="text" placeholder="Search..." />
+                </div>
+
+                <div class="topbar-branch">
+                    <i class="bi bi-building"></i>
+                    <span>@(ViewData["CurrentBranch"] ?? "All Branches")</span>
+                    <i class="bi bi-chevron-down chevron"></i>
+                </div>
+
+                <div class="topbar-btn" title="Notifications">
+                    <i class="bi bi-bell"></i>
+                    <span class="notif-dot"></span>
+                </div>
+
+                <div class="topbar-btn" id="fullscreenBtn" title="Toggle fullscreen">
+                    <i class="bi bi-fullscreen"></i>
+                </div>
+
+                <form asp-controller="Auth" asp-action="Logout" method="post" style="margin:0">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="topbar-btn" title="Logout" style="font-size:14px">
+                        <i class="bi bi-box-arrow-right"></i>
+                    </button>
+                </form>
+            </div>
+        </header>
+
+        <!-- MAIN -->
+        <main class="main-content">
             @RenderBody()
         </main>
+
     </div>
 
-    <footer class="border-top footer text-muted">
-        <div class="container">
-            &copy; 2026 - GymSaaS - <a asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
-        </div>
-    </footer>
+    <div class="toast-container" id="toastContainer"></div>
+
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="~/js/site.js" asp-append-version="true"></script>
+
+    <script>
+        const sidebar   = document.getElementById('sidebar');
+        const overlay   = document.getElementById('sidebarOverlay');
+        const hamburger = document.getElementById('hamburgerBtn');
+
+        hamburger?.addEventListener('click', () => {
+            sidebar.classList.toggle('open');
+            overlay.classList.toggle('show');
+        });
+        overlay?.addEventListener('click', () => {
+            sidebar.classList.remove('open');
+            overlay.classList.remove('show');
+        });
+
+        document.getElementById('fullscreenBtn')?.addEventListener('click', () => {
+            if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+            else document.exitFullscreen();
+        });
+
+        function showToast(message, type = 'info') {
+            const icons = {
+                success: 'bi-check-circle-fill',
+                error:   'bi-x-circle-fill',
+                warning: 'bi-exclamation-triangle-fill',
+                info:    'bi-info-circle-fill'
+            };
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `<i class="bi ${icons[type] || icons.info}" style="font-size:15px"></i>${message}`;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 3500);
+        }
+
+        @if (TempData["Toast"] != null)
+        {
+            <text>
+                    window.addEventListener('load', () => {
+                        showToast('@TempData["Toast"]', '@(TempData["ToastType"] ?? "info")');
+                    });
+            </text>
+        }
+    </script>
+
     @await RenderSectionAsync("Scripts", required: false)
+
 </body>
 </html>

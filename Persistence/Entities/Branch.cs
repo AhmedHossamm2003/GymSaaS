@@ -79,4 +79,7 @@ public partial class Branch
     [ForeignKey("TenantId")]
     [InverseProperty("Branches")]
     public virtual Tenant Tenant { get; set; } = null!;
+
+    [InverseProperty("Branch")]
+    public virtual ICollection<UserBranch> UserBranches { get; set; } = new List<UserBranch>();
 }

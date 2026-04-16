@@ -1,0 +1,704 @@
+@model GymSaaS.Models.LoginViewModel
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login — Ideal Wellness</title>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800;900&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+    <style>
+        :root {
+            --bg-dark:       #0a0a0a;
+            --bg-surface:    #111111;
+            --bg-raised:     #1a1a1a;
+            --border:        #2a2a2a;
+            --border-light:  #3a3a3a;
+            --orange:        #f97316;
+            --orange-dim:    #ea650a;
+            --orange-glow:   rgba(249,115,22,0.18);
+            --orange-subtle: rgba(249,115,22,0.08);
+            --white:         #ffffff;
+            --text-primary:  #f4f4f4;
+            --text-secondary:#9a9a9a;
+            --text-muted:    #555555;
+            --font-display:  'Barlow Condensed', sans-serif;
+            --font-body:     'Barlow', sans-serif;
+            --radius-sm:     6px;
+            --radius-md:     10px;
+            --radius-lg:     16px;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        html, body {
+            height: 100%;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            font-family: var(--font-body);
+            overflow: hidden;
+        }
+
+        /* ── PAGE LAYOUT ── */
+        .page {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            height: 100vh;
+        }
+
+        /* ── LEFT PANEL ── */
+        .left-panel {
+            position: relative;
+            background: var(--bg-surface);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 48px;
+            overflow: hidden;
+        }
+
+        /* Background grid pattern */
+        .left-panel::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image:
+                linear-gradient(var(--border) 1px, transparent 1px),
+                linear-gradient(90deg, var(--border) 1px, transparent 1px);
+            background-size: 48px 48px;
+            opacity: 0.4;
+            pointer-events: none;
+        }
+
+        /* Orange glow blob */
+        .left-panel::after {
+            content: '';
+            position: absolute;
+            bottom: -120px;
+            left: -80px;
+            width: 480px;
+            height: 480px;
+            background: radial-gradient(circle, rgba(249,115,22,0.18) 0%, transparent 65%);
+            pointer-events: none;
+        }
+
+        /* Logo */
+        .panel-logo {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .logo-mark {
+            width: 44px;
+            height: 44px;
+            background: var(--orange);
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .logo-mark svg {
+            width: 24px;
+            height: 24px;
+            fill: #fff;
+        }
+
+        .logo-text .name {
+            display: block;
+            font-family: var(--font-display);
+            font-size: 18px;
+            font-weight: 800;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--white);
+            line-height: 1;
+        }
+
+        .logo-text .tag {
+            display: block;
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--orange);
+            margin-top: 2px;
+        }
+
+        /* Center hero text */
+        .panel-hero {
+            position: relative;
+            z-index: 1;
+        }
+
+        .hero-eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--orange-subtle);
+            border: 1px solid rgba(249,115,22,0.2);
+            border-radius: 20px;
+            padding: 5px 14px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--orange);
+            margin-bottom: 24px;
+        }
+
+        .hero-eyebrow span {
+            width: 6px;
+            height: 6px;
+            background: var(--orange);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @@keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50%       { opacity: 0.5; transform: scale(0.8); }
+        }
+
+        .hero-title {
+            font-family: var(--font-display);
+            font-size: clamp(44px, 5vw, 68px);
+            font-weight: 900;
+            line-height: 0.92;
+            letter-spacing: -0.01em;
+            text-transform: uppercase;
+            color: var(--white);
+            margin-bottom: 20px;
+        }
+
+        .hero-title .accent {
+            color: var(--orange);
+            display: block;
+        }
+
+        .hero-desc {
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.7;
+            max-width: 380px;
+        }
+
+        /* Stats row */
+        .panel-stats {
+            display: flex;
+            gap: 32px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .stat-item {}
+
+        .stat-num {
+            font-family: var(--font-display);
+            font-size: 28px;
+            font-weight: 800;
+            color: var(--white);
+            line-height: 1;
+        }
+
+        .stat-num span { color: var(--orange); }
+
+        .stat-lbl {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            font-weight: 600;
+            margin-top: 3px;
+        }
+
+        /* ── RIGHT PANEL ── */
+        .right-panel {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 48px;
+            background: var(--bg-dark);
+            position: relative;
+        }
+
+        /* Subtle top-right glow */
+        .right-panel::before {
+            content: '';
+            position: absolute;
+            top: -100px;
+            right: -100px;
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(circle, rgba(249,115,22,0.06) 0%, transparent 65%);
+            pointer-events: none;
+        }
+
+        /* ── FORM CARD ── */
+        .form-card {
+            width: 100%;
+            max-width: 420px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .form-header {
+            margin-bottom: 36px;
+        }
+
+        .form-eyebrow {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+        }
+
+        .form-title {
+            font-family: var(--font-display);
+            font-size: 36px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            color: var(--white);
+            line-height: 1;
+            margin-bottom: 8px;
+        }
+
+        .form-subtitle {
+            font-size: 13.5px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        /* ── FORM FIELDS ── */
+        .field {
+            margin-bottom: 20px;
+        }
+
+        .field-label {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .field-label label {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .field-input {
+            position: relative;
+        }
+
+        .field-input i {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 16px;
+            color: var(--text-muted);
+            pointer-events: none;
+            transition: color 0.2s;
+        }
+
+        .field-input input {
+            width: 100%;
+            background: var(--bg-raised);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+            font-family: var(--font-body);
+            font-size: 14px;
+            padding: 12px 44px 12px 44px;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .field-input input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .field-input input:focus {
+            border-color: var(--orange);
+            box-shadow: 0 0 0 3px var(--orange-glow);
+        }
+
+        .field-input input:focus + i,
+        .field-input:focus-within i:first-child {
+            color: var(--orange);
+        }
+
+        /* Eye toggle */
+        .eye-toggle {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 16px;
+            padding: 2px;
+            transition: color 0.2s;
+            z-index: 1;
+        }
+        .eye-toggle:hover { color: var(--text-secondary); }
+
+        /* Validation error */
+        .field-error {
+            font-size: 12px;
+            color: #f87171;
+            margin-top: 6px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        /* Remember me row */
+        .form-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 28px;
+        }
+
+        .checkbox-wrap {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+
+        .checkbox-wrap input[type=checkbox] {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--orange);
+            cursor: pointer;
+        }
+
+        .checkbox-wrap span {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        /* Submit button */
+        .btn-login {
+            width: 100%;
+            background: var(--orange);
+            color: #fff;
+            border: none;
+            border-radius: var(--radius-md);
+            font-family: var(--font-display);
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 14px;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-login::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, transparent 60%);
+            pointer-events: none;
+        }
+
+        .btn-login:hover {
+            background: var(--orange-dim);
+            box-shadow: 0 8px 32px rgba(249,115,22,0.35);
+            transform: translateY(-1px);
+        }
+
+        .btn-login:active {
+            transform: translateY(0);
+        }
+
+        .btn-login.loading .btn-text { opacity: 0; }
+        .btn-login.loading .btn-spinner { display: block; }
+        .btn-spinner {
+            display: none;
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            position: absolute;
+        }
+
+        @@keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Error alert */
+        .alert-error {
+            background: rgba(239,68,68,0.08);
+            border: 1px solid rgba(239,68,68,0.2);
+            border-radius: var(--radius-md);
+            padding: 12px 16px;
+            font-size: 13px;
+            color: #f87171;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 24px;
+            animation: shakeX 0.4s ease;
+        }
+
+        @@keyframes shakeX {
+            0%, 100% { transform: translateX(0); }
+            20%       { transform: translateX(-6px); }
+            40%       { transform: translateX(6px); }
+            60%       { transform: translateX(-4px); }
+            80%       { transform: translateX(4px); }
+        }
+
+        /* Footer note */
+        .form-footer {
+            text-align: center;
+            margin-top: 28px;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .form-footer span { color: var(--orange); }
+
+        /* Orange accent top line */
+        .accent-line {
+            height: 3px;
+            background: linear-gradient(to right, var(--orange), transparent);
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            z-index: 200;
+        }
+
+        /* ── RESPONSIVE ── */
+        @@media (max-width: 900px) {
+            .page { grid-template-columns: 1fr; }
+            .left-panel { display: none; }
+            .right-panel { padding: 32px 24px; }
+        }
+
+        /* Entrance animation */
+        .form-card {
+            animation: fadeUp 0.4s ease both;
+        }
+
+        @@keyframes fadeUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+
+<div class="accent-line"></div>
+
+<div class="page">
+
+    <!-- ═══════════════════════════
+         LEFT PANEL
+    ════════════════════════════ -->
+    <div class="left-panel">
+
+        <div class="panel-logo">
+            <div class="logo-mark">
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M20.57 14.86L22 13.43 20.57 12 17 15.57 8.43 7 12 3.43 10.57 2 9.14 3.43 7.71 2 5.57 4.14 4.14 2.71 2.71 4.14l1.43 1.43L2 7.71l1.43 1.43L2 10.57 3.43 12 7 8.43 15.57 17 12 20.57 13.43 22l1.43-1.43L16.29 22l2.14-2.14 1.43 1.43 1.43-1.43-1.43-1.43L22 16.29l-1.43-1.43z"/>
+                </svg>
+            </div>
+            <div class="logo-text">
+                <span class="name">Ideal Wellness</span>
+                <span class="tag">Management Platform</span>
+            </div>
+        </div>
+
+        <div class="panel-hero">
+            <div class="hero-eyebrow">
+                <span></span>
+                System Active
+            </div>
+            <h1 class="hero-title">
+                Run Your
+                <span class="accent">Gym.</span>
+                Your Way.
+            </h1>
+            <p class="hero-desc">
+                Full control over members, packages, attendance, and branches — all from one place built for gym operators.
+            </p>
+        </div>
+
+        <div class="panel-stats">
+            <div class="stat-item">
+                <div class="stat-num">500<span>+</span></div>
+                <div class="stat-lbl">Members</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-num">Real<span>-</span>time</div>
+                <div class="stat-lbl">Attendance</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-num">Multi<span>-</span>Branch</div>
+                <div class="stat-lbl">Ready</div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ═══════════════════════════
+         RIGHT PANEL — FORM
+    ════════════════════════════ -->
+    <div class="right-panel">
+        <div class="form-card">
+
+            <div class="form-header">
+                <div class="form-eyebrow">Staff Portal</div>
+                <h2 class="form-title">Welcome Back</h2>
+                <p class="form-subtitle">Sign in with your admin credentials to access the dashboard.</p>
+            </div>
+
+            @* Error alert *@
+                @if (!ViewData.ModelState.IsValid)
+                {
+                    <div class="alert-error">
+                        <i class="bi bi-exclamation-circle"></i>
+                        <div asp-validation-summary="ModelOnly"></div>
+                    </div>
+                }
+
+            @if (TempData["Error"] != null)
+            {
+                <div class="alert-error">
+                    <i class="bi bi-exclamation-circle"></i>
+                    @TempData["Error"]
+                </div>
+            }
+
+            <form asp-controller="Auth" asp-action="Login" method="post" id="loginForm">
+                @Html.AntiForgeryToken()
+
+                @* Email *@
+                <div class="field">
+                    <div class="field-label">
+                        <label asp-for="Email">Email Address</label>
+                    </div>
+                    <div class="field-input">
+                        <i class="bi bi-envelope"></i>
+                        <input asp-for="Email"
+                               type="email"
+                               placeholder="admin@idealwellness.com"
+                               autocomplete="email"
+                               autofocus />
+                    </div>
+                        <span class="field-error">
+                            <i class="bi bi-exclamation-circle"></i>
+                            @Html.ValidationMessageFor(m => m.Email, "", new { @class = "field-error-text" })
+                        </span>
+                </div>
+
+                @* Password *@
+                <div class="field">
+                    <div class="field-label">
+                        <label asp-for="Password">Password</label>
+                    </div>
+                    <div class="field-input">
+                        <i class="bi bi-lock"></i>
+                        <input asp-for="Password"
+                               type="password"
+                               id="passwordInput"
+                               placeholder="••••••••••"
+                               autocomplete="current-password" />
+                        <button type="button" class="eye-toggle" id="eyeToggle" tabindex="-1">
+                            <i class="bi bi-eye" id="eyeIcon"></i>
+                        </button>
+                    </div>
+                        <span class="field-error">
+                            <i class="bi bi-exclamation-circle"></i>
+                            @Html.ValidationMessageFor(m => m.Password, "", new { @class = "field-error-text" })
+                        </span>
+                </div>
+
+                @* Remember me *@
+                <div class="form-row">
+                    <label class="checkbox-wrap">
+                        <input asp-for="RememberMe" type="checkbox" />
+                        <span>Keep me signed in</span>
+                    </label>
+                </div>
+
+                @* Submit *@
+                <button type="submit" class="btn-login" id="loginBtn">
+                    <span class="btn-text">
+                        <i class="bi bi-arrow-right-circle"></i>
+                        Sign In
+                    </span>
+                    <span class="btn-spinner"></span>
+                </button>
+
+            </form>
+
+            <div class="form-footer">
+                Ideal Wellness Gym &mdash; <span>Staff Access Only</span>
+            </div>
+
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // Password show/hide
+    const passwordInput = document.getElementById('passwordInput');
+    const eyeToggle     = document.getElementById('eyeToggle');
+    const eyeIcon       = document.getElementById('eyeIcon');
+
+    eyeToggle?.addEventListener('click', () => {
+        const isPassword = passwordInput.type === 'password';
+        passwordInput.type = isPassword ? 'text' : 'password';
+        eyeIcon.className  = isPassword ? 'bi bi-eye-slash' : 'bi bi-eye';
+    });
+
+    // Loading state on submit
+    document.getElementById('loginForm')?.addEventListener('submit', function() {
+        const btn = document.getElementById('loginBtn');
+        btn.classList.add('loading');
+        btn.disabled = true;
+    });
+
+    // Focus glow on icon
+    document.querySelectorAll('.field-input input').forEach(input => {
+        input.addEventListener('focus', () => {
+            input.closest('.field-input').querySelector('i')?.style.setProperty('color', 'var(--orange)');
+        });
+        input.addEventListener('blur', () => {
+            input.closest('.field-input').querySelector('i')?.style.setProperty('color', 'var(--text-muted)');
+        });
+    });
+</script>
+
+</body>
+</html>

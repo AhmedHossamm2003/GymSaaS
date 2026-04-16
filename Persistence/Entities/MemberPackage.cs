@@ -84,6 +84,13 @@ public partial class MemberPackage
 
     public Guid? CancelledByUserId { get; set; }
 
+    public Guid? LinkedPackageGroupId { get; set; }
+
+    public int OpenGymDailyLimit { get; set; }
+
+    [StringLength(20)]
+    public string? PackageComponentRole { get; set; }
+
     [InverseProperty("MemberPackage")]
     public virtual ICollection<AttendanceRecord> AttendanceRecords { get; set; } = new List<AttendanceRecord>();
 

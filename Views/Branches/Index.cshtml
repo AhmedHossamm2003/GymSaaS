@@ -1,0 +1,305 @@
+@model List<GymSaaS.Models.BranchListItem>
+@{
+    ViewData["Title"] = "Branches";
+    var search = ViewData["Search"] as string ?? "";
+}
+
+@section Styles {
+<style>
+    .branches-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+        gap: 16px;
+    }
+
+    .branch-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--r-lg);
+        box-shadow: var(--sh-sm);
+        overflow: hidden;
+        transition: box-shadow .2s, transform .2s;
+        display: flex;
+        flex-direction: column;
+    }
+    .branch-card:hover {
+        box-shadow: var(--sh-md);
+        transform: translateY(-2px);
+    }
+    .branch-card.inactive { opacity: .65; }
+
+    .bc-top {
+        padding: 18px 20px 14px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+    }
+
+    .bc-icon {
+        width: 42px; height: 42px;
+        border-radius: var(--r-sm);
+        background: var(--fire-soft);
+        border: 1px solid var(--fire-border);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        color: var(--fire);
+        flex-shrink: 0;
+    }
+
+    .bc-name-wrap { flex: 1; min-width: 0; }
+
+    .bc-name {
+        font-family: var(--font-display);
+        font-size: 15px;
+        font-weight: 800;
+        letter-spacing: .02em;
+        color: var(--t1);
+        text-transform: uppercase;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .bc-code {
+        display: inline-block;
+        font-size: 10.5px;
+        font-weight: 700;
+        letter-spacing: .12em;
+        color: var(--t3);
+        margin-top: 3px;
+        text-transform: uppercase;
+    }
+
+    .bc-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        border-bottom: 1px solid var(--border);
+    }
+
+    .bc-stat {
+        padding: 14px 16px;
+        text-align: center;
+        border-right: 1px solid var(--border);
+    }
+    .bc-stat:last-child { border-right: none; }
+
+    .bc-stat-val {
+        font-family: var(--font-display);
+        font-size: 22px;
+        font-weight: 800;
+        color: var(--t1);
+        line-height: 1;
+    }
+    .bc-stat-val.fire { color: var(--fire); }
+
+    .bc-stat-lbl {
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: .1em;
+        text-transform: uppercase;
+        color: var(--t3);
+        margin-top: 3px;
+    }
+
+    .bc-info {
+        padding: 14px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        flex: 1;
+    }
+
+    .bc-info-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12.5px;
+        color: var(--t2);
+    }
+    .bc-info-row i { font-size: 13px; color: var(--t3); width: 16px; text-align: center; }
+
+    .bc-foot {
+        padding: 12px 20px;
+        border-top: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: var(--surface-2);
+    }
+
+    /* Empty state */
+    .empty-state {
+        grid-column: 1 / -1;
+        text-align: center;
+        padding: 60px 24px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--r-lg);
+        box-shadow: var(--sh-sm);
+    }
+    .empty-icon {
+        width: 64px; height: 64px;
+        border-radius: var(--r-lg);
+        background: var(--fire-soft);
+        border: 1px solid var(--fire-border);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 28px; color: var(--fire);
+        margin: 0 auto 16px;
+    }
+    .empty-state h3 {
+        font-family: var(--font-display);
+        font-size: 18px; font-weight: 800;
+        text-transform: uppercase; letter-spacing: .03em;
+        color: var(--t1); margin-bottom: 6px;
+    }
+    .empty-state p { font-size: 13px; color: var(--t2); margin-bottom: 20px; }
+</style>
+}
+
+<!-- Page header -->
+<div class="page-header">
+    <div>
+        <div class="page-title">Branches</div>
+        <div class="page-sub">@Model.Count branch@(Model.Count != 1 ? "es" : "") found</div>
+    </div>
+    <a asp-action="Create" class="btn btn-primary">
+        <i class="bi bi-plus-lg"></i> New Branch
+    </a>
+</div>
+
+<!-- Toolbar -->
+<div style="display:flex; align-items:center; gap:10px; margin-bottom:20px; flex-wrap:wrap;">
+    <form method="get" asp-action="Index" style="flex:1; min-width:200px; max-width:320px;">
+        <div class="search-bar">
+            <i class="bi bi-search"></i>
+            <input type="text" name="search" value="@search" placeholder="Search branches..." />
+        </div>
+    </form>
+    @if (!string.IsNullOrEmpty(search))
+    {
+        <a asp-action="Index" class="btn btn-ghost" style="font-size:12.5px;">
+            <i class="bi bi-x"></i> Clear
+        </a>
+    }
+    <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
+        <span style="font-size:12px; color:var(--t3);">
+            <span style="color:var(--green); font-weight:600;">@Model.Count(b => b.IsActive)</span> active
+            &nbsp;·&nbsp;
+            <span style="color:var(--t3);">@Model.Count(b => !b.IsActive)</span> inactive
+        </span>
+    </div>
+</div>
+
+<!-- Grid -->
+<div class="branches-grid">
+
+    @if (!Model.Any())
+    {
+        <div class="empty-state">
+            <div class="empty-icon"><i class="bi bi-building"></i></div>
+            <h3>No Branches Yet</h3>
+            <p>Add your first branch to start managing attendance and members.</p>
+            <a asp-action="Create" class="btn btn-primary">
+                <i class="bi bi-plus-lg"></i> Add First Branch
+            </a>
+        </div>
+    }
+    else
+    {
+        @foreach (var b in Model)
+        {
+            <div class="branch-card @(!b.IsActive ? "inactive" : "")">
+
+                <!-- Top -->
+                <div class="bc-top">
+                    <div class="bc-icon"><i class="bi bi-building"></i></div>
+                    <div class="bc-name-wrap">
+                        <div class="bc-name">@b.BranchName</div>
+                        <span class="bc-code">@b.BranchCode</span>
+                    </div>
+                    @if (b.IsActive)
+                    {
+                        <span class="badge badge-active">Active</span>
+                    }
+                    else
+                    {
+                        <span class="badge badge-inactive">Inactive</span>
+                    }
+                </div>
+
+                <!-- Stats row -->
+                <div class="bc-stats">
+                    <div class="bc-stat">
+                        <div class="bc-stat-val">@b.MemberCount</div>
+                        <div class="bc-stat-lbl">Members</div>
+                    </div>
+                    <div class="bc-stat">
+                        <div class="bc-stat-val">@b.TodayCheckins</div>
+                        <div class="bc-stat-lbl">Today</div>
+                    </div>
+                    <div class="bc-stat">
+                        <div class="bc-stat-val fire">@b.InsideNow</div>
+                        <div class="bc-stat-lbl">Inside Now</div>
+                    </div>
+                </div>
+
+                <!-- Info -->
+                <div class="bc-info">
+                    @if (b.City != "—" || b.Country != "—")
+                    {
+                        <div class="bc-info-row">
+                            <i class="bi bi-geo-alt"></i>
+                            <span>@(b.City != "—" ? b.City : "") @(b.Country != "—" ? $"· {b.Country}" : "")</span>
+                        </div>
+                    }
+                    @if (b.ContactPhone != "—")
+                    {
+                        <div class="bc-info-row">
+                            <i class="bi bi-telephone"></i>
+                            <span>@b.ContactPhone</span>
+                        </div>
+                    }
+                    @if (b.ContactEmail != "—")
+                    {
+                        <div class="bc-info-row">
+                            <i class="bi bi-envelope"></i>
+                            <span>@b.ContactEmail</span>
+                        </div>
+                    }
+                    <div class="bc-info-row">
+                        <i class="bi bi-calendar3"></i>
+                        <span>Added @b.CreatedAtUtc.ToString("MMM d, yyyy")</span>
+                    </div>
+                </div>
+
+                <!-- Footer actions -->
+                <div class="bc-foot">
+                    <div style="display:flex; gap:6px;">
+                        <a asp-action="Details" asp-route-id="@b.BranchId" class="btn btn-ghost" style="padding:6px 10px; font-size:12px;">
+                            <i class="bi bi-eye"></i> View
+                        </a>
+                        <a asp-action="Edit" asp-route-id="@b.BranchId" class="btn btn-secondary" style="padding:6px 10px; font-size:12px;">
+                            <i class="bi bi-pencil"></i> Edit
+                        </a>
+                    </div>
+                    <form asp-action="ToggleStatus" asp-route-id="@b.BranchId" method="post">
+                        @Html.AntiForgeryToken()
+                        <button type="submit"
+                                class="btn @(b.IsActive ? "btn-danger" : "btn-secondary")"
+                                style="padding:6px 10px; font-size:12px;"
+                                onclick="return confirm('@(b.IsActive ? "Deactivate" : "Activate") this branch?')">
+                            <i class="bi bi-@(b.IsActive ? "pause-circle" : "play-circle")"></i>
+                            @(b.IsActive ? "Deactivate" : "Activate")
+                        </button>
+                    </form>
+                </div>
+
+            </div>
+        }
+    }
+
+</div>

@@ -40,9 +40,15 @@ public partial class GymDbContext : DbContext
 
     public virtual DbSet<PackageType> PackageTypes { get; set; }
 
+    public virtual DbSet<Role> Roles { get; set; }
+
     public virtual DbSet<Tenant> Tenants { get; set; }
 
     public virtual DbSet<User> Users { get; set; }
+
+    public virtual DbSet<UserBranch> UserBranches { get; set; }
+
+    public virtual DbSet<UserRole> UserRoles { get; set; }
 
     public virtual DbSet<VwActiveMemberPackage> VwActiveMemberPackages { get; set; }
 
@@ -186,6 +192,7 @@ public partial class GymDbContext : DbContext
         {
             entity.Property(e => e.MemberPackageId).HasDefaultValueSql("(newsequentialid())");
             entity.Property(e => e.CreatedAtUtc).HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.OpenGymDailyLimit).HasDefaultValue(1);
 
             entity.HasOne(d => d.BranchAccessPolicyType).WithMany(p => p.MemberPackages)
                 .OnDelete(DeleteBehavior.ClientSetNull)
@@ -236,6 +243,7 @@ public partial class GymDbContext : DbContext
             entity.Property(e => e.AllowQueuedRenewal).HasDefaultValue(true);
             entity.Property(e => e.CreatedAtUtc).HasDefaultValueSql("(sysutcdatetime())");
             entity.Property(e => e.IsActive).HasDefaultValue(true);
+            entity.Property(e => e.OpenGymDailyLimit).HasDefaultValue(1);
 
             entity.HasOne(d => d.BranchAccessPolicyType).WithMany(p => p.PackageDefinitions)
                 .OnDelete(DeleteBehavior.ClientSetNull)
@@ -259,6 +267,12 @@ public partial class GymDbContext : DbContext
             entity.Property(e => e.PackageTypeId).HasDefaultValueSql("(newsequentialid())");
         });
 
+        modelBuilder.Entity<Role>(entity =>
+        {
+            entity.Property(e => e.RoleId).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.CreatedAtUtc).HasDefaultValueSql("(sysutcdatetime())");
+        });
+
         modelBuilder.Entity<Tenant>(entity =>
         {
             entity.Property(e => e.TenantId).HasDefaultValueSql("(newsequentialid())");
@@ -278,6 +292,35 @@ public partial class GymDbContext : DbContext
             entity.HasOne(d => d.Tenant).WithMany(p => p.Users)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_Users_Tenants");
+        });
+
+        modelBuilder.Entity<UserBranch>(entity =>
+        {
+            entity.Property(e => e.UserBranchId).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.AssignedAtUtc).HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+
+            entity.HasOne(d => d.Branch).WithMany(p => p.UserBranches)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_UserBranches_Branches");
+
+            entity.HasOne(d => d.User).WithMany(p => p.UserBranches)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_UserBranches_Users");
+        });
+
+        modelBuilder.Entity<UserRole>(entity =>
+        {
+            entity.Property(e => e.UserRoleId).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.AssignedAtUtc).HasDefaultValueSql("(sysutcdatetime())");
+
+            entity.HasOne(d => d.Role).WithMany(p => p.UserRoles)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_UserRoles_Roles");
+
+            entity.HasOne(d => d.User).WithMany(p => p.UserRoles)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_UserRoles_Users");
         });
 
         modelBuilder.Entity<VwActiveMemberPackage>(entity =>

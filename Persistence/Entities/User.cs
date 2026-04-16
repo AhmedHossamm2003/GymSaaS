@@ -93,4 +93,10 @@ public partial class User
     [ForeignKey("TenantId")]
     [InverseProperty("Users")]
     public virtual Tenant Tenant { get; set; } = null!;
+
+    [InverseProperty("User")]
+    public virtual ICollection<UserBranch> UserBranches { get; set; } = new List<UserBranch>();
+
+    [InverseProperty("User")]
+    public virtual ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
 }

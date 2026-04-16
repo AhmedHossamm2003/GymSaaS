@@ -1,0 +1,379 @@
+@model GymSaaS.Models.BranchFormViewModel
+@{
+    bool isEdit = Model.IsEdit;
+    ViewData["Title"] = "Branches";
+    ViewData["Subtitle"] = isEdit ? "Edit Branch" : "New Branch";
+    string submitIcon = isEdit ? "check-lg" : "plus-lg";
+    string submitLabel = isEdit ? "Save Changes" : "Create Branch";
+}
+
+@section Styles {
+    <style>
+        .form-shell {
+            max-width: 780px;
+        }
+
+        .form-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--r-lg);
+            box-shadow: var(--sh-sm);
+            overflow: hidden;
+            margin-bottom: 16px;
+        }
+
+        .form-section-head {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 16px 22px;
+            border-bottom: 1px solid var(--border);
+            background: var(--surface-2);
+        }
+
+        .form-section-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: var(--r-xs);
+            background: var(--fire-soft);
+            border: 1px solid var(--fire-border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 15px;
+            color: var(--fire);
+            flex-shrink: 0;
+        }
+
+        .form-section-title {
+            font-family: var(--font-display);
+            font-size: 12.5px;
+            font-weight: 700;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            color: var(--t1);
+        }
+
+        .form-body {
+            padding: 22px;
+        }
+
+        .form-grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .form-grid-3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 16px;
+        }
+
+        @@media (max-width: 640px) {
+            .form-grid-2, .form-grid-3 {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .field-hint {
+            font-size: 11.5px;
+            color: var(--t3);
+            margin-top: 5px;
+        }
+
+        .field-error {
+            font-size: 11.5px;
+            color: var(--red);
+            margin-top: 5px;
+            display: none;
+        }
+
+            .field-error.visible {
+                display: block;
+            }
+
+        /* Auto-code display badge */
+        .code-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: var(--r-sm);
+            padding: 8px 13px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--t2);
+            letter-spacing: .06em;
+            font-family: monospace;
+        }
+
+            .code-badge i {
+                color: var(--t3);
+            }
+
+        /* Toggle switch */
+        .toggle-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 0;
+            border-top: 1px solid var(--border);
+            margin-top: 6px;
+        }
+
+        .toggle-label {
+            display: flex;
+            flex-direction: column;
+        }
+
+            .toggle-label .tl-title {
+                font-size: 13.5px;
+                font-weight: 600;
+                color: var(--t1);
+            }
+
+            .toggle-label .tl-sub {
+                font-size: 12px;
+                color: var(--t3);
+                margin-top: 2px;
+            }
+
+        .toggle-switch {
+            position: relative;
+            width: 44px;
+            height: 24px;
+            flex-shrink: 0;
+        }
+
+            .toggle-switch input {
+                opacity: 0;
+                width: 0;
+                height: 0;
+                position: absolute;
+                padding: 0;
+            }
+
+        .toggle-track {
+            position: absolute;
+            inset: 0;
+            background: var(--border-strong);
+            border-radius: 24px;
+            cursor: pointer;
+            transition: background .2s;
+        }
+
+            .toggle-track::after {
+                content: '';
+                position: absolute;
+                width: 18px;
+                height: 18px;
+                background: #fff;
+                border-radius: 50%;
+                top: 3px;
+                left: 3px;
+                transition: transform .2s;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+            }
+
+        .toggle-switch input:checked + .toggle-track {
+            background: var(--fire);
+        }
+
+            .toggle-switch input:checked + .toggle-track::after {
+                transform: translateX(20px);
+            }
+
+        .form-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding-top: 4px;
+        }
+    </style>
+}
+
+<!-- Back link -->
+<div style="margin-bottom:20px;">
+    <a asp-action="Index" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;color:var(--t2);">
+        <i class="bi bi-arrow-left" style="font-size:14px;"></i>
+        Back to Branches
+    </a>
+</div>
+
+<!-- Page header -->
+<div class="page-header">
+    <div>
+        <div class="page-title">@(isEdit ? "Edit Branch" : "New Branch")</div>
+        <div class="page-sub">@(isEdit ? "Update branch information and settings." : "Fill in the details to add a new branch.")</div>
+    </div>
+</div>
+
+<form asp-action="@(isEdit ? "Edit" : "Create")" asp-route-id="@Model.BranchId" method="post" class="form-shell">
+    @Html.AntiForgeryToken()
+
+    <!-- Hidden BranchCode for edit (readonly, passed as hidden) -->
+    @if (isEdit)
+    {
+        <input type="hidden" asp-for="BranchCode" />
+    }
+
+    <!-- Section 1: Identity -->
+    <div class="form-card">
+        <div class="form-section-head">
+            <div class="form-section-icon"><i class="bi bi-building"></i></div>
+            <span class="form-section-title">Branch Identity</span>
+        </div>
+        <div class="form-body">
+
+            <!-- Branch Code — auto on create, readonly display on edit -->
+            <div class="field" style="margin-bottom:16px;">
+                <label class="field-label">Branch Code</label>
+                @if (isEdit)
+                {
+                    <div class="code-badge">
+                        <i class="bi bi-lock"></i>
+                        @Model.BranchCode
+                    </div>
+                    <div class="field-hint">Branch code is assigned automatically and cannot be changed.</div>
+                }
+                else
+                {
+                    <div class="code-badge">
+                        <i class="bi bi-magic"></i>
+                        Auto-generated on save
+                    </div>
+                    <div class="field-hint">A unique branch code will be assigned automatically when you create this branch.</div>
+                }
+            </div>
+
+            <!-- Branch Name -->
+            <div class="field">
+                <label class="field-label" asp-for="BranchName">Branch Name</label>
+                <input asp-for="BranchName" type="text" placeholder="e.g. Ideal Wellness — Cairo" />
+                @if (!ViewData.ModelState.IsValid && ViewData.ModelState["BranchName"]?.Errors.Count > 0)
+                {
+                    <div class="field-error visible">@ViewData.ModelState["BranchName"]!.Errors[0].ErrorMessage</div>
+                }
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Section 2: Location -->
+    <div class="form-card">
+        <div class="form-section-head">
+            <div class="form-section-icon"><i class="bi bi-geo-alt"></i></div>
+            <span class="form-section-title">Location</span>
+        </div>
+        <div class="form-body">
+
+            <div class="field">
+                <label class="field-label" asp-for="AddressLine1">Address Line 1</label>
+                <input asp-for="AddressLine1" type="text" placeholder="Street address" />
+            </div>
+
+            <div class="field">
+                <label class="field-label" asp-for="AddressLine2">Address Line 2</label>
+                <input asp-for="AddressLine2" type="text" placeholder="Floor, building, district (optional)" />
+            </div>
+
+            <div class="form-grid-3">
+                <div class="field">
+                    <label class="field-label" asp-for="City">City</label>
+                    <input asp-for="City" type="text" placeholder="Cairo" />
+                </div>
+                <div class="field">
+                    <label class="field-label" asp-for="StateProvince">State / Province</label>
+                    <input asp-for="StateProvince" type="text" placeholder="Cairo Governorate" />
+                </div>
+                <div class="field">
+                    <label class="field-label" asp-for="Country">Country</label>
+                    <input asp-for="Country" type="text" placeholder="Egypt" />
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Section 3: Contact -->
+    <div class="form-card">
+        <div class="form-section-head">
+            <div class="form-section-icon"><i class="bi bi-telephone"></i></div>
+            <span class="form-section-title">Contact</span>
+        </div>
+        <div class="form-body">
+            <div class="form-grid-2">
+
+                <div class="field">
+                    <label class="field-label" asp-for="ContactPhone">Phone Number</label>
+                    <input asp-for="ContactPhone" type="text" placeholder="+20 100 000 0000" />
+                </div>
+
+                <div class="field">
+                    <label class="field-label" asp-for="ContactEmail">Email Address</label>
+                    <input asp-for="ContactEmail" type="email" placeholder="branch@idealwellness.com" />
+                    @if (!ViewData.ModelState.IsValid && ViewData.ModelState["ContactEmail"]?.Errors.Count > 0)
+                    {
+                        <div class="field-error visible">@ViewData.ModelState["ContactEmail"]!.Errors[0].ErrorMessage</div>
+                    }
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Section 4: Settings -->
+    <div class="form-card">
+        <div class="form-section-head">
+            <div class="form-section-icon"><i class="bi bi-sliders"></i></div>
+            <span class="form-section-title">Settings</span>
+        </div>
+        <div class="form-body">
+
+            <div class="field">
+                <label class="field-label" asp-for="MemberPresenceWindowMinutes">
+                    Presence Window (minutes)
+                </label>
+                <input asp-for="MemberPresenceWindowMinutes"
+                       type="number"
+                       min="15"
+                       max="480"
+                       style="max-width:160px;" />
+                <div class="field-hint">
+                    How long a member is counted as "inside" after scanning. Default is 120 minutes.
+                </div>
+                @if (!ViewData.ModelState.IsValid && ViewData.ModelState["MemberPresenceWindowMinutes"]?.Errors.Count > 0)
+                {
+                    <div class="field-error visible">@ViewData.ModelState["MemberPresenceWindowMinutes"]!.Errors[0].ErrorMessage</div>
+                }
+            </div>
+
+            <div class="toggle-row">
+                <div class="toggle-label">
+                    <span class="tl-title">Branch Active</span>
+                    <span class="tl-sub">Inactive branches cannot receive member check-ins.</span>
+                </div>
+                <label class="toggle-switch">
+                    <input asp-for="IsActive" type="checkbox" />
+                    <span class="toggle-track"></span>
+                </label>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="form-footer">
+        <a asp-action="Index" class="btn btn-ghost">
+            <i class="bi bi-x"></i> Cancel
+        </a>
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-@submitIcon"></i>
+            @submitLabel
+        </button>
+    </div>
+
+</form>

@@ -62,6 +62,10 @@ public partial class PackageDefinition
 
     public Guid? UpdatedByUserId { get; set; }
 
+    public int? OpenGymDurationDays { get; set; }
+
+    public int OpenGymDailyLimit { get; set; }
+
     [ForeignKey("BranchAccessPolicyTypeId")]
     [InverseProperty("PackageDefinitions")]
     public virtual BranchAccessPolicyType BranchAccessPolicyType { get; set; } = null!;

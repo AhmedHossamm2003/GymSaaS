@@ -1,0 +1,454 @@
+@model GymSaaS.Models.MemberFormViewModel
+@{
+    bool isEdit = Model.IsEdit;
+    string submitIcon = isEdit ? "check-lg" : "person-plus";
+    string submitLabel = isEdit ? "Save Changes" : "Create Member";
+    ViewData["Title"] = "Members";
+    ViewData["Subtitle"] = isEdit ? "Edit Member" : "New Member";
+}
+
+@section Styles {
+    <style>
+        .form-shell {
+            max-width: 800px;
+        }
+
+        .form-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--r-lg);
+            box-shadow: var(--sh-sm);
+            overflow: hidden;
+            margin-bottom: 16px;
+        }
+
+        .form-section-head {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 22px;
+            border-bottom: 1px solid var(--border);
+            background: var(--surface-2);
+        }
+
+        .form-section-icon {
+            width: 30px;
+            height: 30px;
+            border-radius: var(--r-xs);
+            background: var(--fire-soft);
+            border: 1px solid var(--fire-border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            color: var(--fire);
+            flex-shrink: 0;
+        }
+
+        .form-section-title {
+            font-family: var(--font-display);
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            color: var(--t1);
+        }
+
+        .form-body {
+            padding: 22px;
+        }
+
+        .form-grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .form-grid-3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 16px;
+        }
+
+        @@media (max-width: 640px) {
+            .form-grid-2, .form-grid-3 {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .field-hint {
+            font-size: 11.5px;
+            color: var(--t3);
+            margin-top: 5px;
+        }
+
+        .field-error {
+            font-size: 11.5px;
+            color: var(--red);
+            margin-top: 5px;
+            display: none;
+        }
+
+            .field-error.visible {
+                display: block;
+            }
+
+        /* Photo uploader */
+        .photo-upload {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .photo-preview {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: var(--fire-soft);
+            border: 2px dashed var(--fire-border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            color: var(--fire);
+            overflow: hidden;
+            flex-shrink: 0;
+            cursor: pointer;
+            transition: border-color .15s;
+            position: relative;
+        }
+
+            .photo-preview:hover {
+                border-color: var(--fire);
+            }
+
+            .photo-preview img {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                border-radius: 50%;
+            }
+
+            .photo-preview .photo-overlay {
+                position: absolute;
+                inset: 0;
+                background: rgba(249,115,22,.5);
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                opacity: 0;
+                transition: opacity .2s;
+                color: #fff;
+                font-size: 20px;
+            }
+
+            .photo-preview:hover .photo-overlay {
+                opacity: 1;
+            }
+
+        .photo-info {
+            flex: 1;
+            min-width: 140px;
+        }
+
+            .photo-info .photo-title {
+                font-size: 13px;
+                font-weight: 600;
+                color: var(--t1);
+                margin-bottom: 4px;
+            }
+
+            .photo-info .photo-hint {
+                font-size: 12px;
+                color: var(--t3);
+                line-height: 1.5;
+            }
+
+        #ProfileImage {
+            display: none;
+        }
+
+        /* Password display */
+        .pwd-box {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--canvas);
+            border: 1px solid var(--border);
+            border-radius: var(--r-sm);
+            padding: 8px 12px;
+        }
+
+            .pwd-box input {
+                flex: 1;
+                background: none;
+                border: none;
+                font-family: monospace;
+                font-size: 14px;
+                color: var(--t1);
+                padding: 0;
+            }
+
+        .pwd-toggle {
+            color: var(--t3);
+            cursor: pointer;
+            font-size: 15px;
+        }
+
+            .pwd-toggle:hover {
+                color: var(--t1);
+            }
+
+        /* Toggle */
+        .form-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding-top: 4px;
+        }
+    </style>
+}
+
+<!-- Back -->
+<div style="margin-bottom:20px;">
+    <a asp-action="Index" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;color:var(--t2);">
+        <i class="bi bi-arrow-left" style="font-size:14px;"></i>
+        Back to Members
+    </a>
+</div>
+
+<div class="page-header">
+    <div>
+        <div class="page-title">@(isEdit ? "Edit Member" : "New Member")</div>
+        <div class="page-sub">@(isEdit ? "Update member information." : "Fill in the details to register a new member.")</div>
+    </div>
+</div>
+
+<form asp-action="@(isEdit ? "Edit" : "Create")" asp-route-id="@Model.MemberId"
+      method="post" enctype="multipart/form-data" class="form-shell">
+    @Html.AntiForgeryToken()
+    @if (isEdit)
+    {
+        <input type="hidden" asp-for="ExistingImageUrl" />
+    }
+
+    <!-- Section 1: Photo + Identity -->
+    <div class="form-card">
+        <div class="form-section-head">
+            <div class="form-section-icon"><i class="bi bi-person"></i></div>
+            <span class="form-section-title">Profile</span>
+        </div>
+        <div class="form-body">
+
+            <!-- Photo uploader -->
+            <div class="photo-upload" style="margin-bottom:22px;">
+                <div class="photo-preview" onclick="document.getElementById('ProfileImage').click()" id="photoPreview">
+                    @if (!string.IsNullOrEmpty(Model.ExistingImageUrl))
+                    {
+                        <img src="@Model.ExistingImageUrl" id="photoImg" alt="Profile" />
+                    }
+                    else
+                    {
+                        <i class="bi bi-person" id="photoIcon"></i>
+                        <img id="photoImg" style="display:none;" alt="Preview" />
+                    }
+                    <div class="photo-overlay"><i class="bi bi-camera"></i></div>
+                </div>
+                <div class="photo-info">
+                    <div class="photo-title">Profile Photo</div>
+                    <div class="photo-hint">Click the circle to upload. JPG, PNG or WEBP. Recommended square, min 200×200px.</div>
+                    <input type="file" asp-for="ProfileImage" accept=".jpg,.jpeg,.png,.webp" id="ProfileImage" />
+                </div>
+            </div>
+
+            <div class="form-grid-2">
+                <div class="field">
+                    <label class="field-label" asp-for="FirstName">First Name</label>
+                    <input asp-for="FirstName" type="text" placeholder="Ahmed" />
+                    @if (!ViewData.ModelState.IsValid && ViewData.ModelState["FirstName"]?.Errors.Count > 0)
+                    {
+                        <div class="field-error visible">@ViewData.ModelState["FirstName"]!.Errors[0].ErrorMessage</div>
+                    }
+                </div>
+                <div class="field">
+                    <label class="field-label" asp-for="LastName">Last Name</label>
+                    <input asp-for="LastName" type="text" placeholder="Hassan" />
+                    @if (!ViewData.ModelState.IsValid && ViewData.ModelState["LastName"]?.Errors.Count > 0)
+                    {
+                        <div class="field-error visible">@ViewData.ModelState["LastName"]!.Errors[0].ErrorMessage</div>
+                    }
+                </div>
+            </div>
+
+            <div class="form-grid-3" style="margin-top:16px;">
+                <div class="field">
+                    <label class="field-label" asp-for="DateOfBirth">Date of Birth</label>
+                    <input asp-for="DateOfBirth" type="date" />
+                </div>
+                <div class="field">
+                    <label class="field-label" asp-for="Gender">Gender</label>
+                    <select asp-for="Gender">
+                        <option value="">— Select —</option>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label class="field-label" asp-for="HomeBranchId">Home Branch</label>
+                    <select asp-for="HomeBranchId">
+                        <option value="">— Select Branch —</option>
+                        @foreach (var b in Model.Branches)
+                        {
+                            if (Model.HomeBranchId == b.BranchId)
+                            {
+                                <option value="@b.BranchId" selected>@b.BranchName</option>
+                            }
+                            else
+                            {
+                                <option value="@b.BranchId">@b.BranchName</option>
+                            }
+                        }
+                    </select>
+                    @if (!ViewData.ModelState.IsValid && ViewData.ModelState["HomeBranchId"]?.Errors.Count > 0)
+                    {
+                        <div class="field-error visible">@ViewData.ModelState["HomeBranchId"]!.Errors[0].ErrorMessage</div>
+                    }
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Section 2: Contact -->
+    <div class="form-card">
+        <div class="form-section-head">
+            <div class="form-section-icon"><i class="bi bi-envelope"></i></div>
+            <span class="form-section-title">Contact</span>
+        </div>
+        <div class="form-body">
+            <div class="form-grid-2">
+                <div class="field">
+                    <label class="field-label" asp-for="Email">Email Address</label>
+                    <input asp-for="Email" type="email" placeholder="ahmed@example.com" />
+                    @if (!ViewData.ModelState.IsValid && ViewData.ModelState["Email"]?.Errors.Count > 0)
+                    {
+                        <div class="field-error visible">@ViewData.ModelState["Email"]!.Errors[0].ErrorMessage</div>
+                    }
+                </div>
+                <div class="field">
+                    <label class="field-label" asp-for="PhoneNumber">Phone Number</label>
+                    <input asp-for="PhoneNumber" type="text" placeholder="+20 100 000 0000" />
+                    @if (!ViewData.ModelState.IsValid && ViewData.ModelState["PhoneNumber"]?.Errors.Count > 0)
+                    {
+                        <div class="field-error visible">@ViewData.ModelState["PhoneNumber"]!.Errors[0].ErrorMessage</div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section 3: App Password (create only) -->
+    @if (!isEdit)
+    {
+        <div class="form-card">
+            <div class="form-section-head">
+                <div class="form-section-icon"><i class="bi bi-lock"></i></div>
+                <span class="form-section-title">App Password</span>
+            </div>
+            <div class="form-body">
+                <div class="field" style="max-width:340px;">
+                    <label class="field-label" asp-for="Password">Initial Password</label>
+                    <div class="pwd-box">
+                        <input asp-for="Password" type="password" id="pwdInput"
+                               placeholder="Leave blank to auto-generate" />
+                        <i class="bi bi-eye pwd-toggle" id="pwdToggle"></i>
+                    </div>
+                    <div class="field-hint">
+                        If left blank, a temporary password is auto-generated and shown after creation.
+                        Format: Name + 4 digits + ! (e.g. <strong>Ahm4821!</strong>)
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Section 4: Emergency Contact -->
+    <div class="form-card">
+        <div class="form-section-head">
+            <div class="form-section-icon"><i class="bi bi-heart-pulse"></i></div>
+            <span class="form-section-title">Emergency Contact</span>
+        </div>
+        <div class="form-body">
+            <div class="form-grid-2">
+                <div class="field">
+                    <label class="field-label" asp-for="EmergencyContactName">Contact Name</label>
+                    <input asp-for="EmergencyContactName" type="text" placeholder="Full name" />
+                </div>
+                <div class="field">
+                    <label class="field-label" asp-for="EmergencyContactPhone">Contact Phone</label>
+                    <input asp-for="EmergencyContactPhone" type="text" placeholder="+20 100 000 0000" />
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section 5: Notes -->
+    <div class="form-card">
+        <div class="form-section-head">
+            <div class="form-section-icon"><i class="bi bi-sticky"></i></div>
+            <span class="form-section-title">Notes</span>
+        </div>
+        <div class="form-body">
+            <div class="field">
+                <label class="field-label" asp-for="Notes">Internal Notes</label>
+                <textarea asp-for="Notes" rows="3"
+                          placeholder="Any notes about this member (internal use only)..."
+                          style="resize:vertical;"></textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="form-footer">
+        <a asp-action="Index" class="btn btn-ghost">
+            <i class="bi bi-x"></i> Cancel
+        </a>
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-@submitIcon"></i>
+            @submitLabel
+        </button>
+    </div>
+
+</form>
+
+@section Scripts {
+    <script>
+        // Photo preview
+        document.getElementById('ProfileImage')?.addEventListener('change', function () {
+            const file = this.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = e => {
+                const img  = document.getElementById('photoImg');
+                const icon = document.getElementById('photoIcon');
+                img.src   = e.target.result;
+                img.style.display = 'block';
+                if (icon) icon.style.display = 'none';
+            };
+            reader.readAsDataURL(file);
+        });
+
+        // Password toggle
+        const pwdInput  = document.getElementById('pwdInput');
+        const pwdToggle = document.getElementById('pwdToggle');
+        pwdToggle?.addEventListener('click', () => {
+            const isHidden = pwdInput.type === 'password';
+            pwdInput.type  = isHidden ? 'text' : 'password';
+            pwdToggle.className = `bi bi-${isHidden ? 'eye-slash' : 'eye'} pwd-toggle`;
+        });
+    </script>
+}
