@@ -66,6 +66,9 @@ public partial class PackageDefinition
 
     public int OpenGymDailyLimit { get; set; }
 
+    [Column(TypeName = "decimal(10, 2)")]
+    public decimal? Price { get; set; }
+
     [ForeignKey("BranchAccessPolicyTypeId")]
     [InverseProperty("PackageDefinitions")]
     public virtual BranchAccessPolicyType BranchAccessPolicyType { get; set; } = null!;

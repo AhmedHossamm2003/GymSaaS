@@ -32,6 +32,8 @@ public partial class GymDbContext : DbContext
 
     public virtual DbSet<MemberPackage> MemberPackages { get; set; }
 
+    public virtual DbSet<MemberPackageAllowedBranch> MemberPackageAllowedBranches { get; set; }
+
     public virtual DbSet<MemberStatus> MemberStatuses { get; set; }
 
     public virtual DbSet<OverrideRequestStatus> OverrideRequestStatuses { get; set; }
@@ -56,7 +58,7 @@ public partial class GymDbContext : DbContext
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 #warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
-        => optionsBuilder.UseSqlServer("Server=tcp:main-server-db.database.windows.net,1433;Initial Catalog=GymDB;User ID=ServerAdmin;Password=Admin@2026;Encrypt=True;TrustServerCertificate=False;");
+        => optionsBuilder.UseSqlServer("Server=tcp:main-server-db.database.windows.net,1433;Initial Catalog=GymDB;Persist Security Info=False;User ID=ServerAdmin;Password=Admin@2026;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;");
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -223,6 +225,20 @@ public partial class GymDbContext : DbContext
                 .HasConstraintName("FK_MemberPackages_Tenants");
 
             entity.HasOne(d => d.UpdatedByUser).WithMany(p => p.MemberPackageUpdatedByUsers).HasConstraintName("FK_MemberPackages_UpdatedBy");
+        });
+
+        modelBuilder.Entity<MemberPackageAllowedBranch>(entity =>
+        {
+            entity.Property(e => e.AllowedBranchId).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.CreatedAtUtc).HasDefaultValueSql("(sysutcdatetime())");
+
+            entity.HasOne(d => d.Branch).WithMany(p => p.MemberPackageAllowedBranches)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_MemberPackageAllowedBranches_Branches");
+
+            entity.HasOne(d => d.MemberPackage).WithMany(p => p.MemberPackageAllowedBranches)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_MemberPackageAllowedBranches_MemberPackages");
         });
 
         modelBuilder.Entity<MemberStatus>(entity =>

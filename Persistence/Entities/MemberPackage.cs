@@ -117,6 +117,9 @@ public partial class MemberPackage
     [InverseProperty("MemberPackages")]
     public virtual Member Member { get; set; } = null!;
 
+    [InverseProperty("MemberPackage")]
+    public virtual ICollection<MemberPackageAllowedBranch> MemberPackageAllowedBranches { get; set; } = new List<MemberPackageAllowedBranch>();
+
     [ForeignKey("PackageDefinitionId")]
     [InverseProperty("MemberPackages")]
     public virtual PackageDefinition? PackageDefinition { get; set; }

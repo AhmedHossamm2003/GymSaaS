@@ -1,0 +1,728 @@
+@model GymSaaS.Models.PackageDefinitionFormViewModel
+@{
+    bool isEdit = Model.IsEdit;
+    string submitIcon = isEdit ? "check-lg" : "plus-lg";
+    string submitLabel = isEdit ? "Save Changes" : "Create Package";
+    ViewData["Title"] = "Package Catalog";
+    ViewData["Subtitle"] = isEdit ? "Edit Package" : "New Package";
+}
+
+@section Styles {
+    <style>
+        .form-shell {
+            max-width: 760px;
+        }
+
+        .form-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--r-lg);
+            box-shadow: var(--sh-sm);
+            overflow: hidden;
+            margin-bottom: 16px;
+        }
+
+        .form-section-head {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 22px;
+            border-bottom: 1px solid var(--border);
+            background: var(--surface-2);
+        }
+
+        .form-section-icon {
+            width: 30px;
+            height: 30px;
+            border-radius: var(--r-xs);
+            background: var(--fire-soft);
+            border: 1px solid var(--fire-border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            color: var(--fire);
+            flex-shrink: 0;
+        }
+
+        .form-section-title {
+            font-family: var(--font-display);
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            color: var(--t1);
+        }
+
+        .form-body {
+            padding: 22px;
+        }
+
+        .form-grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        @@media (max-width: 640px) {
+            .form-grid-2 {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .field-hint {
+            font-size: 11.5px;
+            color: var(--t3);
+            margin-top: 5px;
+        }
+
+        .field-error {
+            font-size: 11.5px;
+            color: var(--red);
+            margin-top: 5px;
+            display: none;
+        }
+
+            .field-error.visible {
+                display: block;
+            }
+
+        /* Type selector */
+        .type-selector {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        @@media (max-width: 500px) {
+            .type-selector {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .type-option {
+            border: 2px solid var(--border);
+            border-radius: var(--r-md);
+            padding: 14px;
+            cursor: pointer;
+            transition: all .15s;
+            text-align: center;
+            background: var(--surface);
+        }
+
+            .type-option:hover {
+                border-color: var(--border-strong);
+                background: var(--canvas);
+            }
+
+            .type-option.sel-SESSION {
+                border-color: var(--fire);
+                background: var(--fire-soft);
+            }
+
+            .type-option.sel-OPEN_GYM {
+                border-color: var(--blue);
+                background: var(--blue-bg);
+            }
+
+            .type-option.sel-COMBINED {
+                border-color: var(--t2);
+                background: var(--canvas);
+            }
+
+        .type-option-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: var(--r-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            margin: 0 auto 8px;
+            background: var(--canvas);
+            color: var(--t3);
+        }
+
+        .type-option.sel-SESSION .type-option-icon {
+            background: var(--fire-soft);
+            color: var(--fire);
+        }
+
+        .type-option.sel-OPEN_GYM .type-option-icon {
+            background: var(--blue-bg);
+            color: var(--blue);
+        }
+
+        .type-option.sel-COMBINED .type-option-icon {
+            background: var(--canvas);
+            color: var(--t2);
+        }
+
+        .type-option-name {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--t1);
+            margin-bottom: 3px;
+        }
+
+        .type-option-desc {
+            font-size: 11px;
+            color: var(--t3);
+            line-height: 1.4;
+        }
+
+        /* Dynamic sections */
+        .dyn-section {
+            display: none;
+        }
+
+            .dyn-section.show {
+                display: block;
+            }
+
+        /* Combined separator */
+        .combined-sep {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 18px 0 14px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+            color: var(--t3);
+        }
+
+            .combined-sep::before, .combined-sep::after {
+                content: '';
+                flex: 1;
+                height: 1px;
+                background: var(--border);
+            }
+
+        /* Toggle */
+        .toggle-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-top: 1px solid var(--border);
+            margin-top: 6px;
+        }
+
+        .toggle-label .tl-title {
+            font-size: 13.5px;
+            font-weight: 600;
+            color: var(--t1);
+        }
+
+        .toggle-label .tl-sub {
+            font-size: 12px;
+            color: var(--t3);
+            margin-top: 1px;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 44px;
+            height: 24px;
+            flex-shrink: 0;
+        }
+
+            .toggle-switch input {
+                opacity: 0;
+                width: 0;
+                height: 0;
+                position: absolute;
+            }
+
+        .toggle-track {
+            position: absolute;
+            inset: 0;
+            background: var(--border-strong);
+            border-radius: 24px;
+            cursor: pointer;
+            transition: background .2s;
+        }
+
+            .toggle-track::after {
+                content: '';
+                position: absolute;
+                width: 18px;
+                height: 18px;
+                background: #fff;
+                border-radius: 50%;
+                top: 3px;
+                left: 3px;
+                transition: transform .2s;
+                box-shadow: 0 1px 3px rgba(0,0,0,.15);
+            }
+
+        .toggle-switch input:checked + .toggle-track {
+            background: var(--fire);
+        }
+
+            .toggle-switch input:checked + .toggle-track::after {
+                transform: translateX(20px);
+            }
+
+        /* Policy selector */
+        .policy-selector {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        @@media (max-width: 600px) {
+            .policy-selector {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .policy-option {
+            border: 2px solid var(--border);
+            border-radius: var(--r-md);
+            padding: 14px 12px;
+            cursor: pointer;
+            transition: all .15s;
+            text-align: center;
+            background: var(--surface);
+            display: block;
+        }
+
+            .policy-option:hover {
+                border-color: var(--border-strong);
+                background: var(--canvas);
+            }
+
+            .policy-option input[type=radio] {
+                display: none;
+            }
+
+            .policy-option.pol-selected {
+                border-color: var(--fire);
+                background: var(--fire-soft);
+            }
+
+        .policy-option-icon {
+            font-size: 22px;
+            margin-bottom: 7px;
+            line-height: 1;
+        }
+
+        .policy-option-name {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--t1);
+            line-height: 1.3;
+        }
+
+        .policy-option-desc {
+            font-size: 11px;
+            color: var(--t3);
+            margin-top: 3px;
+            line-height: 1.3;
+        }
+
+        .form-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding-top: 4px;
+        }
+    </style>
+}
+
+<!-- Back -->
+<div style="margin-bottom:20px;">
+    <a asp-action="Index" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;color:var(--t2);">
+        <i class="bi bi-arrow-left" style="font-size:14px;"></i> Back to Catalog
+    </a>
+</div>
+
+<div class="page-header">
+    <div>
+        <div class="page-title">@(isEdit ? "Edit Package" : "New Package")</div>
+        <div class="page-sub">@(isEdit ? "Update package details." : "Define a new package for members.")</div>
+    </div>
+</div>
+
+<form asp-action="@(isEdit ? "Edit" : "Create")" asp-route-id="@Model.PackageDefinitionId"
+      method="post" class="form-shell" id="pkgForm">
+    @Html.AntiForgeryToken()
+
+    @* Validation summary *@
+    @if (!ViewData.ModelState.IsValid && ViewData.ModelState.ErrorCount > 0)
+    {
+        <div style="background:var(--red-bg,#fef2f2); border:1px solid var(--red-border,#fecaca); border-radius:var(--r-md); padding:14px 18px; margin-bottom:16px; display:flex; align-items:flex-start; gap:10px;">
+            <i class="bi bi-exclamation-circle" style="color:var(--red); font-size:16px; flex-shrink:0; margin-top:1px;"></i>
+            <div>
+                <div style="font-size:13px; font-weight:600; color:var(--red-text,#991b1b); margin-bottom:4px;">Please fix the following:</div>
+                <ul style="list-style:none; padding:0; margin:0;">
+                    @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                    {
+                        <li style="font-size:12.5px; color:var(--red-text,#991b1b);">· @error.ErrorMessage</li>
+                    }
+                </ul>
+            </div>
+        </div>
+    }
+
+    <!-- ── 1. Package Type ── -->
+    <div class="form-card">
+        <div class="form-section-head">
+            <div class="form-section-icon"><i class="bi bi-tag"></i></div>
+            <span class="form-section-title">Package Type</span>
+        </div>
+        <div class="form-body">
+            <input type="hidden" name="PackageTypeCode" id="packageTypeCode" value="@Model.PackageTypeCode" />
+            <div class="type-selector">
+                <div class="type-option @(Model.PackageTypeCode == "SESSION" ? "sel-SESSION" : "")"
+                     onclick="selectType('SESSION', event)">
+                    <div class="type-option-icon"><i class="bi bi-ticket-perforated"></i></div>
+                    <div class="type-option-name">Sessions</div>
+                    <div class="type-option-desc">Fixed sessions with an expiry date</div>
+                </div>
+                <div class="type-option @(Model.PackageTypeCode == "OPEN_GYM" ? "sel-OPEN_GYM" : "")"
+                     onclick="selectType('OPEN_GYM', event)">
+                    <div class="type-option-icon"><i class="bi bi-door-open"></i></div>
+                    <div class="type-option-name">Open Gym</div>
+                    <div class="type-option-desc">Daily access for a set number of days</div>
+                </div>
+                <div class="type-option @(Model.PackageTypeCode == "COMBINED" ? "sel-COMBINED" : "")"
+                     onclick="selectType('COMBINED', event)">
+                    <div class="type-option-icon"><i class="bi bi-collection"></i></div>
+                    <div class="type-option-name">Combined</div>
+                    <div class="type-option-desc">Sessions + open gym, separate expiry dates</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── 2. Package Details ── -->
+    <div class="form-card">
+        <div class="form-section-head">
+            <div class="form-section-icon"><i class="bi bi-box-seam"></i></div>
+            <span class="form-section-title">Package Details</span>
+        </div>
+        <div class="form-body">
+            <div class="field" style="margin-bottom:16px;">
+                <label class="field-label">Package Name</label>
+                <input name="PackageName" type="text" value="@Model.PackageName"
+                       placeholder="e.g. Gold Monthly, Boxing 12 Sessions" />
+                @if (!ViewData.ModelState.IsValid && ViewData.ModelState["PackageName"]?.Errors.Count > 0)
+                {
+                    <div class="field-error visible">@ViewData.ModelState["PackageName"]!.Errors[0].ErrorMessage</div>
+                }
+            </div>
+            <div class="field" style="margin-bottom:16px;">
+                <label class="field-label">Description</label>
+                <textarea name="Description" rows="2"
+                          placeholder="Optional description..."
+                          style="resize:vertical;">@Model.Description</textarea>
+            </div>
+            <div class="form-grid-2">
+                <div class="field">
+                    <label class="field-label">Price (EGP)</label>
+                    <input name="Price" type="number" step="0.01" min="0"
+                           value="@Model.Price" placeholder="e.g. 1500" />
+                    <div class="field-hint">Leave blank if price varies per assignment.</div>
+                </div>
+                <div class="field">
+                    <label class="field-label">Sort Order</label>
+                    <input name="SortOrder" type="number" min="0" value="@Model.SortOrder" placeholder="0" />
+                    <div class="field-hint">Lower numbers appear first.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── 3. Duration & Sessions ── -->
+    <div class="form-card">
+        <div class="form-section-head">
+            <div class="form-section-icon"><i class="bi bi-calendar-range"></i></div>
+            <span class="form-section-title" id="durationCardTitle">Duration & Sessions</span>
+        </div>
+        <div class="form-body">
+
+            @* SESSION *@
+            <div class="dyn-section @(Model.PackageTypeCode == "SESSION" || string.IsNullOrEmpty(Model.PackageTypeCode) ? "show" : "")" id="sectionSession">
+                <div class="form-grid-2">
+                    <div class="field">
+                        <label class="field-label">Number of Sessions</label>
+                        <input name="ui_session_count" id="fSessionCount" type="number" min="1" max="9999"
+                               placeholder="e.g. 12" value="@Model.SessionCount" />
+                        @if (!ViewData.ModelState.IsValid && ViewData.ModelState["SessionCount"]?.Errors.Count > 0)
+                        {
+                            <div class="field-error visible">@ViewData.ModelState["SessionCount"]!.Errors[0].ErrorMessage</div>
+                        }
+                    </div>
+                    <div class="field">
+                        <label class="field-label">Valid For (Days)</label>
+                        <input name="ui_session_duration" id="fDurationDays" type="number" min="1" max="3650"
+                               placeholder="e.g. 30" value="@Model.DurationDays" />
+                        <div class="field-hint">Sessions expire after this many days from activation.</div>
+                        @if (!ViewData.ModelState.IsValid && ViewData.ModelState["DurationDays"]?.Errors.Count > 0)
+                        {
+                            <div class="field-error visible">@ViewData.ModelState["DurationDays"]!.Errors[0].ErrorMessage</div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            @* OPEN_GYM *@
+            <div class="dyn-section @(Model.PackageTypeCode == "OPEN_GYM" ? "show" : "")" id="sectionOpenGym">
+                <div class="form-grid-2">
+                    <div class="field">
+                        <label class="field-label">Open Gym Duration (Days)</label>
+                        <input name="ui_gym_duration" id="fDurationDaysGym" type="number" min="1" max="3650"
+                               placeholder="e.g. 30" value="@Model.DurationDays" />
+                        <div class="field-hint">Member has daily gym access for this many days.</div>
+                    </div>
+                    <div class="field">
+                        <label class="field-label">Max Visits Per Day</label>
+                        <input name="ui_gym_daily_limit" id="fGymDailyLimit" type="number" min="1" max="10"
+                               value="@(Model.OpenGymDailyLimit > 0 ? Model.OpenGymDailyLimit : 1)" />
+                        <div class="field-hint">Usually 1 visit per day.</div>
+                    </div>
+                </div>
+            </div>
+
+            @* COMBINED *@
+            <div class="dyn-section @(Model.PackageTypeCode == "COMBINED" ? "show" : "")" id="sectionCombined">
+                <div style="font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--fire); margin-bottom:12px;">
+                    <i class="bi bi-ticket-perforated"></i> Sessions Component
+                </div>
+                <div class="form-grid-2" style="margin-bottom:16px;">
+                    <div class="field">
+                        <label class="field-label">Number of Sessions</label>
+                        <input name="ui_combined_session_count" id="fSessionCountCombined" type="number" min="1" max="9999"
+                               placeholder="e.g. 12" value="@Model.SessionCount" />
+                    </div>
+                    <div class="field">
+                        <label class="field-label">Sessions Valid For (Days)</label>
+                        <input name="ui_combined_session_duration" id="fDurationDaysCombined" type="number" min="1" max="3650"
+                               placeholder="e.g. 60" value="@Model.DurationDays" />
+                        <div class="field-hint">Sessions expire after this many days.</div>
+                    </div>
+                </div>
+                <div class="combined-sep">Open Gym Component</div>
+                <div style="font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--blue); margin-bottom:12px;">
+                    <i class="bi bi-door-open"></i> Open Gym Component
+                </div>
+                <div class="form-grid-2">
+                    <div class="field">
+                        <label class="field-label">Open Gym Valid For (Days)</label>
+                        <input name="ui_combined_gym_duration" id="fGymDurationSeparate" type="number" min="1" max="3650"
+                               placeholder="e.g. 90" value="@Model.OpenGymDurationDaysSeparate" />
+                        <div class="field-hint">Separate from sessions expiry.</div>
+                        @if (!ViewData.ModelState.IsValid && ViewData.ModelState["OpenGymDurationDaysSeparate"]?.Errors.Count > 0)
+                        {
+                            <div class="field-error visible">@ViewData.ModelState["OpenGymDurationDaysSeparate"]!.Errors[0].ErrorMessage</div>
+                        }
+                    </div>
+                    <div class="field">
+                        <label class="field-label">Max Gym Visits Per Day</label>
+                        <input name="ui_combined_gym_daily_limit" id="fGymDailyLimitCombined" type="number" min="1" max="10"
+                               value="@(Model.OpenGymDailyLimit > 0 ? Model.OpenGymDailyLimit : 1)" />
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- ── 4. Branch Access ── -->
+    <div class="form-card">
+        <div class="form-section-head">
+            <div class="form-section-icon"><i class="bi bi-building"></i></div>
+            <span class="form-section-title">Branch Access</span>
+        </div>
+        <div class="form-body">
+            <div class="field" style="margin-bottom:4px;">
+                <label class="field-label" style="margin-bottom:12px; display:block;">Access Policy</label>
+
+                <div class="policy-selector">
+                    @{
+                        var policies = new[]
+                        {
+                    new { Code = "HOME_ONLY",         Icon = "🏠", Name = "Home Branch Only",                    Desc = "Member checks in at their home branch only." },
+                    new { Code = "SELECTED_BRANCHES", Icon = "📍", Name = "Home Branch + Limited Other Branches", Desc = "Specific extra branches chosen per assignment." },
+                    new { Code = "ALL_BRANCHES",      Icon = "🌐", Name = "All Branches",                        Desc = "Member can attend any branch in the network." },
+                    };
+                    }
+
+                    @foreach (var pol in policies)
+                    {
+                        var matchingPolicy = Model.BranchPolicies.FirstOrDefault(bp => bp.PolicyCode == pol.Code);
+                        if (matchingPolicy == null) continue;
+                        bool polSelected = Model.BranchAccessPolicyTypeId == matchingPolicy.BranchAccessPolicyTypeId;
+
+                        <label class="policy-option @(polSelected ? "pol-selected" : "")"
+                               onclick="selectPolicy(this)">
+                            <input type="radio" name="BranchAccessPolicyTypeId"
+                                   value="@matchingPolicy.BranchAccessPolicyTypeId"
+                            @(polSelected ? "checked" : "") />
+                            <div class="policy-option-icon">@pol.Icon</div>
+                            <div class="policy-option-name">@pol.Name</div>
+                            <div class="policy-option-desc">@pol.Desc</div>
+                        </label>
+                    }
+                </div>
+
+                @if (!ViewData.ModelState.IsValid && ViewData.ModelState["BranchAccessPolicyTypeId"]?.Errors.Count > 0)
+                {
+                    <div class="field-error visible" style="margin-top:8px;">@ViewData.ModelState["BranchAccessPolicyTypeId"]!.Errors[0].ErrorMessage</div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- ── 5. Settings ── -->
+    <div class="form-card">
+        <div class="form-section-head">
+            <div class="form-section-icon"><i class="bi bi-sliders"></i></div>
+            <span class="form-section-title">Settings</span>
+        </div>
+        <div class="form-body">
+            <div class="toggle-row" style="border-top:none; padding-top:0;">
+                <div class="toggle-label">
+                    <div class="tl-title">Allow Session Carry-over</div>
+                    <div class="tl-sub">Unused sessions carry over when member renews.</div>
+                </div>
+                <label class="toggle-switch">
+                    <input name="AllowCarryOverSessions" type="checkbox" value="true" @(Model.AllowCarryOverSessions ? "checked" : "") />
+                    <span class="toggle-track"></span>
+                </label>
+            </div>
+
+            <div class="toggle-row">
+                <div class="toggle-label">
+                    <div class="tl-title">Allow Queued Renewal</div>
+                    <div class="tl-sub">New package starts after current one ends.</div>
+                </div>
+                <label class="toggle-switch">
+                    <input name="AllowQueuedRenewal" type="checkbox" value="true" @(Model.AllowQueuedRenewal ? "checked" : "") />
+                    <span class="toggle-track"></span>
+                </label>
+            </div>
+
+            <div class="toggle-row">
+                <div class="toggle-label">
+                    <div class="tl-title">Active</div>
+                    <div class="tl-sub">Inactive packages cannot be assigned to members.</div>
+                </div>
+                <label class="toggle-switch">
+                    <input name="IsActive" type="checkbox" value="true" @(Model.IsActive ? "checked" : "") />
+                    <span class="toggle-track"></span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden real fields — populated by JS before submit -->
+    <input type="hidden" name="SessionCount" id="real_SessionCount" />
+    <input type="hidden" name="DurationDays" id="real_DurationDays" />
+    <input type="hidden" name="OpenGymDurationDaysSeparate" id="real_OpenGymDurationDaysSeparate" />
+    <input type="hidden" name="OpenGymDailyLimit" id="real_OpenGymDailyLimit" value="1" />
+
+    <!-- Footer -->
+    <div class="form-footer">
+        <a asp-action="Index" class="btn btn-ghost"><i class="bi bi-x"></i> Cancel</a>
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-@submitIcon"></i> @submitLabel
+        </button>
+    </div>
+
+</form>
+
+@section Scripts {
+    <script>
+        const typeCodeInput = document.getElementById('packageTypeCode');
+
+        const titles = {
+            SESSION:  'Sessions & Validity',
+            OPEN_GYM: 'Open Gym Duration',
+            COMBINED: 'Sessions & Open Gym Durations'
+        };
+
+        function selectType(type, e) {
+            typeCodeInput.value = type;
+            document.querySelectorAll('.type-option').forEach(el => el.className = 'type-option');
+            e.currentTarget.classList.add('sel-' + type);
+            document.getElementById('sectionSession').classList.toggle('show',  type === 'SESSION');
+            document.getElementById('sectionOpenGym').classList.toggle('show',  type === 'OPEN_GYM');
+            document.getElementById('sectionCombined').classList.toggle('show', type === 'COMBINED');
+            const titleEl = document.getElementById('durationCardTitle');
+            if (titleEl) titleEl.textContent = titles[type] || 'Duration & Sessions';
+            copyValues(type);
+        }
+
+        function selectPolicy(el) {
+            document.querySelectorAll('.policy-option').forEach(o => o.classList.remove('pol-selected'));
+            el.classList.add('pol-selected');
+            el.querySelector('input[type=radio]').checked = true;
+        }
+
+        function copyValues(type) {
+            const get = id => document.getElementById(id)?.value || '';
+            const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+
+            if (type === 'SESSION') {
+                set('real_SessionCount',                get('fSessionCount'));
+                set('real_DurationDays',                get('fDurationDays'));
+                set('real_OpenGymDurationDaysSeparate', '');
+                set('real_OpenGymDailyLimit',           '1');
+            } else if (type === 'OPEN_GYM') {
+                set('real_SessionCount',                '');
+                set('real_DurationDays',                get('fDurationDaysGym'));
+                set('real_OpenGymDurationDaysSeparate', '');
+                set('real_OpenGymDailyLimit',           get('fGymDailyLimit'));
+            } else if (type === 'COMBINED') {
+                set('real_SessionCount',                get('fSessionCountCombined'));
+                set('real_DurationDays',                get('fDurationDaysCombined'));
+                set('real_OpenGymDurationDaysSeparate', get('fGymDurationSeparate'));
+                set('real_OpenGymDailyLimit',           get('fGymDailyLimitCombined'));
+            }
+        }
+
+        // Init on load
+        const initType = typeCodeInput?.value;
+        if (initType) {
+            document.querySelectorAll('.type-option').forEach(el => el.className = 'type-option');
+            const opt = document.querySelector(`[onclick*="'${initType}'"]`);
+            if (opt) opt.classList.add('sel-' + initType);
+            document.getElementById('sectionSession')?.classList.toggle('show',  initType === 'SESSION');
+            document.getElementById('sectionOpenGym')?.classList.toggle('show',  initType === 'OPEN_GYM');
+            document.getElementById('sectionCombined')?.classList.toggle('show', initType === 'COMBINED');
+            const titleEl = document.getElementById('durationCardTitle');
+            if (titleEl && initType) titleEl.textContent = titles[initType] || 'Duration & Sessions';
+            copyValues(initType);
+        }
+
+        // Client-side guard before submit
+        document.getElementById('pkgForm').addEventListener('submit', function (e) {
+            const type = typeCodeInput?.value;
+            if (!type) {
+                e.preventDefault();
+                alert('Please select a package type first.');
+                window.scrollTo(0, 0);
+                return;
+            }
+            const name = document.querySelector('[name="PackageName"]')?.value?.trim();
+            if (!name) {
+                e.preventDefault();
+                alert('Package name is required.');
+                return;
+            }
+            const policy = document.querySelector('[name="BranchAccessPolicyTypeId"]:checked');
+            if (!policy) {
+                e.preventDefault();
+                alert('Please select a branch access policy.');
+                return;
+            }
+            copyValues(type);
+        });
+    </script>
+}

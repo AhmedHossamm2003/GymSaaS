@@ -70,6 +70,9 @@ public partial class Branch
     [InverseProperty("Branch")]
     public virtual ICollection<BranchQrcode> BranchQrcodes { get; set; } = new List<BranchQrcode>();
 
+    [InverseProperty("Branch")]
+    public virtual ICollection<MemberPackageAllowedBranch> MemberPackageAllowedBranches { get; set; } = new List<MemberPackageAllowedBranch>();
+
     [InverseProperty("HomeBranch")]
     public virtual ICollection<MemberPackage> MemberPackages { get; set; } = new List<MemberPackage>();
 

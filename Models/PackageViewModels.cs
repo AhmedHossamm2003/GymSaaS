@@ -9,6 +9,8 @@ namespace GymSaaS.Models
     public class PackageDefinitionListItem
     {
         public Guid PackageDefinitionId { get; set; }
+        public decimal? Price { get; set; }
+
         public string PackageCode { get; set; } = string.Empty;
         public string PackageName { get; set; } = string.Empty;
         public string? Description { get; set; }
@@ -20,6 +22,7 @@ namespace GymSaaS.Models
         public int? OpenGymDurationDays { get; set; }
         public bool IsActive { get; set; }
         public int AssignedCount { get; set; }
+        public int SortOrder { get; set; }
 
         // Display helpers
         public string SessionLabel => PackageTypeCode switch
@@ -35,17 +38,17 @@ namespace GymSaaS.Models
     {
         public Guid? PackageDefinitionId { get; set; }
 
-        [Required(ErrorMessage = "Package name is required")]
         [MaxLength(200)]
         public string PackageName { get; set; } = string.Empty;
 
         [MaxLength(1000)]
         public string? Description { get; set; }
+        public decimal? Price { get; set; }
 
-        [Required(ErrorMessage = "Package type is required")]
+
+        // Validated manually in controller
         public string PackageTypeCode { get; set; } = string.Empty;
 
-        [Required(ErrorMessage = "Branch access policy is required")]
         public Guid BranchAccessPolicyTypeId { get; set; }
 
         // SESSION + COMBINED: number of sessions
@@ -159,6 +162,8 @@ namespace GymSaaS.Models
     public class AssignPackageViewModel
     {
         public Guid MemberId { get; set; }
+        public Guid HomeBranchId { get; set; }
+        public string HomeBranchName { get; set; } = string.Empty;
         public string MemberName { get; set; } = string.Empty;
         public string MembershipNumber { get; set; } = string.Empty;
 
@@ -184,5 +189,8 @@ namespace GymSaaS.Models
 
         // Currently active packages (to show carry-over option)
         public List<MemberPackageListItem> CurrentPackages { get; set; } = new();
+
+        // All branches for SELECTED_BRANCHES policy
+        public List<BranchDropdownItem> AllBranches { get; set; } = new();
     }
 }

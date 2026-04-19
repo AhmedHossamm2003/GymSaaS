@@ -1028,10 +1028,7 @@
                        class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Members" ? "active" : "")">
                         <i class="bi bi-people"></i> All Members
                     </a>
-                    <a asp-controller="MemberPackages" asp-action="Index"
-                       class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "MemberPackages" ? "active" : "")">
-                        <i class="bi bi-ticket-perforated"></i> Packages
-                    </a>
+                   
                 </div>
 
                 <div class="nav-section">
@@ -1040,8 +1037,8 @@
                        class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Branches" ? "active" : "")">
                         <i class="bi bi-building"></i> Branches
                     </a>
-                    <a asp-controller="PackageDefinitions" asp-action="Index"
-                       class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "PackageDefinitions" ? "active" : "")">
+                    <a asp-controller="PackageCatalog" asp-action="Index"
+                       class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "PackageCatalog" ? "active" : "")">
                         <i class="bi bi-box-seam"></i> Package Catalog
                     </a>
                     <a asp-controller="Users" asp-action="Index"
