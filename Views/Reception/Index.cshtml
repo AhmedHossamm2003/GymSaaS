@@ -1,0 +1,734 @@
+@using GymSaaS.Services.Reception
+
+@{
+    ViewData["Title"] = "Reception";
+
+    var dashboard = ViewBag.Dashboard as ReceptionDashboardDto;
+    var isAdmin = (bool)(ViewBag.IsAdmin ?? false);
+    var branches = ViewBag.Branches as List<BranchOptionDto> ?? new();
+    var selectedBranchId = ViewBag.SelectedBranchId as Guid?;
+}
+
+<style>
+    .reception-page {
+        width: 100%;
+        max-width: 1180px;
+        padding: 26px 28px;
+    }
+
+    .reception-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 22px;
+    }
+
+    .reception-title {
+        font-size: 24px;
+        font-weight: 800;
+        margin: 0;
+        letter-spacing: .3px;
+        color: #111827;
+    }
+
+    .reception-subtitle {
+        margin: 4px 0 0;
+        color: #6b7280;
+        font-size: 14px;
+    }
+
+    .reception-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 16px;
+        margin-bottom: 18px;
+    }
+
+    .reception-card {
+        background: #fff;
+        border: 1px solid #eef0f4;
+        border-radius: 22px;
+        box-shadow: 0 8px 22px rgba(15, 23, 42, .04);
+    }
+
+    .reception-card-body {
+        padding: 22px;
+    }
+
+    .stat-label {
+        color: #6b7280;
+        font-size: 13px;
+        margin-bottom: 8px;
+    }
+
+    .stat-value {
+        font-size: 30px;
+        font-weight: 800;
+        color: #111827;
+        margin-bottom: 6px;
+    }
+
+    .stat-note {
+        color: #9ca3af;
+        font-size: 13px;
+    }
+
+    .main-area {
+        display: grid;
+        grid-template-columns: minmax(0, 760px) minmax(280px, 1fr);
+        gap: 18px;
+    }
+
+    .section-title {
+        font-size: 16px;
+        font-weight: 800;
+        margin-bottom: 18px;
+        color: #111827;
+    }
+
+    .form-label-clean {
+        display: block;
+        font-size: 12px;
+        color: #6b7280;
+        font-weight: 800;
+        text-transform: uppercase;
+        margin-bottom: 8px;
+    }
+
+    .scan-row {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+
+    .scan-input {
+        flex: 1;
+        min-height: 48px;
+        border-radius: 14px;
+        border: 1px solid #fb6a16;
+        padding: 0 16px;
+        outline: none;
+        font-size: 14px;
+    }
+
+        .scan-input:focus {
+            box-shadow: 0 0 0 4px rgba(251, 106, 22, .12);
+        }
+
+    .orange-btn {
+        min-height: 48px;
+        border: none;
+        border-radius: 14px;
+        padding: 0 22px;
+        background: #ff5b14;
+        color: #fff;
+        font-weight: 800;
+        cursor: pointer;
+    }
+
+        .orange-btn:disabled {
+            opacity: .65;
+            cursor: not-allowed;
+        }
+
+    .schedule-empty {
+        padding: 34px 20px;
+        text-align: center;
+        color: #6b7280;
+    }
+
+    .schedule-empty-icon {
+        width: 58px;
+        height: 58px;
+        border-radius: 18px;
+        background: #fff4ed;
+        color: #ff5b14;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 14px;
+        font-size: 24px;
+    }
+
+    .branch-select {
+        min-height: 40px;
+        min-width: 220px;
+        border-radius: 12px;
+        border: 1px solid #e5e7eb;
+        padding: 0 12px;
+        background: #fff;
+    }
+
+    .custom-modal-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, .45);
+        z-index: 9998;
+    }
+
+        .custom-modal-overlay.is-open {
+            display: block;
+        }
+
+    .custom-modal {
+        display: none;
+        position: fixed;
+        z-index: 9999;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: min(520px, calc(100% - 32px));
+        background: #fff;
+        border-radius: 24px;
+        box-shadow: 0 24px 70px rgba(15, 23, 42, .28);
+        overflow: hidden;
+    }
+
+        .custom-modal.is-open {
+            display: block;
+        }
+
+    .custom-modal-header {
+        padding: 22px 24px 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .custom-modal-title {
+        font-size: 20px;
+        font-weight: 800;
+        margin: 0;
+    }
+
+    .modal-close-btn {
+        border: none;
+        background: #f3f4f6;
+        border-radius: 10px;
+        width: 34px;
+        height: 34px;
+        cursor: pointer;
+    }
+
+    .custom-modal-body {
+        padding: 18px 24px 24px;
+    }
+
+    .member-card {
+        display: flex;
+        gap: 14px;
+        align-items: center;
+        margin-bottom: 18px;
+    }
+
+    .member-photo {
+        width: 74px;
+        height: 74px;
+        object-fit: cover;
+        border-radius: 50%;
+        border: 1px solid #e5e7eb;
+        background: #f9fafb;
+    }
+
+    .member-name {
+        font-size: 18px;
+        font-weight: 800;
+        margin-bottom: 6px;
+    }
+
+    .member-badge {
+        display: inline-block;
+        background: #fff4ed;
+        color: #ff5b14;
+        border-radius: 999px;
+        padding: 5px 10px;
+        font-size: 12px;
+        font-weight: 800;
+    }
+
+    .alert-clean {
+        border-radius: 16px;
+        padding: 14px 16px;
+        margin-bottom: 12px;
+        font-size: 14px;
+    }
+
+    .alert-success-clean {
+        background: #ecfdf3;
+        color: #027a48;
+    }
+
+    .alert-warning-clean {
+        background: #fffaeb;
+        color: #b54708;
+    }
+
+    .alert-danger-clean {
+        background: #fef3f2;
+        color: #b42318;
+    }
+
+    .package-buttons {
+        display: grid;
+        gap: 10px;
+        margin-top: 12px;
+    }
+
+    .package-btn {
+        border: 1px solid #ff5b14;
+        background: #fff;
+        color: #ff5b14;
+        border-radius: 14px;
+        padding: 12px 14px;
+        text-align: left;
+        font-weight: 800;
+        cursor: pointer;
+    }
+
+        .package-btn:hover {
+            background: #fff4ed;
+        }
+
+    .d-none {
+        display: none !important;
+    }
+
+    @@media (max-width: 1200px) {
+        .reception-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .main-area {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @@media (max-width: 700px) {
+        .reception-page {
+            padding: 18px;
+        }
+
+        .reception-header {
+            align-items: flex-start;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .reception-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .scan-row {
+            flex-direction: column;
+            align-items: stretch;
+        }
+    }
+</style>
+
+<div class="reception-page">
+
+    <div class="reception-header">
+        <div>
+            <h1 class="reception-title">Reception</h1>
+            <p class="reception-subtitle">Scan members, check branch access, and manage live attendance.</p>
+        </div>
+
+        @if (isAdmin && branches.Count > 0)
+        {
+            <select id="branchSelector" class="branch-select">
+                @foreach (var b in branches)
+                {
+                    if (b.BranchId == selectedBranchId)
+                    {
+                        <option value="@b.BranchId" selected>@b.BranchName</option>
+                    }
+                    else
+                    {
+                        <option value="@b.BranchId">@b.BranchName</option>
+                    }
+                }
+            </select>
+        }
+    </div>
+
+    @Html.AntiForgeryToken()
+
+    @if (dashboard != null)
+    {
+        <div class="reception-grid">
+            <div class="reception-card">
+                <div class="reception-card-body">
+                    <div class="stat-label">Gym Capacity</div>
+                    <div class="stat-value">@dashboard.CurrentlyPresentCount / @dashboard.MaxCapacity</div>
+                    <div class="stat-note">@dashboard.CapacityPercent% full</div>
+                </div>
+            </div>
+
+            <div class="reception-card">
+                <div class="reception-card-body">
+                    <div class="stat-label">Currently Inside</div>
+                    <div class="stat-value" id="statCurrently">@dashboard.CurrentlyPresentCount</div>
+                    <div class="stat-note">Auto-exit after @(ViewBag.PresenceWindowMinutes ?? 120) min</div>
+                </div>
+            </div>
+
+            <div class="reception-card">
+                <div class="reception-card-body">
+                    <div class="stat-label">Today's Entries</div>
+                    <div class="stat-value" id="statToday">@dashboard.TodayEntryCount</div>
+                    <div class="stat-note">Total check-ins since midnight</div>
+                </div>
+            </div>
+
+            <div class="reception-card">
+                <div class="reception-card-body">
+                    <div class="stat-label">Classes Today</div>
+                    <div class="stat-value">—</div>
+                    <div class="stat-note">Classes module coming soon</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="main-area">
+            <div>
+                <div class="reception-card" style="margin-bottom:18px;">
+                    <div class="reception-card-body">
+                        <div class="section-title">Member Check-In</div>
+
+                        <label class="form-label-clean">Membership Number</label>
+
+                        <div class="scan-row">
+                            <input type="text"
+                                   id="membershipNumberInput"
+                                   class="scan-input"
+                                   placeholder="Enter or scan membership number..."
+                                   autocomplete="off"
+                                   autofocus />
+
+                            <button id="btnScan" class="orange-btn">
+                                Check In
+                            </button>
+                        </div>
+
+                        <div id="scanSpinner" class="d-none" style="margin-top:12px;color:#ff5b14;font-weight:700;">
+                            Processing...
+                        </div>
+                    </div>
+                </div>
+
+                <div class="reception-card">
+                    <div class="reception-card-body">
+                        <div class="section-title">Today's Schedule</div>
+
+                        <div class="schedule-empty">
+                            <div class="schedule-empty-icon">📅</div>
+                            <h6 style="font-weight:800;margin-bottom:6px;">Classes module not yet built.</h6>
+                            <div>Schedule will appear here once classes are configured.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="reception-card">
+                <div class="reception-card-body">
+                    <div class="section-title">Reception Notes</div>
+                    <div class="stat-note" style="line-height:1.8;">
+                        Search by membership number, QR, or NFC card value.
+                        If the member has multiple active packages, the system will ask which package should be used.
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="reception-card">
+            <div class="reception-card-body">
+                No branch selected or branch not found.
+            </div>
+        </div>
+    }
+</div>
+
+<div id="customModalOverlay" class="custom-modal-overlay"></div>
+
+<div id="memberModal" class="custom-modal">
+    <div id="modalError" class="d-none">
+        <div class="custom-modal-body" style="text-align:center;padding-top:38px;">
+            <div class="alert-clean alert-danger-clean">
+                <strong id="modalErrorTitle">Entry Denied</strong>
+                <div id="modalErrorMessage" style="margin-top:6px;"></div>
+            </div>
+
+            <button type="button" class="orange-btn" data-close-modal>Close</button>
+        </div>
+    </div>
+
+    <div id="modalSuccess">
+        <div class="custom-modal-header">
+            <h5 class="custom-modal-title">Member Check-In</h5>
+            <button type="button" class="modal-close-btn" data-close-modal>×</button>
+        </div>
+
+        <div class="custom-modal-body">
+            <div class="member-card">
+                <img id="memberPhoto"
+                     src="/images/avatar-placeholder.png"
+                     class="member-photo"
+                     alt="Member Photo" />
+
+                <div>
+                    <div class="member-name" id="memberName">—</div>
+                    <span class="member-badge" id="membershipBadge">—</span>
+                </div>
+            </div>
+
+            <div id="alreadyInsideAlert" class="alert-clean alert-warning-clean d-none">
+                This member is already inside the gym.
+            </div>
+
+            <div id="autoCheckinAlert" class="alert-clean alert-success-clean d-none">
+                Checked in successfully via <strong id="autoPackageName"></strong>.
+            </div>
+
+            <div id="conflictSection" class="d-none">
+                <div class="stat-note">
+                    This member has multiple active packages. Please select how to check them in:
+                </div>
+
+                <div id="packageButtons" class="package-buttons"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            const branchId = '@(selectedBranchId?.ToString() ?? "")';
+            const antiforgery = document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '';
+
+            const branchSelector = document.getElementById('branchSelector');
+            const btnScan = document.getElementById('btnScan');
+            const input = document.getElementById('membershipNumberInput');
+            const spinner = document.getElementById('scanSpinner');
+
+            const overlay = document.getElementById('customModalOverlay');
+            const modal = document.getElementById('memberModal');
+
+            const modalError = document.getElementById('modalError');
+            const modalSuccess = document.getElementById('modalSuccess');
+            const alreadyAlert = document.getElementById('alreadyInsideAlert');
+            const autoAlert = document.getElementById('autoCheckinAlert');
+            const conflictSection = document.getElementById('conflictSection');
+            const packageButtons = document.getElementById('packageButtons');
+
+            if (branchSelector) {
+                branchSelector.addEventListener('change', function () {
+                    window.location.href = '/Reception/Index?branchId=' + branchSelector.value;
+                });
+            }
+
+            if (btnScan && input) {
+                btnScan.addEventListener('click', doScan);
+
+                input.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter') {
+                        doScan();
+                    }
+                });
+            }
+
+            document.querySelectorAll('[data-close-modal]').forEach(function (btn) {
+                btn.addEventListener('click', closeModal);
+            });
+
+            overlay.addEventListener('click', closeModal);
+
+            async function doScan() {
+                const membershipNumber = input.value.trim();
+
+                if (!membershipNumber) {
+                    showModalError('Missing Membership Number', 'Please enter or scan a membership number.');
+                    return;
+                }
+
+                if (!branchId) {
+                    showModalError('No Branch Selected', 'Please select a branch first.');
+                    return;
+                }
+
+                setLoading(true);
+
+                try {
+                    const res = await fetch('/Reception/Scan', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'RequestVerificationToken': antiforgery
+                        },
+                        body: JSON.stringify({
+                            membershipNumber: membershipNumber,
+                            branchId: branchId
+                        })
+                    });
+
+                    const data = await res.json();
+                    input.value = '';
+                    showModal(data);
+                }
+                catch {
+                    showModalError('Network Error', 'Could not reach server. Please try again.');
+                }
+                finally {
+                    setLoading(false);
+                }
+            }
+
+            function showModal(data) {
+                resetModal();
+
+                if (!data.success) {
+                    showModalError(getErrorTitle(data.errorCode), data.errorMessage);
+                    return;
+                }
+
+                document.getElementById('memberName').textContent = data.memberName ?? '—';
+                document.getElementById('membershipBadge').textContent = data.membershipNumber ?? '—';
+
+                const photo = document.getElementById('memberPhoto');
+                photo.src = data.photoUrl ? data.photoUrl : '/images/avatar-placeholder.png';
+
+                if (data.alreadyInsideGym) {
+                    alreadyAlert.classList.remove('d-none');
+                }
+
+                if (data.autoCheckedInRecordId) {
+                    autoAlert.classList.remove('d-none');
+                    document.getElementById('autoPackageName').textContent =
+                        data.autoCheckedInPackageName ?? '';
+                    refreshStats();
+                }
+
+                if (data.hasConflict && !data.alreadyInsideGym && data.packageOptions) {
+                    conflictSection.classList.remove('d-none');
+
+                    data.packageOptions.forEach(function (opt) {
+                        const btn = document.createElement('button');
+                        btn.type = 'button';
+                        btn.className = 'package-btn';
+
+                        btn.innerHTML =
+                            `${opt.label}`
+                            + (opt.sessionsRemaining ? ` <small style="color:#6b7280;">(${opt.sessionsRemaining})</small>` : '');
+
+                        btn.addEventListener('click', function () {
+                            markAttendance(data.memberId, opt.memberPackageId, opt.label);
+                        });
+
+                        packageButtons.appendChild(btn);
+                    });
+                }
+
+                openModal();
+            }
+
+            function showModalError(title, message) {
+                modalError.classList.remove('d-none');
+                modalSuccess.classList.add('d-none');
+
+                document.getElementById('modalErrorTitle').textContent = title ?? 'Entry Denied';
+                document.getElementById('modalErrorMessage').textContent = message ?? 'Unknown error.';
+
+                openModal();
+            }
+
+            async function markAttendance(memberId, memberPackageId, label) {
+                packageButtons.querySelectorAll('button').forEach(function (b) {
+                    b.disabled = true;
+                });
+
+                try {
+                    const res = await fetch('/Reception/MarkAttendance', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'RequestVerificationToken': antiforgery
+                        },
+                        body: JSON.stringify({
+                            memberId: memberId,
+                            branchId: branchId,
+                            selectedMemberPackageId: memberPackageId
+                        })
+                    });
+
+                    const data = await res.json();
+
+                    conflictSection.classList.add('d-none');
+
+                    if (data.success) {
+                        autoAlert.classList.remove('d-none');
+                        document.getElementById('autoPackageName').textContent = label;
+                        refreshStats();
+                    }
+                    else {
+                        showModalError('Check-In Failed', data.errorMessage ?? 'Unknown error.');
+                    }
+                }
+                catch {
+                    showModalError('Network Error', 'Could not reach server.');
+                }
+            }
+
+            async function refreshStats() {
+                try {
+                    const res = await fetch(`/Reception/Stats?branchId=${branchId}`);
+                    const data = await res.json();
+
+                    const currently = document.getElementById('statCurrently');
+                    const today = document.getElementById('statToday');
+
+                    if (currently) currently.textContent = data.currentlyPresentCount;
+                    if (today) today.textContent = data.todayEntryCount;
+                }
+                catch {
+                }
+            }
+
+            function resetModal() {
+                modalError.classList.add('d-none');
+                modalSuccess.classList.remove('d-none');
+                alreadyAlert.classList.add('d-none');
+                autoAlert.classList.add('d-none');
+                conflictSection.classList.add('d-none');
+                packageButtons.innerHTML = '';
+            }
+
+            function openModal() {
+                overlay.classList.add('is-open');
+                modal.classList.add('is-open');
+            }
+
+            function closeModal() {
+                overlay.classList.remove('is-open');
+                modal.classList.remove('is-open');
+            }
+
+            function setLoading(on) {
+                btnScan.disabled = on;
+                spinner.classList.toggle('d-none', !on);
+            }
+
+            function getErrorTitle(code) {
+                return ({
+                    MEMBER_NOT_FOUND: 'Member Not Found',
+                    MEMBER_INACTIVE: 'Inactive Account',
+                    NO_ACTIVE_PACKAGE: 'No Active Package',
+                    BRANCH_ACCESS_DENIED: 'Access Denied',
+                    BRANCH_NOT_FOUND: 'Branch Not Found'
+                })[code] ?? 'Entry Denied';
+            }
+        })();
+    </script>
+}

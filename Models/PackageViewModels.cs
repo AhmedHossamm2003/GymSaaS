@@ -20,6 +20,12 @@ namespace GymSaaS.Models
         public int? SessionCount { get; set; }
         public int? DurationDays { get; set; }
         public int? OpenGymDurationDays { get; set; }
+        public Guid? GymClassId { get; set; }
+        public string? GymClassName { get; set; }
+        public int? InvitationCount { get; set; }
+        public int? InBodyCount { get; set; }
+        public int? PtSessionCount { get; set; }
+        public int? FreezeAllowanceDays { get; set; }
         public bool IsActive { get; set; }
         public int AssignedCount { get; set; }
         public int SortOrder { get; set; }
@@ -55,6 +61,15 @@ namespace GymSaaS.Models
         [Range(1, 9999, ErrorMessage = "Must be between 1 and 9999")]
         public int? SessionCount { get; set; }
 
+        // Linked class — for SESSION / COMBINED packages
+        public Guid? GymClassId { get; set; }
+
+        // Package perks — defaults applied at assignment; staff can override
+        [Range(0, 999)] public int? InvitationCount { get; set; }
+        [Range(0, 999)] public int? InBodyCount { get; set; }
+        [Range(0, 999)] public int? PtSessionCount { get; set; }
+        [Range(0, 365)] public int? FreezeAllowanceDays { get; set; }
+
         // SESSION + COMBINED: how many days the sessions are valid
         [Range(1, 3650, ErrorMessage = "Must be between 1 and 3650 days")]
         public int? DurationDays { get; set; }
@@ -76,6 +91,7 @@ namespace GymSaaS.Models
 
         // For dropdowns
         public List<BranchPolicyDropdownItem> BranchPolicies { get; set; } = new();
+        public List<ClassLookupItem> AvailableClasses { get; set; } = new();
 
         public bool IsEdit => PackageDefinitionId.HasValue;
 
@@ -112,6 +128,22 @@ namespace GymSaaS.Models
         public int CrossBranchVisitsUsed { get; set; }
         public int? CrossBranchVisitLimit { get; set; }
         public DateTime CreatedAtUtc { get; set; }
+
+        // Perks
+        public int? InvitationsTotal { get; set; }
+        public int? InvitationsRemaining { get; set; }
+        public int? InBodyTotal { get; set; }
+        public int? InBodyRemaining { get; set; }
+        public int? PtSessionsTotal { get; set; }
+        public int? PtSessionsRemaining { get; set; }
+        public int? FreezeAllowanceDays { get; set; }
+        public int? FreezeRemainingDays { get; set; }
+        public bool IsFrozen { get; set; }
+        public DateOnly? FrozenUntilDate { get; set; }
+
+        // Helper: true if this subscription carries any perks worth displaying
+        public bool HasPerks =>
+            InvitationsTotal > 0 || InBodyTotal > 0 || PtSessionsTotal > 0 || FreezeAllowanceDays > 0;
 
         // Display helpers
         public bool IsActive => Status == "ACTIVE";
@@ -180,6 +212,12 @@ namespace GymSaaS.Models
 
         // Carry over from previous package
         public int CarryOverSessions { get; set; } = 0;
+
+        // Perks override — leave null to use package catalog defaults
+        public int? CustomInvitationCount { get; set; }
+        public int? CustomInBodyCount { get; set; }
+        public int? CustomPtSessionCount { get; set; }
+        public int? CustomFreezeAllowanceDays { get; set; }
 
         [MaxLength(1000)]
         public string? Notes { get; set; }

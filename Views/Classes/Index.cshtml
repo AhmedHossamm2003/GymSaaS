@@ -1,0 +1,213 @@
+@model List<GymSaaS.Models.ClassListItem>
+@using GymSaaS.Persistence.Entities
+@using GymSaaS.Models
+
+@{
+    var search   = ViewData["Search"] as string;
+    var branchId = ViewData["BranchId"] as Guid?;
+    var coachId  = ViewData["CoachId"] as Guid?;
+    var day      = ViewData["Day"] as int?;
+    var branches = ViewData["Branches"] as List<Branch> ?? new();
+    var coaches  = ViewData["Coaches"] as List<CoachDropdownItem> ?? new();
+    var total    = (int)(ViewData["TotalCount"] ?? 0);
+    var active   = (int)(ViewData["ActiveCount"] ?? 0);
+
+    var days = new[] {
+        (0,"Sunday"),(1,"Monday"),(2,"Tuesday"),(3,"Wednesday"),
+        (4,"Thursday"),(5,"Friday"),(6,"Saturday")
+    };
+}
+
+<!-- Header -->
+<div class="page-header">
+    <div>
+        <div class="page-title">Classes</div>
+        <div class="page-subtitle">Manage gym classes and schedule</div>
+    </div>
+    <div style="display:flex;gap:8px">
+        <a asp-controller="Classes" asp-action="Schedule" class="btn btn-secondary">
+            <i class="bi bi-calendar-week"></i> Weekly Schedule
+        </a>
+        <a asp-controller="Classes" asp-action="Create" class="btn btn-primary">
+            <i class="bi bi-plus-lg"></i> Add Class
+        </a>
+    </div>
+</div>
+
+<!-- Stats -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin-bottom:24px">
+    <div class="stat-card highlight">
+        <div class="stat-icon"><i class="bi bi-calendar2-week"></i></div>
+        <div>
+            <div class="stat-value">@total</div>
+            <div class="stat-label">Total Classes</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon"><i class="bi bi-check-circle"></i></div>
+        <div>
+            <div class="stat-value">@active</div>
+            <div class="stat-label">Active</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon"><i class="bi bi-person-badge"></i></div>
+        <div>
+            <div class="stat-value">@(Model.Select(c => c.CoachId).Distinct().Count(x => x.HasValue))</div>
+            <div class="stat-label">Coaches Assigned</div>
+        </div>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="card" style="margin-bottom:20px;padding:16px 20px">
+    <form method="get" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <div style="flex:1;min-width:180px;display:flex;align-items:center;gap:8px;background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius-sm);padding:0 12px">
+            <i class="bi bi-search" style="color:var(--text-faint);font-size:13px"></i>
+            <input type="text" name="search" value="@search" placeholder="Search class name…"
+                   style="border:none;background:transparent;outline:none;padding:8px 0;font-size:13px;width:100%"/>
+        </div>
+
+        <select name="branchId" style="min-width:150px">
+            <option value="">All Branches</option>
+            @foreach (var b in branches)
+            {
+                <option value="@b.BranchId" selected="@(branchId == b.BranchId)">@b.BranchName</option>
+            }
+        </select>
+
+        <select name="coachId" style="min-width:150px">
+            <option value="">All Coaches</option>
+            @foreach (var c in coaches)
+            {
+                <option value="@c.CoachId" selected="@(coachId == c.CoachId)">@c.FullName</option>
+            }
+        </select>
+
+        <select name="day" style="min-width:130px">
+            <option value="">All Days</option>
+            @foreach (var (val, label) in days)
+            {
+                <option value="@val" selected="@(day == val)">@label</option>
+            }
+        </select>
+
+        <button type="submit" class="btn btn-secondary"><i class="bi bi-funnel"></i> Filter</button>
+        @if (!string.IsNullOrWhiteSpace(search) || branchId.HasValue || coachId.HasValue || day.HasValue)
+        {
+            <a asp-controller="Classes" asp-action="Index" class="btn btn-ghost">Clear</a>
+        }
+    </form>
+</div>
+
+<!-- Table -->
+<div class="card" style="padding:0">
+    @if (!Model.Any())
+    {
+        <div style="text-align:center;padding:60px 24px">
+            <i class="bi bi-calendar2-week" style="font-size:40px;color:var(--text-faint)"></i>
+            <div style="margin-top:12px;color:var(--text-muted);font-size:14px">No classes found.</div>
+            <a asp-controller="Classes" asp-action="Create" class="btn btn-primary" style="margin-top:16px;display:inline-flex">
+                <i class="bi bi-plus-lg"></i> Create First Class
+            </a>
+        </div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Class</th>
+                        <th>Coach</th>
+                        <th>Branch</th>
+                        <th>Day</th>
+                        <th>Time</th>
+                        <th>Capacity</th>
+                        <th>Status</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var c in Model)
+                    {
+                        <tr>
+                            <td>
+                                <div style="display:flex;align-items:center;gap:12px">
+                                    @if (!string.IsNullOrEmpty(c.PhotoUrl))
+                                    {
+                                        <img src="@c.PhotoUrl" alt="@c.ClassName"
+                                             style="width:44px;height:32px;border-radius:var(--radius-sm);object-fit:cover;flex-shrink:0"/>
+                                    }
+                                    else
+                                    {
+                                        <div style="width:44px;height:32px;border-radius:var(--radius-sm);background:var(--bg-raised);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                                            <i class="bi bi-image" style="font-size:14px;color:var(--text-faint)"></i>
+                                        </div>
+                                    }
+                                    <div>
+                                        <div style="font-weight:600;color:var(--black)">@c.ClassName</div>
+                                        @if (!string.IsNullOrEmpty(c.Description))
+                                        {
+                                            <div style="font-size:11.5px;color:var(--text-muted);margin-top:2px;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+                                                @c.Description
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                @if (c.CoachId.HasValue)
+                                {
+                                    <span style="font-size:12.5px">@c.CoachName</span>
+                                }
+                                else
+                                {
+                                    <span style="color:var(--text-faint)">—</span>
+                                }
+                            </td>
+                            <td style="font-size:12.5px">@c.BranchName</td>
+                            <td>
+                                <span class="badge badge-orange">@c.DayName</span>
+                            </td>
+                            <td style="font-size:12.5px;white-space:nowrap">
+                                <i class="bi bi-clock" style="color:var(--text-faint);margin-right:4px"></i>
+                                @c.TimeDisplay
+                            </td>
+                            <td style="font-size:12.5px">
+                                @if (c.Capacity.HasValue)
+                                {
+                                    @c.Capacity.ToString()
+                                }
+                                else
+                                {
+                                    <span style="color:var(--text-faint)">—</span>
+                                }
+                            </td>
+                            <td>
+                                <span class="badge @(c.IsActive ? "badge-active" : "badge-inactive")">
+                                    @(c.IsActive ? "Active" : "Inactive")
+                                </span>
+                            </td>
+                            <td>
+                                <div style="display:flex;gap:6px;justify-content:flex-end">
+                                    <a asp-controller="Classes" asp-action="Edit" asp-route-id="@c.GymClassId"
+                                       class="btn btn-ghost" style="padding:5px 10px;font-size:12px">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <form asp-controller="Classes" asp-action="Delete" asp-route-id="@c.GymClassId"
+                                          method="post" onsubmit="return confirm('Delete class \'@c.ClassName\'?')">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="btn btn-danger" style="padding:5px 10px;font-size:12px">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

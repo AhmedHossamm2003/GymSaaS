@@ -1,0 +1,145 @@
+@model GymSaaS.Models.CoachFormViewModel
+
+<div class="page-header">
+    <div>
+        <div class="page-title">Coaches</div>
+        <div class="page-subtitle">@ViewData["Subtitle"]</div>
+    </div>
+    <a asp-controller="Coaches" asp-action="Index" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
+</div>
+
+<div style="max-width:720px">
+    <form asp-controller="Coaches" asp-action="@(Model.IsEdit ? "Edit" : "Create")"
+          asp-route-id="@Model.CoachId" method="post" enctype="multipart/form-data">
+        @Html.AntiForgeryToken()
+
+        <!-- Basic info -->
+        <div class="card" style="margin-bottom:20px">
+            <div class="card-header">
+                <span class="card-title">Basic Information</span>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+                <div class="form-group">
+                    <label asp-for="FirstName">First Name</label>
+                    <input asp-for="FirstName" type="text" placeholder="e.g. Ahmed" />
+                    <span asp-validation-for="FirstName" style="color:#dc2626;font-size:11px"></span>
+                </div>
+                <div class="form-group">
+                    <label asp-for="LastName">Last Name</label>
+                    <input asp-for="LastName" type="text" placeholder="e.g. Hassan" />
+                    <span asp-validation-for="LastName" style="color:#dc2626;font-size:11px"></span>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Specialty">Specialty / What They Coach</label>
+                <input asp-for="Specialty" type="text" placeholder="e.g. CrossFit, Yoga, Boxing, Personal Training" />
+                <span asp-validation-for="Specialty" style="color:#dc2626;font-size:11px"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="BranchId">Branch</label>
+                <select asp-for="BranchId">
+                    <option value="">— Select Branch —</option>
+                    @foreach (var b in Model.Branches)
+                    {
+                        <option value="@b.BranchId">@b.BranchName</option>
+                    }
+                </select>
+                <span asp-validation-for="BranchId" style="color:#dc2626;font-size:11px"></span>
+            </div>
+
+            <div class="form-group" style="margin-bottom:0">
+                <label asp-for="Bio">Bio</label>
+                <textarea asp-for="Bio" rows="3" placeholder="Short profile description about this coach…" style="resize:vertical"></textarea>
+            </div>
+        </div>
+
+        <!-- Contact -->
+        <div class="card" style="margin-bottom:20px">
+            <div class="card-header">
+                <span class="card-title">Contact</span>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+                <div class="form-group" style="margin-bottom:0">
+                    <label asp-for="Phone">Phone</label>
+                    <input asp-for="Phone" type="text" placeholder="+20 1xx xxx xxxx" />
+                    <span asp-validation-for="Phone" style="color:#dc2626;font-size:11px"></span>
+                </div>
+                <div class="form-group" style="margin-bottom:0">
+                    <label asp-for="Email">Email</label>
+                    <input asp-for="Email" type="email" placeholder="coach@example.com" />
+                    <span asp-validation-for="Email" style="color:#dc2626;font-size:11px"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Photo -->
+        <div class="card" style="margin-bottom:20px">
+            <div class="card-header">
+                <span class="card-title">Profile Photo</span>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:20px">
+                <div id="photoPreviewWrap" style="flex-shrink:0">
+                    @if (!string.IsNullOrEmpty(Model.ExistingPhotoUrl))
+                    {
+                        <img id="photoPreview" src="@Model.ExistingPhotoUrl"
+                             style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid var(--border)"/>
+                    }
+                    else
+                    {
+                        <div id="photoPreview" style="width:80px;height:80px;border-radius:50%;background:var(--bg-raised);display:flex;align-items:center;justify-content:center;border:2px dashed var(--border)">
+                            <i class="bi bi-person" style="font-size:28px;color:var(--text-faint)"></i>
+                        </div>
+                    }
+                </div>
+                <div>
+                    <label style="text-transform:none;font-size:13px;font-weight:500;margin-bottom:6px;display:block" for="Photo">
+                        Upload photo (JPG, PNG, WebP)
+                    </label>
+                    <input type="file" name="Photo" id="Photo" accept=".jpg,.jpeg,.png,.webp"
+                           onchange="previewPhoto(this)"
+                           style="font-size:13px;border:none;padding:0"/>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status -->
+        <div class="card" style="margin-bottom:24px">
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin:0">
+                <input asp-for="IsActive" type="checkbox" style="width:16px;height:16px;accent-color:var(--orange)" />
+                <span style="font-size:13.5px;font-weight:500">Active — coach is currently working</span>
+            </label>
+        </div>
+
+        <!-- Submit -->
+        <div style="display:flex;gap:10px">
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-check-lg"></i>
+                @(Model.IsEdit ? "Save Changes" : "Create Coach")
+            </button>
+            <a asp-controller="Coaches" asp-action="Index" class="btn btn-secondary">Cancel</a>
+        </div>
+
+    </form>
+</div>
+
+@section Scripts {
+    <script>
+        function previewPhoto(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    const wrap = document.getElementById('photoPreviewWrap');
+                    wrap.innerHTML = `<img src="${e.target.result}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid var(--border)"/>`;
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+    </script>
+}

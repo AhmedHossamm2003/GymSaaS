@@ -1043,7 +1043,12 @@
                     </a>
                     <a asp-controller="Users" asp-action="Index"
                        class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Users" ? "active" : "")">
-                        <i class="bi bi-person-gear"></i> Staff & Roles
+                        <i class="bi bi-people-fill"></i> Users
+                    </a>
+
+                    <a asp-controller="Roles" asp-action="Index"
+                       class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Roles" ? "active" : "")">
+                        <i class="bi bi-shield-lock"></i> Roles
                     </a>
                 </div>
 
@@ -1061,6 +1066,14 @@
 
                 <div class="nav-section">
                     <span class="nav-section-label">Content</span>
+                    <a asp-controller="Coaches" asp-action="Index"
+                       class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Coaches" ? "active" : "")">
+                        <i class="bi bi-person-badge"></i> Coaches
+                    </a>
+                    <a asp-controller="Classes" asp-action="Index"
+                       class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Classes" ? "active" : "")">
+                        <i class="bi bi-calendar2-week"></i> Classes
+                    </a>
                     <a asp-controller="Exercises" asp-action="Index"
                        class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Exercises" ? "active" : "")">
                         <i class="bi bi-activity"></i> Exercise Library

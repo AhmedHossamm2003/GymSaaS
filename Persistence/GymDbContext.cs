@@ -7,10 +7,6 @@ namespace GymSaaS.Persistence;
 
 public partial class GymDbContext : DbContext
 {
-    public GymDbContext()
-    {
-    }
-
     public GymDbContext(DbContextOptions<GymDbContext> options)
         : base(options)
     {
@@ -44,6 +40,8 @@ public partial class GymDbContext : DbContext
 
     public virtual DbSet<Role> Roles { get; set; }
 
+    public virtual DbSet<RoleViewPermission> RoleViewPermissions { get; set; }
+
     public virtual DbSet<Tenant> Tenants { get; set; }
 
     public virtual DbSet<User> Users { get; set; }
@@ -52,13 +50,15 @@ public partial class GymDbContext : DbContext
 
     public virtual DbSet<UserRole> UserRoles { get; set; }
 
+    public virtual DbSet<ViewPermission> ViewPermissions { get; set; }
+
+    public virtual DbSet<Coach> Coaches { get; set; }
+
+    public virtual DbSet<GymClass> GymClasses { get; set; }
+
     public virtual DbSet<VwActiveMemberPackage> VwActiveMemberPackages { get; set; }
 
     public virtual DbSet<VwCurrentBranchPresence> VwCurrentBranchPresences { get; set; }
-
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
-        => optionsBuilder.UseSqlServer("Server=tcp:main-server-db.database.windows.net,1433;Initial Catalog=GymDB;Persist Security Info=False;User ID=ServerAdmin;Password=Admin@2026;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;");
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -276,6 +276,10 @@ public partial class GymDbContext : DbContext
                 .HasConstraintName("FK_PackageDefinitions_Tenants");
 
             entity.HasOne(d => d.UpdatedByUser).WithMany(p => p.PackageDefinitionUpdatedByUsers).HasConstraintName("FK_PackageDefinitions_UpdatedBy");
+
+            entity.HasOne(d => d.GymClass).WithMany()
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_PackageDefinitions_GymClasses");
         });
 
         modelBuilder.Entity<PackageType>(entity =>
@@ -285,8 +289,31 @@ public partial class GymDbContext : DbContext
 
         modelBuilder.Entity<Role>(entity =>
         {
+            entity.HasIndex(e => new { e.TenantId, e.RoleName }, "UQ_Roles_Tenant_RoleName")
+                .IsUnique()
+                .HasFilter("([IsDeleted]=(0))");
+
             entity.Property(e => e.RoleId).HasDefaultValueSql("(newsequentialid())");
             entity.Property(e => e.CreatedAtUtc).HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+
+            entity.HasOne(d => d.Tenant).WithMany(p => p.Roles)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Roles_Tenants");
+        });
+
+        modelBuilder.Entity<RoleViewPermission>(entity =>
+        {
+            entity.Property(e => e.RoleViewPermissionId).ValueGeneratedNever();
+            entity.Property(e => e.CreatedAtUtc).HasDefaultValueSql("(sysutcdatetime())");
+
+            entity.HasOne(d => d.Role).WithMany(p => p.RoleViewPermissions)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_RoleViewPermissions_Roles");
+
+            entity.HasOne(d => d.ViewPermission).WithMany(p => p.RoleViewPermissions)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_RoleViewPermissions_ViewPermissions");
         });
 
         modelBuilder.Entity<Tenant>(entity =>
@@ -337,6 +364,47 @@ public partial class GymDbContext : DbContext
             entity.HasOne(d => d.User).WithMany(p => p.UserRoles)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_UserRoles_Users");
+        });
+
+        modelBuilder.Entity<ViewPermission>(entity =>
+        {
+            entity.Property(e => e.ViewPermissionId).ValueGeneratedNever();
+            entity.Property(e => e.CreatedAtUtc).HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+        });
+
+        modelBuilder.Entity<Coach>(entity =>
+        {
+            entity.Property(e => e.CoachId).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.CreatedAtUtc).HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+
+            entity.HasOne(d => d.Tenant).WithMany()
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Coaches_Tenants");
+
+            entity.HasOne(d => d.Branch).WithMany()
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Coaches_Branches");
+        });
+
+        modelBuilder.Entity<GymClass>(entity =>
+        {
+            entity.Property(e => e.GymClassId).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.CreatedAtUtc).HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+
+            entity.HasOne(d => d.Tenant).WithMany()
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_GymClasses_Tenants");
+
+            entity.HasOne(d => d.Branch).WithMany()
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_GymClasses_Branches");
+
+            entity.HasOne(d => d.Coach).WithMany(p => p.GymClasses)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_GymClasses_Coaches");
         });
 
         modelBuilder.Entity<VwActiveMemberPackage>(entity =>

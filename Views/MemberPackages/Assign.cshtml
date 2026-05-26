@@ -452,7 +452,11 @@
                                data-policy="@pkg.BranchAccessPolicy"
                                data-sessions="@(pkg.SessionCount?.ToString() ?? "")"
                                data-duration="@(pkg.DurationDays?.ToString() ?? "")"
-                               data-gym-duration="@(pkg.OpenGymDurationDays?.ToString() ?? "")">
+                               data-gym-duration="@(pkg.OpenGymDurationDays?.ToString() ?? "")"
+                               data-invitations="@(pkg.InvitationCount?.ToString() ?? "")"
+                               data-inbody="@(pkg.InBodyCount?.ToString() ?? "")"
+                               data-pt="@(pkg.PtSessionCount?.ToString() ?? "")"
+                               data-freeze="@(pkg.FreezeAllowanceDays?.ToString() ?? "")">
                             <input type="radio" name="PackageDefinitionId" value="@pkg.PackageDefinitionId" />
                             <div class="pkg-opt-icon @pkg.PackageTypeCode">
                                 @if (pkg.PackageTypeCode == "SESSION")
@@ -608,7 +612,43 @@
         </div>
     </div>
 
-    <!-- 5. Notes -->
+    <!-- 5. Perks Override -->
+    <div class="form-card" id="perksCard" style="display:none;">
+        <div class="form-section-head">
+            <div class="form-section-icon"><i class="bi bi-gift"></i></div>
+            <span class="form-section-title">Package Perks</span>
+        </div>
+        <div class="form-body">
+            <div style="font-size:12px; color:var(--t3); margin-bottom:14px;">
+                Defaults are loaded from the catalog. Override here if needed.
+            </div>
+            <div class="form-grid-2">
+                <div class="field">
+                    <label class="field-label"><i class="bi bi-ticket-detailed" style="color:var(--fire);margin-right:4px;"></i> Guest Invitations</label>
+                    <input asp-for="CustomInvitationCount" type="number" min="0" id="customInvitations"
+                           placeholder="Default from package" />
+                </div>
+                <div class="field">
+                    <label class="field-label"><i class="bi bi-activity" style="color:var(--blue);margin-right:4px;"></i> InBody Scans</label>
+                    <input asp-for="CustomInBodyCount" type="number" min="0" id="customInBody"
+                           placeholder="Default from package" />
+                </div>
+                <div class="field">
+                    <label class="field-label"><i class="bi bi-person-arms-up" style="color:var(--green);margin-right:4px;"></i> PT Sessions</label>
+                    <input asp-for="CustomPtSessionCount" type="number" min="0" id="customPt"
+                           placeholder="Default from package" />
+                </div>
+                <div class="field">
+                    <label class="field-label"><i class="bi bi-snow" style="color:var(--blue);margin-right:4px;"></i> Freeze Days</label>
+                    <input asp-for="CustomFreezeAllowanceDays" type="number" min="0" id="customFreeze"
+                           placeholder="Default from package" />
+                </div>
+            </div>
+            <div id="perksDefaultNote" style="font-size:12px;color:var(--t3);margin-top:10px;display:none;"></div>
+        </div>
+    </div>
+
+    <!-- 6. Notes -->
     <div class="form-card">
         <div class="form-section-head">
             <div class="form-section-icon"><i class="bi bi-sticky"></i></div>
@@ -656,14 +696,43 @@
             document.getElementById('sessionOverrideCard').style.display = showSessions ? 'block' : 'none';
 
             // Show branch section ONLY for SELECTED_BRANCHES
-            // Home branch is always auto-included — extra branches shown for selection
             const branchSection = document.getElementById('branchSection');
             if (policy === 'SELECTED_BRANCHES') {
                 branchSection.style.display = 'block';
             } else {
                 branchSection.style.display = 'none';
-                // Uncheck all extra branch checkboxes so they don't accidentally submit
                 document.querySelectorAll('[name="selectedBranchIds"]').forEach(cb => cb.checked = false);
+            }
+
+            // Perks card — always show, populate placeholder text with package defaults
+            const invitations = el.dataset.invitations;
+            const inbody      = el.dataset.inbody;
+            const pt          = el.dataset.pt;
+            const freeze      = el.dataset.freeze;
+            const hasPerks    = invitations || inbody || pt || freeze;
+
+            document.getElementById('perksCard').style.display = hasPerks ? 'block' : 'none';
+
+            if (hasPerks) {
+                const setPlaceholder = (id, val) => {
+                    const el2 = document.getElementById(id);
+                    if (!el2) return;
+                    el2.placeholder = val ? `Default: ${val}` : 'Not included';
+                    el2.value = '';
+                };
+                setPlaceholder('customInvitations', invitations);
+                setPlaceholder('customInBody',      inbody);
+                setPlaceholder('customPt',          pt);
+                setPlaceholder('customFreeze',      freeze);
+
+                const parts = [];
+                if (invitations) parts.push(`${invitations} invitation${invitations != '1' ? 's' : ''}`);
+                if (inbody)      parts.push(`${inbody} InBody`);
+                if (pt)          parts.push(`${pt} PT session${pt != '1' ? 's' : ''}`);
+                if (freeze)      parts.push(`${freeze}d freeze`);
+                const note = document.getElementById('perksDefaultNote');
+                note.textContent = parts.length ? `Package includes: ${parts.join(' · ')}` : '';
+                note.style.display = parts.length ? 'block' : 'none';
             }
         }
     </script>

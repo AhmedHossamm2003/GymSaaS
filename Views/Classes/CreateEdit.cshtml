@@ -1,0 +1,187 @@
+@model GymSaaS.Models.ClassFormViewModel
+
+<div class="page-header">
+    <div>
+        <div class="page-title">Classes</div>
+        <div class="page-subtitle">@ViewData["Subtitle"]</div>
+    </div>
+    <a asp-controller="Classes" asp-action="Index" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
+</div>
+
+<div style="max-width:720px">
+    <form asp-controller="Classes" asp-action="@(Model.IsEdit ? "Edit" : "Create")"
+          asp-route-id="@Model.GymClassId" method="post" enctype="multipart/form-data">
+        @Html.AntiForgeryToken()
+
+        <!-- Class details -->
+        <div class="card" style="margin-bottom:20px">
+            <div class="card-header">
+                <span class="card-title">Class Details</span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="ClassName">Class Name</label>
+                <input asp-for="ClassName" type="text" placeholder="e.g. Morning Yoga, HIIT Circuit, Boxing Fundamentals" />
+                <span asp-validation-for="ClassName" style="color:#dc2626;font-size:11px"></span>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+                <div class="form-group">
+                    <label asp-for="BranchId">Branch</label>
+                    <select asp-for="BranchId" id="branchSelect">
+                        <option value="">— Select Branch —</option>
+                        @foreach (var b in Model.Branches)
+                        {
+                            <option value="@b.BranchId">@b.BranchName</option>
+                        }
+                    </select>
+                    <span asp-validation-for="BranchId" style="color:#dc2626;font-size:11px"></span>
+                </div>
+
+                <div class="form-group">
+                    <label asp-for="CoachId">Coach <span style="color:var(--text-muted);font-weight:400">(optional)</span></label>
+                    <select asp-for="CoachId" id="coachSelect">
+                        <option value="">— No Coach —</option>
+                        @foreach (var c in Model.Coaches)
+                        {
+                            <option value="@c.CoachId" data-branch="@c.BranchId">
+                                @c.FullName (@c.Specialty)
+                            </option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom:0">
+                <label asp-for="Description">Description <span style="color:var(--text-muted);font-weight:400">(optional)</span></label>
+                <textarea asp-for="Description" rows="2" placeholder="Brief description of what this class involves…" style="resize:vertical"></textarea>
+            </div>
+        </div>
+
+        <!-- Schedule -->
+        <div class="card" style="margin-bottom:20px">
+            <div class="card-header">
+                <span class="card-title">Schedule</span>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px">
+                <div class="form-group">
+                    <label asp-for="DayOfWeek">Day of Week</label>
+                    <select asp-for="DayOfWeek">
+                        <option value="">— Select Day —</option>
+                        <option value="1">Monday</option>
+                        <option value="2">Tuesday</option>
+                        <option value="3">Wednesday</option>
+                        <option value="4">Thursday</option>
+                        <option value="5">Friday</option>
+                        <option value="6">Saturday</option>
+                        <option value="0">Sunday</option>
+                    </select>
+                    <span asp-validation-for="DayOfWeek" style="color:#dc2626;font-size:11px"></span>
+                </div>
+
+                <div class="form-group">
+                    <label asp-for="StartTimeStr">Start Time</label>
+                    <input asp-for="StartTimeStr" type="time" />
+                    <span asp-validation-for="StartTimeStr" style="color:#dc2626;font-size:11px"></span>
+                </div>
+
+                <div class="form-group">
+                    <label asp-for="EndTimeStr">End Time</label>
+                    <input asp-for="EndTimeStr" type="time" />
+                    <span asp-validation-for="EndTimeStr" style="color:#dc2626;font-size:11px"></span>
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom:0;max-width:200px">
+                <label asp-for="Capacity">Capacity <span style="color:var(--text-muted);font-weight:400">(optional)</span></label>
+                <input asp-for="Capacity" type="number" min="1" max="500" placeholder="e.g. 20" />
+                <span asp-validation-for="Capacity" style="color:#dc2626;font-size:11px"></span>
+            </div>
+        </div>
+
+        <!-- Photo -->
+        <div class="card" style="margin-bottom:20px">
+            <div class="card-header">
+                <span class="card-title">Class Photo</span>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:20px">
+                <div id="classPhotoWrap" style="flex-shrink:0">
+                    @if (!string.IsNullOrEmpty(Model.ExistingPhotoUrl))
+                    {
+                        <img id="classPhotoPreview" src="@Model.ExistingPhotoUrl"
+                             style="width:100px;height:70px;border-radius:var(--radius-md);object-fit:cover;border:1px solid var(--border)"/>
+                    }
+                    else
+                    {
+                        <div id="classPhotoPreview" style="width:100px;height:70px;border-radius:var(--radius-md);background:var(--bg-raised);display:flex;align-items:center;justify-content:center;border:2px dashed var(--border)">
+                            <i class="bi bi-image" style="font-size:24px;color:var(--text-faint)"></i>
+                        </div>
+                    }
+                </div>
+                <div>
+                    <label style="text-transform:none;font-size:13px;font-weight:500;margin-bottom:6px;display:block" for="Photo">
+                        Upload class photo (JPG, PNG, WebP)
+                    </label>
+                    <input type="file" name="Photo" id="Photo" accept=".jpg,.jpeg,.png,.webp"
+                           onchange="previewClassPhoto(this)"
+                           style="font-size:13px;border:none;padding:0"/>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status -->
+        <div class="card" style="margin-bottom:24px">
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin:0">
+                <input asp-for="IsActive" type="checkbox" style="width:16px;height:16px;accent-color:var(--orange)" />
+                <span style="font-size:13.5px;font-weight:500">Active — show this class in the schedule</span>
+            </label>
+        </div>
+
+        <!-- Submit -->
+        <div style="display:flex;gap:10px">
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-check-lg"></i>
+                @(Model.IsEdit ? "Save Changes" : "Create Class")
+            </button>
+            <a asp-controller="Classes" asp-action="Index" class="btn btn-secondary">Cancel</a>
+        </div>
+
+    </form>
+</div>
+
+@section Scripts {
+    <script>
+        function previewClassPhoto(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    const wrap = document.getElementById('classPhotoWrap');
+                    wrap.innerHTML = `<img src="${e.target.result}" style="width:100px;height:70px;border-radius:var(--radius-md);object-fit:cover;border:1px solid var(--border)"/>`;
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        // Filter coach options to match selected branch
+        const branchSelect = document.getElementById('branchSelect');
+        const coachSelect  = document.getElementById('coachSelect');
+
+        function filterCoaches() {
+            const selectedBranch = branchSelect.value;
+            const options = coachSelect.querySelectorAll('option[data-branch]');
+            options.forEach(opt => {
+                opt.hidden = selectedBranch && opt.dataset.branch !== selectedBranch;
+            });
+            // Clear selected coach if it's now hidden
+            const selected = coachSelect.options[coachSelect.selectedIndex];
+            if (selected && selected.hidden) coachSelect.value = '';
+        }
+
+        branchSelect.addEventListener('change', filterCoaches);
+        filterCoaches(); // run on load
+    </script>
+}

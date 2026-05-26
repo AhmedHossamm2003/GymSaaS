@@ -499,6 +499,61 @@
                                 }
 
                             </div>
+
+                            @* Perks row — shown once per component that carries perks *@
+                            @if (comp.HasPerks)
+                            {
+                                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:2px;margin-bottom:6px;padding-left:35px;">
+
+                                    @if (comp.InvitationsTotal > 0)
+                                    {
+                                        int invRem = comp.InvitationsRemaining ?? 0;
+                                        <span style="display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:600;background:var(--fire-soft);border:1px solid var(--fire-border);color:var(--fire-text);border-radius:20px;padding:2px 9px;">
+                                            <i class="bi bi-ticket-detailed" style="font-size:10px;"></i>
+                                            @invRem / @comp.InvitationsTotal Invitation@(comp.InvitationsTotal != 1 ? "s" : "")
+                                        </span>
+                                    }
+
+                                    @if (comp.InBodyTotal > 0)
+                                    {
+                                        int ibRem = comp.InBodyRemaining ?? 0;
+                                        <span style="display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:600;background:var(--blue-bg);border:1px solid var(--blue-border);color:var(--blue-text);border-radius:20px;padding:2px 9px;">
+                                            <i class="bi bi-activity" style="font-size:10px;"></i>
+                                            @ibRem / @comp.InBodyTotal InBody
+                                        </span>
+                                    }
+
+                                    @if (comp.PtSessionsTotal > 0)
+                                    {
+                                        int ptRem = comp.PtSessionsRemaining ?? 0;
+                                        string ptColor = ptRem == 0 ? "var(--red)" : "var(--green)";
+                                        <span style="display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:600;background:var(--surface-2);border:1px solid var(--border);color:var(--t1);border-radius:20px;padding:2px 9px;">
+                                            <i class="bi bi-person-arms-up" style="font-size:10px;color:var(--green);"></i>
+                                            <span style="color:@ptColor">@ptRem</span> / @comp.PtSessionsTotal PT
+                                        </span>
+                                    }
+
+                                    @if (comp.FreezeAllowanceDays > 0)
+                                    {
+                                        int freezeRem = comp.FreezeRemainingDays ?? 0;
+                                        if (comp.IsFrozen && comp.FrozenUntilDate.HasValue)
+                                        {
+                                            <span style="display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:600;background:var(--blue-bg);border:1px solid var(--blue-border);color:var(--blue-text);border-radius:20px;padding:2px 9px;">
+                                                <i class="bi bi-snow" style="font-size:10px;"></i>
+                                                Frozen until @comp.FrozenUntilDate.Value.ToString("MMM d")
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span style="display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:600;background:var(--surface-2);border:1px solid var(--border);color:var(--t2);border-radius:20px;padding:2px 9px;">
+                                                <i class="bi bi-snow" style="font-size:10px;color:var(--blue);"></i>
+                                                @freezeRem / @comp.FreezeAllowanceDays d Freeze
+                                            </span>
+                                        }
+                                    }
+
+                                </div>
+                            }
                         }
                     </div>
                 }

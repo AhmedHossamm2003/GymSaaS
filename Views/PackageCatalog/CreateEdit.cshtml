@@ -533,7 +533,77 @@
         </div>
     </div>
 
-    <!-- ── 4. Branch Access ── -->
+    <!-- ── 4. Linked Class (SESSION / COMBINED only) ── -->
+    <div class="form-card dyn-section @(Model.PackageTypeCode is "SESSION" or "COMBINED" ? "show" : "")" id="cardLinkedClass">
+        <div class="form-section-head">
+            <div class="form-section-icon"><i class="bi bi-calendar2-week"></i></div>
+            <span class="form-section-title">Linked Class</span>
+        </div>
+        <div class="form-body">
+            <div class="field">
+                <label class="field-label">Class for this Package</label>
+                <select name="GymClassId" id="gymClassSelect">
+                    <option value="">— No specific class —</option>
+                    @{
+                        string? lastBranch = null;
+                    }
+                    @foreach (var cls in Model.AvailableClasses)
+                    {
+                        if (cls.BranchName != lastBranch)
+                        {
+                            if (lastBranch != null) { @Html.Raw("</optgroup>") }
+                            @Html.Raw($"<optgroup label=\"{System.Net.WebUtility.HtmlEncode(cls.BranchName)}\">")
+                            lastBranch = cls.BranchName;
+                        }
+                        <option value="@cls.GymClassId" selected="@(Model.GymClassId == cls.GymClassId)">@cls.ClassName</option>
+                    }
+                    @if (lastBranch != null) { @Html.Raw("</optgroup>") }
+                </select>
+                <div class="field-hint">Members subscribed to this package will see which class they're attending.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── 5b. Package Perks ── -->
+    <div class="form-card">
+        <div class="form-section-head">
+            <div class="form-section-icon"><i class="bi bi-gift"></i></div>
+            <span class="form-section-title">Package Perks</span>
+        </div>
+        <div class="form-body">
+            <div style="font-size:12px; color:var(--t3); margin-bottom:14px;">
+                Leave blank if this package does not include a perk. These values are copied to the member's subscription when assigned.
+            </div>
+            <div class="form-grid-2">
+                <div class="field">
+                    <label class="field-label"><i class="bi bi-ticket-detailed" style="color:var(--fire);margin-right:5px;"></i> Guest Invitations</label>
+                    <input name="InvitationCount" type="number" min="0" max="999"
+                           value="@Model.InvitationCount" placeholder="e.g. 2" />
+                    <div class="field-hint">Guest passes included per subscription.</div>
+                </div>
+                <div class="field">
+                    <label class="field-label"><i class="bi bi-activity" style="color:var(--blue);margin-right:5px;"></i> InBody Scans</label>
+                    <input name="InBodyCount" type="number" min="0" max="999"
+                           value="@Model.InBodyCount" placeholder="e.g. 1" />
+                    <div class="field-hint">Body composition scans included.</div>
+                </div>
+                <div class="field">
+                    <label class="field-label"><i class="bi bi-person-arms-up" style="color:var(--green);margin-right:5px;"></i> PT Sessions</label>
+                    <input name="PtSessionCount" type="number" min="0" max="999"
+                           value="@Model.PtSessionCount" placeholder="e.g. 4" />
+                    <div class="field-hint">Personal training sessions included.</div>
+                </div>
+                <div class="field">
+                    <label class="field-label"><i class="bi bi-snow" style="color:var(--blue);margin-right:5px;"></i> Freeze Allowance (Days)</label>
+                    <input name="FreezeAllowanceDays" type="number" min="0" max="365"
+                           value="@Model.FreezeAllowanceDays" placeholder="e.g. 14" />
+                    <div class="field-hint">Max days the member can freeze this subscription.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── 6. Branch Access ── -->
     <div class="form-card">
         <div class="form-section-head">
             <div class="form-section-icon"><i class="bi bi-building"></i></div>
@@ -579,7 +649,7 @@
         </div>
     </div>
 
-    <!-- ── 5. Settings ── -->
+    <!-- ── 7. Settings ── -->
     <div class="form-card">
         <div class="form-section-head">
             <div class="form-section-icon"><i class="bi bi-sliders"></i></div>
@@ -656,6 +726,13 @@
             document.getElementById('sectionCombined').classList.toggle('show', type === 'COMBINED');
             const titleEl = document.getElementById('durationCardTitle');
             if (titleEl) titleEl.textContent = titles[type] || 'Duration & Sessions';
+            // Show linked class card only for session-based types
+            const hasSessions = type === 'SESSION' || type === 'COMBINED';
+            document.getElementById('cardLinkedClass').classList.toggle('show', hasSessions);
+            if (!hasSessions) {
+                const sel = document.getElementById('gymClassSelect');
+                if (sel) sel.value = '';
+            }
             copyValues(type);
         }
 
@@ -696,6 +773,8 @@
             document.getElementById('sectionSession')?.classList.toggle('show',  initType === 'SESSION');
             document.getElementById('sectionOpenGym')?.classList.toggle('show',  initType === 'OPEN_GYM');
             document.getElementById('sectionCombined')?.classList.toggle('show', initType === 'COMBINED');
+            const initHasSessions = initType === 'SESSION' || initType === 'COMBINED';
+            document.getElementById('cardLinkedClass')?.classList.toggle('show', initHasSessions);
             const titleEl = document.getElementById('durationCardTitle');
             if (titleEl && initType) titleEl.textContent = titles[initType] || 'Duration & Sessions';
             copyValues(initType);

@@ -30,6 +30,21 @@ public partial class PackageDefinition
 
     public int? SessionCount { get; set; }
 
+    // Linked gym class — set only for SESSION / COMBINED packages
+    public Guid? GymClassId { get; set; }
+
+    // Package perks / add-ons — defaults copied to MemberPackage on assignment
+    public int? InvitationCount { get; set; }
+
+    public int? InBodyCount { get; set; }
+
+    public int? PtSessionCount { get; set; }
+
+    public int? FreezeAllowanceDays { get; set; }
+
+    [ForeignKey("GymClassId")]
+    public virtual GymClass? GymClass { get; set; }
+
     public int? DurationDays { get; set; }
 
     public int? CrossBranchVisitLimit { get; set; }

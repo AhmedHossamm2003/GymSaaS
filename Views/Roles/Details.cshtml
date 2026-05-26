@@ -1,0 +1,86 @@
+﻿@model GymSaaS.Models.EditRoleViewModel
+
+@{
+    ViewData["Title"] = "Role Details";
+    var selectedFolders = Model.Permissions
+        .Where(x => x.IsSelected)
+        .OrderBy(x => x.DisplayName)
+        .ToList();
+}
+
+<div class="mb-4">
+    <h2 class="mb-1">Role Details</h2>
+    <p class="text-muted mb-0">View role information and assigned view folders.</p>
+</div>
+
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <div class="text-muted small">Role Name</div>
+                <div class="fw-semibold">@Model.RoleName</div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="text-muted small">Type</div>
+                <div>
+                    @if (Model.IsSystem)
+                    {
+                        <span class="badge bg-dark">System</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-secondary">Custom</span>
+                    }
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="text-muted small">Status</div>
+                <div>
+                    @if (Model.IsActive)
+                    {
+                        <span class="badge bg-success">Active</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-danger">Inactive</span>
+                    }
+                </div>
+            </div>
+
+            <div class="col-12">
+                <div class="text-muted small">Description</div>
+                <div>@(string.IsNullOrWhiteSpace(Model.RoleDescription) ? "-" : Model.RoleDescription)</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="card-body">
+        <h5 class="mb-3">Allowed View Folders</h5>
+
+        @if (!selectedFolders.Any())
+        {
+            <p class="text-muted mb-0">No folders assigned.</p>
+        }
+        else
+        {
+            <div class="d-flex flex-wrap gap-2">
+                @foreach (var item in selectedFolders)
+                {
+                    <span class="badge bg-light text-dark border">@item.DisplayName</span>
+                }
+            </div>
+        }
+
+        <div class="mt-4 d-flex gap-2">
+            @if (!Model.IsSystem)
+            {
+                <a asp-action="Edit" asp-route-id="@Model.RoleId" class="btn btn-primary">Edit</a>
+            }
+            <a asp-action="Index" class="btn btn-outline-secondary">Back</a>
+        </div>
+    </div>
+</div>

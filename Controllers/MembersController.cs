@@ -198,6 +198,16 @@ namespace GymSaaS.Controllers
                     CrossBranchVisitsUsed = x.p.CrossBranchVisitsUsed,
                     CrossBranchVisitLimit = x.p.CrossBranchVisitLimit,
                     CreatedAtUtc = x.p.CreatedAtUtc,
+                    InvitationsTotal     = x.p.InvitationsTotal,
+                    InvitationsRemaining = x.p.InvitationsRemaining,
+                    InBodyTotal          = x.p.InBodyTotal,
+                    InBodyRemaining      = x.p.InBodyRemaining,
+                    PtSessionsTotal      = x.p.PtSessionsTotal,
+                    PtSessionsRemaining  = x.p.PtSessionsRemaining,
+                    FreezeAllowanceDays  = x.p.FreezeAllowanceDays,
+                    FreezeRemainingDays  = x.p.FreezeRemainingDays,
+                    IsFrozen             = x.p.IsFrozen,
+                    FrozenUntilDate      = x.p.FrozenUntilDate,
                 }).ToList();
 
                 packageGroups.Add(new MemberPackageGroup

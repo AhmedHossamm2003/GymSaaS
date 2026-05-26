@@ -1,0 +1,181 @@
+@model List<GymSaaS.Models.ClassListItem>
+@using GymSaaS.Persistence.Entities
+@using GymSaaS.Models
+
+@{
+    var branchId = ViewData["BranchId"] as Guid?;
+    var coachId  = ViewData["CoachId"] as Guid?;
+    var branches = ViewData["Branches"] as List<Branch> ?? new();
+    var coaches  = ViewData["Coaches"] as List<CoachDropdownItem> ?? new();
+
+    // Order: Mon → Tue → Wed → Thu → Fri → Sat → Sun
+    var orderedDays = new[] { 1, 2, 3, 4, 5, 6, 0 };
+    var dayNames = new Dictionary<int, string>
+    {
+        [0] = "Sunday",   [1] = "Monday",  [2] = "Tuesday",
+        [3] = "Wednesday",[4] = "Thursday",[5] = "Friday",
+        [6] = "Saturday"
+    };
+
+    var byDay = orderedDays.ToDictionary(
+        d => d,
+        d => Model.Where(c => c.DayOfWeek == d).OrderBy(c => c.StartTime).ToList()
+    );
+
+    var today = (int)DateTime.Now.DayOfWeek;
+
+    // Accent colors cycling for class cards
+    string[] cardColors = {
+        "rgba(249,115,22,0.10)", "rgba(59,130,246,0.10)",
+        "rgba(22,163,74,0.10)",  "rgba(168,85,247,0.10)",
+        "rgba(236,72,153,0.10)", "rgba(234,179,8,0.10)",
+        "rgba(20,184,166,0.10)"
+    };
+    string[] textColors = {
+        "#f97316","#3b82f6","#16a34a","#a855f7","#ec4899","#ca8a04","#14b8a6"
+    };
+    int colorIdx = 0;
+}
+
+<!-- Header -->
+<div class="page-header">
+    <div>
+        <div class="page-title">Classes</div>
+        <div class="page-subtitle">Weekly Schedule</div>
+    </div>
+    <a asp-controller="Classes" asp-action="Index" class="btn btn-secondary">
+        <i class="bi bi-list-ul"></i> List View
+    </a>
+</div>
+
+<!-- Filters -->
+<div class="card" style="margin-bottom:20px;padding:14px 20px">
+    <form method="get" asp-action="Schedule" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <select name="branchId" style="min-width:150px">
+            <option value="">All Branches</option>
+            @foreach (var b in branches)
+            {
+                <option value="@b.BranchId" selected="@(branchId == b.BranchId)">@b.BranchName</option>
+            }
+        </select>
+        <select name="coachId" style="min-width:150px">
+            <option value="">All Coaches</option>
+            @foreach (var c in coaches)
+            {
+                <option value="@c.CoachId" selected="@(coachId == c.CoachId)">@c.FullName</option>
+            }
+        </select>
+        <button type="submit" class="btn btn-secondary"><i class="bi bi-funnel"></i> Filter</button>
+        @if (branchId.HasValue || coachId.HasValue)
+        {
+            <a asp-controller="Classes" asp-action="Schedule" class="btn btn-ghost">Clear</a>
+        }
+        <div style="margin-left:auto;font-size:12px;color:var(--text-muted)">
+            @Model.Count @(Model.Count == 1 ? "class" : "classes") shown
+        </div>
+    </form>
+</div>
+
+<!-- Weekly grid -->
+<div style="overflow-x:auto">
+    <div style="display:grid;grid-template-columns:repeat(7,minmax(140px,1fr));gap:12px;min-width:980px">
+
+        @foreach (var dayNum in orderedDays)
+        {
+            var classes = byDay[dayNum];
+            var isToday = dayNum == today;
+
+            <div>
+                <!-- Day header -->
+                <div style="text-align:center;margin-bottom:10px">
+                    <div style="font-family:var(--font-display);font-size:13px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;
+                                color:@(isToday ? "var(--orange)" : "var(--text-muted)")">
+                        @dayNames[dayNum]
+                    </div>
+                    @if (isToday)
+                    {
+                        <div style="width:6px;height:6px;background:var(--orange);border-radius:50%;margin:4px auto 0"></div>
+                    }
+                </div>
+
+                <!-- Class cards column -->
+                <div style="display:flex;flex-direction:column;gap:8px;min-height:120px">
+                    @if (!classes.Any())
+                    {
+                        <div style="border:1px dashed var(--border);border-radius:var(--radius-md);padding:20px 12px;text-align:center;color:var(--text-faint);font-size:11.5px">
+                            No classes
+                        </div>
+                    }
+                    else
+                    {
+                        @foreach (var cls in classes)
+                        {
+                            var bg   = cardColors[colorIdx % cardColors.Length];
+                            var col  = textColors[colorIdx % textColors.Length];
+                            colorIdx++;
+
+                            <div style="background:@bg;border:1px solid rgba(0,0,0,0.06);border-radius:var(--radius-md);overflow:hidden;position:relative;@(cls.IsActive ? "" : "opacity:0.5")">
+
+                                @if (!string.IsNullOrEmpty(cls.PhotoUrl))
+                                {
+                                    <img src="@cls.PhotoUrl" alt="@cls.ClassName"
+                                         style="width:100%;height:64px;object-fit:cover;display:block"/>
+                                }
+
+                                <div style="padding:10px 12px">
+
+                                @if (!cls.IsActive)
+                                {
+                                    <span style="position:absolute;top:8px;right:8px;font-size:9px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-muted);background:rgba(255,255,255,0.85);padding:2px 5px;border-radius:3px">inactive</span>
+                                }
+
+                                <div style="font-weight:700;font-size:12.5px;color:var(--black);margin-bottom:6px;padding-right:@(cls.IsActive ? "0" : "48px")">
+                                    @cls.ClassName
+                                </div>
+
+                                <div style="display:flex;align-items:center;gap:5px;font-size:11.5px;color:@col;font-weight:600;margin-bottom:4px">
+                                    <i class="bi bi-clock" style="font-size:11px"></i>
+                                    @cls.TimeDisplay
+                                </div>
+
+                                @if (cls.CoachId.HasValue)
+                                {
+                                    <div style="font-size:11px;color:var(--text-secondary);display:flex;align-items:center;gap:4px">
+                                        <i class="bi bi-person" style="font-size:11px"></i>
+                                        @cls.CoachName
+                                    </div>
+                                }
+
+                                @if (cls.Capacity.HasValue)
+                                {
+                                    <div style="font-size:11px;color:var(--text-muted);margin-top:3px;display:flex;align-items:center;gap:4px">
+                                        <i class="bi bi-people" style="font-size:11px"></i>
+                                        Max @cls.Capacity
+                                    </div>
+                                }
+
+                                <div style="font-size:10.5px;color:var(--text-faint);margin-top:6px">@cls.BranchName</div>
+
+                                <!-- Edit link -->
+                                <a asp-controller="Classes" asp-action="Edit" asp-route-id="@cls.GymClassId"
+                                   style="position:absolute;bottom:8px;right:8px;font-size:12px;color:var(--text-faint);opacity:0;transition:opacity 0.15s"
+                                   class="schedule-edit-btn" title="Edit">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+
+                                </div>@* end padding div *@
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        }
+
+    </div>
+</div>
+
+@section Scripts {
+    <style>
+        div:hover > .schedule-edit-btn { opacity: 1 !important; }
+    </style>
+}

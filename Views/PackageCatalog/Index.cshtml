@@ -462,6 +462,32 @@ else
                                     <span>Home branch + limited other branches</span>
                                 }
                             </div>
+                            @if (!string.IsNullOrEmpty(p.GymClassName) &&
+                                 (p.PackageTypeCode == "SESSION" || p.PackageTypeCode == "COMBINED"))
+                            {
+                                <div class="pc-info-row">
+                                    <i class="bi bi-calendar2-week"></i>
+                                    <span>@p.GymClassName</span>
+                                </div>
+                            }
+                            @{
+                                var perks = new List<(string icon, string label, string color)>();
+                                if (p.InvitationCount > 0)    perks.Add(("bi-ticket-detailed",  $"{p.InvitationCount} Invitation{(p.InvitationCount != 1 ? "s" : "")}", "var(--fire)"));
+                                if (p.InBodyCount > 0)        perks.Add(("bi-activity",          $"{p.InBodyCount} InBody",                                                   "var(--blue)"));
+                                if (p.PtSessionCount > 0)     perks.Add(("bi-person-arms-up",    $"{p.PtSessionCount} PT Session{(p.PtSessionCount != 1 ? "s" : "")}",        "var(--green)"));
+                                if (p.FreezeAllowanceDays > 0) perks.Add(("bi-snow",             $"{p.FreezeAllowanceDays}d Freeze",                                          "var(--blue)"));
+                            }
+                            @if (perks.Any())
+                            {
+                                <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:4px;">
+                                    @foreach (var perk in perks)
+                                    {
+                                        <span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:@perk.color;background:var(--canvas);border:1px solid var(--border);border-radius:20px;padding:2px 8px;">
+                                            <i class="bi @perk.icon" style="font-size:10px;"></i>@perk.label
+                                        </span>
+                                    }
+                                </div>
+                            }
                             @if (p.Price.HasValue)
                             {
                                 <div class="pc-price-row">

@@ -51,6 +51,11 @@ namespace GymSaaS.Controllers
                     SessionCount = x.p.SessionCount,
                     DurationDays = x.p.DurationDays,
                     OpenGymDurationDays = x.p.OpenGymDurationDays,
+                    GymClassId = x.p.GymClassId,
+                    InvitationCount = x.p.InvitationCount,
+                    InBodyCount = x.p.InBodyCount,
+                    PtSessionCount = x.p.PtSessionCount,
+                    FreezeAllowanceDays = x.p.FreezeAllowanceDays,
                     Price = x.p.Price,
                     IsActive = x.p.IsActive,
                     SortOrder = x.p.SortOrder,
@@ -59,6 +64,24 @@ namespace GymSaaS.Controllers
                                                       && mp.Status == "ACTIVE"),
                 })
                 .ToListAsync();
+
+            // Populate GymClassName for packages that have a linked class
+            var classIds = packages
+                .Where(p => p.GymClassId.HasValue)
+                .Select(p => p.GymClassId!.Value)
+                .Distinct()
+                .ToList();
+
+            if (classIds.Count > 0)
+            {
+                var classNames = await _db.GymClasses
+                    .Where(gc => classIds.Contains(gc.GymClassId))
+                    .Select(gc => new { gc.GymClassId, gc.ClassName })
+                    .ToDictionaryAsync(gc => gc.GymClassId, gc => gc.ClassName);
+
+                foreach (var p in packages.Where(p => p.GymClassId.HasValue))
+                    p.GymClassName = classNames.GetValueOrDefault(p.GymClassId!.Value);
+            }
 
             ViewData["Title"] = "Package Catalog";
             return View(packages);
@@ -72,6 +95,7 @@ namespace GymSaaS.Controllers
             var vm = new PackageDefinitionFormViewModel
             {
                 BranchPolicies = await GetPoliciesAsync(),
+                AvailableClasses = await GetClassesAsync(),
             };
             ViewData["Title"] = "Package Catalog";
             ViewData["Subtitle"] = "New Package";
@@ -90,6 +114,7 @@ namespace GymSaaS.Controllers
             if (!ModelState.IsValid)
             {
                 model.BranchPolicies = await GetPoliciesAsync();
+                model.AvailableClasses = await GetClassesAsync();
                 ViewData["Title"] = "Package Catalog";
                 ViewData["Subtitle"] = "New Package";
                 return View("CreateEdit", model);
@@ -100,6 +125,7 @@ namespace GymSaaS.Controllers
             {
                 ModelState.AddModelError(nameof(model.PackageTypeCode), $"Invalid package type: '{model.PackageTypeCode}'");
                 model.BranchPolicies = await GetPoliciesAsync();
+                model.AvailableClasses = await GetClassesAsync();
                 ViewData["Title"] = "Package Catalog";
                 ViewData["Subtitle"] = "New Package";
                 return View("CreateEdit", model);
@@ -117,9 +143,14 @@ namespace GymSaaS.Controllers
                 PackageTypeId = typeId.Value,
                 BranchAccessPolicyTypeId = model.BranchAccessPolicyTypeId,
                 SessionCount = model.HasSessions ? model.SessionCount : null,
+                GymClassId = model.HasSessions ? model.GymClassId : null,
                 DurationDays = model.DurationDays,
                 OpenGymDurationDays = model.IsCombined ? model.OpenGymDurationDaysSeparate : null,
                 OpenGymDailyLimit = model.OpenGymDailyLimit,
+                InvitationCount = model.InvitationCount,
+                InBodyCount = model.InBodyCount,
+                PtSessionCount = model.PtSessionCount,
+                FreezeAllowanceDays = model.FreezeAllowanceDays,
                 Price = model.Price,
                 AllowCarryOverSessions = model.AllowCarryOverSessions,
                 AllowQueuedRenewal = model.AllowQueuedRenewal,
@@ -158,6 +189,11 @@ namespace GymSaaS.Controllers
                 PackageTypeCode = pkg.PackageType?.PackageTypeCode ?? "",
                 BranchAccessPolicyTypeId = pkg.BranchAccessPolicyTypeId,
                 SessionCount = pkg.SessionCount,
+                GymClassId = pkg.GymClassId,
+                InvitationCount = pkg.InvitationCount,
+                InBodyCount = pkg.InBodyCount,
+                PtSessionCount = pkg.PtSessionCount,
+                FreezeAllowanceDays = pkg.FreezeAllowanceDays,
                 DurationDays = pkg.DurationDays,
                 OpenGymDurationDaysSeparate = pkg.OpenGymDurationDays,
                 OpenGymDailyLimit = pkg.OpenGymDailyLimit,
@@ -167,6 +203,7 @@ namespace GymSaaS.Controllers
                 IsActive = pkg.IsActive,
                 SortOrder = pkg.SortOrder,
                 BranchPolicies = await GetPoliciesAsync(),
+                AvailableClasses = await GetClassesAsync(),
             };
 
             ViewData["Title"] = "Package Catalog";
@@ -192,6 +229,7 @@ namespace GymSaaS.Controllers
             if (!ModelState.IsValid)
             {
                 model.BranchPolicies = await GetPoliciesAsync();
+                model.AvailableClasses = await GetClassesAsync();
                 ViewData["Title"] = "Package Catalog";
                 ViewData["Subtitle"] = "Edit Package";
                 return View("CreateEdit", model);
@@ -201,6 +239,11 @@ namespace GymSaaS.Controllers
             pkg.Description = model.Description?.Trim();
             pkg.BranchAccessPolicyTypeId = model.BranchAccessPolicyTypeId;
             pkg.SessionCount = model.HasSessions ? model.SessionCount : null;
+            pkg.GymClassId = model.HasSessions ? model.GymClassId : null;
+            pkg.InvitationCount = model.InvitationCount;
+            pkg.InBodyCount = model.InBodyCount;
+            pkg.PtSessionCount = model.PtSessionCount;
+            pkg.FreezeAllowanceDays = model.FreezeAllowanceDays;
             pkg.DurationDays = model.DurationDays;
             pkg.OpenGymDurationDays = model.IsCombined ? model.OpenGymDurationDaysSeparate : null;
             pkg.OpenGymDailyLimit = model.OpenGymDailyLimit;
@@ -243,6 +286,23 @@ namespace GymSaaS.Controllers
         // ─────────────────────────────────────────────
         // HELPERS
         // ─────────────────────────────────────────────
+        private async Task<List<ClassLookupItem>> GetClassesAsync() =>
+            await _db.GymClasses
+                .Where(gc => gc.TenantId == TenantId && gc.IsActive && !gc.IsDeleted)
+                .Join(_db.Branches,
+                      gc => gc.BranchId,
+                      b => b.BranchId,
+                      (gc, b) => new ClassLookupItem
+                      {
+                          GymClassId = gc.GymClassId,
+                          ClassName = gc.ClassName,
+                          BranchId = gc.BranchId,
+                          BranchName = b.BranchName,
+                      })
+                .OrderBy(c => c.BranchName)
+                .ThenBy(c => c.ClassName)
+                .ToListAsync();
+
         private async Task<List<BranchPolicyDropdownItem>> GetPoliciesAsync()
         {
             var raw = await _db.BranchAccessPolicyTypes

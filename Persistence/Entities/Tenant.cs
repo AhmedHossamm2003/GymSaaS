@@ -64,5 +64,8 @@ public partial class Tenant
     public virtual ICollection<PackageDefinition> PackageDefinitions { get; set; } = new List<PackageDefinition>();
 
     [InverseProperty("Tenant")]
+    public virtual ICollection<Role> Roles { get; set; } = new List<Role>();
+
+    [InverseProperty("Tenant")]
     public virtual ICollection<User> Users { get; set; } = new List<User>();
 }

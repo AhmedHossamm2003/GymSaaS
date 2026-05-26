@@ -66,6 +66,29 @@ public partial class MemberPackage
 
     public Guid? RenewalOfMemberPackageId { get; set; }
 
+    // Perks tracking — values copied from PackageDefinition at assignment time
+    public int? InvitationsTotal { get; set; }
+
+    public int? InvitationsRemaining { get; set; }
+
+    public int? InBodyTotal { get; set; }
+
+    public int? InBodyRemaining { get; set; }
+
+    public int? PtSessionsTotal { get; set; }
+
+    public int? PtSessionsRemaining { get; set; }
+
+    public int? FreezeAllowanceDays { get; set; }
+
+    public int? FreezeRemainingDays { get; set; }
+
+    public bool IsFrozen { get; set; }
+
+    public DateOnly? FrozenFromDate { get; set; }
+
+    public DateOnly? FrozenUntilDate { get; set; }
+
     [StringLength(1000)]
     public string? Notes { get; set; }
 

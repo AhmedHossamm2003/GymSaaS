@@ -1,0 +1,81 @@
+﻿@model GymSaaS.Models.CreateRoleViewModel
+
+@{
+    ViewData["Title"] = "Create Role";
+}
+
+<div class="mb-4">
+    <h2 class="mb-1">Create Role</h2>
+    <p class="text-muted mb-0">Create a global role and assign accessible view folders.</p>
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="card-body">
+        <form asp-action="Create" method="post">
+            <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label asp-for="RoleName" class="form-label"></label>
+                    <input asp-for="RoleName" class="form-control" />
+                    <span asp-validation-for="RoleName" class="text-danger"></span>
+                </div>
+
+                <div class="col-md-6 d-flex align-items-end">
+                    <div class="form-check form-switch">
+                        <input asp-for="IsActive" class="form-check-input" />
+                        <label asp-for="IsActive" class="form-check-label"></label>
+                    </div>
+                </div>
+
+                <div class="col-12">
+                    <label asp-for="RoleDescription" class="form-label"></label>
+                    <textarea asp-for="RoleDescription" class="form-control" rows="3"></textarea>
+                    <span asp-validation-for="RoleDescription" class="text-danger"></span>
+                </div>
+            </div>
+
+            <hr class="my-4" />
+
+            <h5 class="mb-3">Allowed View Folders</h5>
+            <p class="text-muted">
+                Selecting a folder gives this role access to all pages inside that folder.
+            </p>
+
+            @if (!Model.Permissions.Any())
+            {
+                <div class="alert alert-warning">
+                    No eligible view folders were found.
+                </div>
+            }
+            else
+            {
+                <div class="row">
+                    @for (int i = 0; i < Model.Permissions.Count; i++)
+                    {
+                        <div class="col-md-4 mb-3">
+                            <div class="form-check border rounded p-3">
+                                <input type="hidden" asp-for="Permissions[@i].ViewPermissionId" />
+                                <input type="hidden" asp-for="Permissions[@i].DisplayName" />
+                                <input type="hidden" asp-for="Permissions[@i].GroupName" />
+                                <input asp-for="Permissions[@i].IsSelected" class="form-check-input" />
+                                <label asp-for="Permissions[@i].IsSelected" class="form-check-label fw-semibold">
+                                    @Model.Permissions[i].DisplayName
+                                </label>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+
+            <div class="mt-4 d-flex gap-2">
+                <button type="submit" class="btn btn-primary">Save Role</button>
+                <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

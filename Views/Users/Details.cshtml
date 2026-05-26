@@ -1,0 +1,62 @@
+﻿@model GymSaaS.Models.EditUserViewModel
+
+@{
+    ViewData["Title"] = "User Details";
+    var roleName = Model.Roles.FirstOrDefault(x => x.Value == Model.RoleId.ToString())?.Text ?? "-";
+    var branchName = Model.Branches.FirstOrDefault(x => x.Value == Model.BranchId?.ToString())?.Text ?? "-";
+}
+
+<div class="mb-4">
+    <h2 class="mb-1">User Details</h2>
+    <p class="text-muted mb-0">View user information.</p>
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="card-body">
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="text-muted small">Full Name</div>
+                <div class="fw-semibold">@Model.FullName</div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="text-muted small">Email</div>
+                <div>@Model.Email</div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="text-muted small">Phone Number</div>
+                <div>@(string.IsNullOrWhiteSpace(Model.PhoneNumber) ? "-" : Model.PhoneNumber)</div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="text-muted small">Role</div>
+                <div>@roleName</div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="text-muted small">Branch</div>
+                <div>@branchName</div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="text-muted small">Status</div>
+                <div>
+                    @if (Model.IsActive)
+                    {
+                        <span class="badge bg-success">Active</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-danger">Inactive</span>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-4 d-flex gap-2">
+            <a asp-action="Edit" asp-route-id="@Model.UserId" class="btn btn-primary">Edit</a>
+            <a asp-action="Index" class="btn btn-outline-secondary">Back</a>
+        </div>
+    </div>
+</div>

@@ -93,6 +93,12 @@ namespace GymSaaS.Controllers
             var startDate = model.CustomStartDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
             var typeCode = pkgDef.PackageType?.PackageTypeCode ?? "";
 
+            // Resolve perks — use override if provided, else use catalog defaults
+            int? invitationsTotal   = model.CustomInvitationCount   ?? pkgDef.InvitationCount;
+            int? inBodyTotal        = model.CustomInBodyCount        ?? pkgDef.InBodyCount;
+            int? ptSessionsTotal    = model.CustomPtSessionCount     ?? pkgDef.PtSessionCount;
+            int? freezeAllowance    = model.CustomFreezeAllowanceDays ?? pkgDef.FreezeAllowanceDays;
+
             // ── Build final allowed branch list (home always included) ─────────
             List<Guid> finalBranchIds = new();
             if (pkgDef.BranchAccessPolicyType?.PolicyCode == "SELECTED_BRANCHES")
@@ -138,6 +144,15 @@ namespace GymSaaS.Controllers
                     LinkedPackageGroupId = groupId,
                     PackageComponentRole = "SESSION",
                     OpenGymDailyLimit = 1,
+                    // Perks — stored on the SESSION component row
+                    InvitationsTotal     = invitationsTotal,
+                    InvitationsRemaining = invitationsTotal,
+                    InBodyTotal          = inBodyTotal,
+                    InBodyRemaining      = inBodyTotal,
+                    PtSessionsTotal      = ptSessionsTotal,
+                    PtSessionsRemaining  = ptSessionsTotal,
+                    FreezeAllowanceDays  = freezeAllowance,
+                    FreezeRemainingDays  = freezeAllowance,
                     CreatedAtUtc = DateTime.UtcNow,
                     CreatedByUserId = UserId,
                 };
@@ -218,6 +233,15 @@ namespace GymSaaS.Controllers
                     LinkedPackageGroupId = null,
                     PackageComponentRole = null,
                     OpenGymDailyLimit = pkgDef.OpenGymDailyLimit,
+                    // Perks
+                    InvitationsTotal     = invitationsTotal,
+                    InvitationsRemaining = invitationsTotal,
+                    InBodyTotal          = inBodyTotal,
+                    InBodyRemaining      = inBodyTotal,
+                    PtSessionsTotal      = ptSessionsTotal,
+                    PtSessionsRemaining  = ptSessionsTotal,
+                    FreezeAllowanceDays  = freezeAllowance,
+                    FreezeRemainingDays  = freezeAllowance,
                     CreatedAtUtc = DateTime.UtcNow,
                     CreatedByUserId = UserId,
                 };
@@ -254,6 +278,10 @@ namespace GymSaaS.Controllers
                     SessionCount = x.p.SessionCount,
                     DurationDays = x.p.DurationDays,
                     OpenGymDurationDays = x.p.OpenGymDurationDays,
+                    InvitationCount = x.p.InvitationCount,
+                    InBodyCount = x.p.InBodyCount,
+                    PtSessionCount = x.p.PtSessionCount,
+                    FreezeAllowanceDays = x.p.FreezeAllowanceDays,
                     Price = x.p.Price,
                     IsActive = x.p.IsActive,
                     SortOrder = x.p.SortOrder,
