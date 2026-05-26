@@ -117,6 +117,9 @@ public partial class MemberPackage
     [InverseProperty("MemberPackage")]
     public virtual ICollection<AttendanceRecord> AttendanceRecords { get; set; } = new List<AttendanceRecord>();
 
+    [InverseProperty("MemberPackage")]
+    public virtual ICollection<MemberInvitation> MemberInvitations { get; set; } = new List<MemberInvitation>();
+
     [ForeignKey("BranchAccessPolicyTypeId")]
     [InverseProperty("MemberPackages")]
     public virtual BranchAccessPolicyType BranchAccessPolicyType { get; set; } = null!;

@@ -30,6 +30,8 @@ public partial class GymDbContext : DbContext
 
     public virtual DbSet<MemberPackageAllowedBranch> MemberPackageAllowedBranches { get; set; }
 
+    public virtual DbSet<MemberInvitation> MemberInvitations { get; set; }
+
     public virtual DbSet<MemberStatus> MemberStatuses { get; set; }
 
     public virtual DbSet<OverrideRequestStatus> OverrideRequestStatuses { get; set; }
@@ -405,6 +407,32 @@ public partial class GymDbContext : DbContext
             entity.HasOne(d => d.Coach).WithMany(p => p.GymClasses)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_GymClasses_Coaches");
+        });
+
+        modelBuilder.Entity<MemberInvitation>(entity =>
+        {
+            entity.Property(e => e.MemberInvitationId).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.CreatedAtUtc).HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.Status).HasDefaultValue("PENDING");
+
+            entity.HasOne(d => d.Tenant).WithMany()
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_MemberInvitations_Tenants");
+
+            entity.HasOne(d => d.Member).WithMany(p => p.SentInvitations)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_MemberInvitations_Members");
+
+            entity.HasOne(d => d.MemberPackage).WithMany(p => p.MemberInvitations)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_MemberInvitations_MemberPackages");
+
+            entity.HasOne(d => d.InvitedMember).WithMany(p => p.ReceivedInvitations)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_MemberInvitations_InvitedMember");
+
+            entity.HasOne(d => d.CreatedByUser).WithMany()
+                .HasConstraintName("FK_MemberInvitations_CreatedBy");
         });
 
         modelBuilder.Entity<VwActiveMemberPackage>(entity =>

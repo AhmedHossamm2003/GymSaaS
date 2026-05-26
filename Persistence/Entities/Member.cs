@@ -126,4 +126,10 @@ public partial class Member
     [ForeignKey("UpdatedByUserId")]
     [InverseProperty("MemberUpdatedByUsers")]
     public virtual User? UpdatedByUser { get; set; }
+
+    [InverseProperty("Member")]
+    public virtual ICollection<MemberInvitation> SentInvitations { get; set; } = new List<MemberInvitation>();
+
+    [InverseProperty("InvitedMember")]
+    public virtual ICollection<MemberInvitation> ReceivedInvitations { get; set; } = new List<MemberInvitation>();
 }

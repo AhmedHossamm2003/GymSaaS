@@ -561,6 +561,159 @@
         </div>
     </div>
 
+    <!-- Invitations -->
+    <div class="info-card">
+        <div class="ic-head">
+            <div class="ic-head-left">
+                <div class="ic-head-icon"><i class="bi bi-ticket-detailed"></i></div>
+                <span class="ic-head-title">Invitations</span>
+                @if (Model.InvitationsRemaining > 0)
+                {
+                    <span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;background:var(--fire-soft);border:1px solid var(--fire-border);color:var(--fire-text);border-radius:20px;padding:1px 8px;">
+                        @Model.InvitationsRemaining remaining
+                    </span>
+                }
+            </div>
+            @if (Model.InvitationsRemaining > 0)
+            {
+                <button type="button" class="btn btn-primary" style="padding:5px 12px;font-size:12px;" onclick="openInviteModal()">
+                    <i class="bi bi-plus-lg"></i> Use Invitation
+                </button>
+            }
+        </div>
+        <div class="ic-body" style="padding:0;">
+            @if (!Model.Invitations.Any())
+            {
+                <div style="text-align:center;padding:28px 0;color:var(--t3);font-size:13px;">
+                    <i class="bi bi-ticket-detailed" style="font-size:28px;display:block;margin-bottom:8px;"></i>
+                    No invitations recorded yet.
+                </div>
+            }
+            else
+            {
+                <table style="width:100%;border-collapse:collapse;">
+                    <thead>
+                        <tr style="background:var(--surface-2);font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--t3);">
+                            <th style="padding:10px 20px;text-align:left;">Guest</th>
+                            <th style="padding:10px 20px;text-align:left;">Phone</th>
+                            <th style="padding:10px 20px;text-align:left;">Package</th>
+                            <th style="padding:10px 20px;text-align:left;">Date</th>
+                            <th style="padding:10px 20px;text-align:left;">Status</th>
+                            <th style="padding:10px 20px;text-align:left;"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var inv in Model.Invitations)
+                        {
+                            <tr style="border-top:1px solid var(--border);font-size:13px;">
+                                <td style="padding:11px 20px;">
+                                    <span style="font-weight:600;color:var(--t1);">@inv.GuestName</span>
+                                    @if (!string.IsNullOrEmpty(inv.InvitedMemberName))
+                                    {
+                                        <br /><span style="font-size:11px;color:var(--t3);">Member: @inv.InvitedMemberName</span>
+                                    }
+                                </td>
+                                <td style="padding:11px 20px;color:var(--t2);">@inv.GuestPhone</td>
+                                <td style="padding:11px 20px;color:var(--t2);font-size:12px;">@inv.PackageName</td>
+                                <td style="padding:11px 20px;color:var(--t3);font-size:12px;">@inv.CreatedAtUtc.ToString("MMM d, yyyy")</td>
+                                <td style="padding:11px 20px;">
+                                    @if (inv.IsPending)
+                                    {
+                                        <span class="badge badge-pending">Pending</span>
+                                    }
+                                    else if (inv.IsUsed)
+                                    {
+                                        <span class="badge badge-active">Used</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge badge-inactive">Cancelled</span>
+                                    }
+                                </td>
+                                <td style="padding:11px 20px;">
+                                    @if (inv.IsPending)
+                                    {
+                                        <div style="display:flex;gap:6px;">
+                                            <form asp-controller="Invitations" asp-action="MarkUsed" method="post" style="display:inline;">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="id" value="@inv.MemberInvitationId" />
+                                                <input type="hidden" name="memberId" value="@Model.MemberId" />
+                                                <button type="submit" class="btn btn-ghost" style="font-size:11px;padding:3px 9px;border:1px solid var(--border);" title="Mark as used">
+                                                    <i class="bi bi-check-lg"></i> Used
+                                                </button>
+                                            </form>
+                                            <form asp-controller="Invitations" asp-action="Cancel" method="post" style="display:inline;"
+                                                  onsubmit="return confirm('Cancel this invitation?')">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="id" value="@inv.MemberInvitationId" />
+                                                <input type="hidden" name="memberId" value="@Model.MemberId" />
+                                                <button type="submit" class="btn btn-ghost" style="font-size:11px;padding:3px 9px;border:1px solid var(--border);color:var(--red);" title="Cancel">
+                                                    <i class="bi bi-x-lg"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+    </div>
+
+    <!-- Invite Modal -->
+    <div id="inviteModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:center;justify-content:center;">
+        <div style="background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--sh-lg);width:100%;max-width:440px;margin:16px;overflow:hidden;">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);background:var(--surface-2);">
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <div style="width:28px;height:28px;border-radius:var(--r-xs);background:var(--fire-soft);border:1px solid var(--fire-border);display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--fire);">
+                        <i class="bi bi-ticket-detailed"></i>
+                    </div>
+                    <span style="font-family:var(--font-display);font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;">Use Invitation</span>
+                </div>
+                <button type="button" onclick="closeInviteModal()" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--t3);">&times;</button>
+            </div>
+            <form asp-controller="Invitations" asp-action="Create" method="post" style="padding:20px;">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="MemberId" value="@Model.MemberId" />
+
+                <!-- Phone search -->
+                <div class="form-field" style="margin-bottom:14px;">
+                    <label class="form-label">Guest Phone</label>
+                    <div style="display:flex;gap:8px;">
+                        <input type="text" id="invPhoneInput" name="GuestPhone" class="form-control" placeholder="+20 1xx xxxxxxx"
+                               style="flex:1;" oninput="debouncedPhoneSearch(this.value)" />
+                        <button type="button" onclick="searchByPhone()" class="btn btn-ghost" style="border:1px solid var(--border);white-space:nowrap;font-size:12px;">
+                            <i class="bi bi-search"></i> Search
+                        </button>
+                    </div>
+                    <div id="phoneSearchResult" style="margin-top:6px;font-size:12px;"></div>
+                </div>
+
+                <!-- Hidden field for matched member id -->
+                <input type="hidden" id="invInvitedMemberId" name="InvitedMemberId" value="" />
+
+                <!-- Guest name -->
+                <div class="form-field" style="margin-bottom:14px;">
+                    <label class="form-label">Guest Name</label>
+                    <input type="text" id="invGuestName" name="GuestName" class="form-control" placeholder="Full name" />
+                </div>
+
+                <!-- Notes -->
+                <div class="form-field" style="margin-bottom:20px;">
+                    <label class="form-label">Notes <span style="color:var(--t3);font-weight:400;">(optional)</span></label>
+                    <input type="text" name="Notes" class="form-control" placeholder="e.g. friend of member" />
+                </div>
+
+                <div style="display:flex;gap:8px;justify-content:flex-end;">
+                    <button type="button" onclick="closeInviteModal()" class="btn btn-ghost" style="border:1px solid var(--border);">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Record Invitation</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Personal Info -->
     <div class="info-card">
         <div class="ic-head">
@@ -607,6 +760,7 @@
 
 @section Scripts {
     <script>
+        // Status dropdown
         document.getElementById("statusMenuBtn")?.addEventListener("click", function(e) {
             e.stopPropagation();
             const drop = document.getElementById("statusDrop");
@@ -616,5 +770,59 @@
             const drop = document.getElementById("statusDrop");
             if (drop) drop.style.display = "none";
         });
+
+        // ── Invitation Modal ──────────────────────────
+        function openInviteModal() {
+            document.getElementById("inviteModal").style.display = "flex";
+            document.getElementById("invPhoneInput").value = "";
+            document.getElementById("invGuestName").value = "";
+            document.getElementById("invInvitedMemberId").value = "";
+            document.getElementById("phoneSearchResult").innerHTML = "";
+            document.getElementById("invPhoneInput").focus();
+        }
+
+        function closeInviteModal() {
+            document.getElementById("inviteModal").style.display = "none";
+        }
+
+        document.getElementById("inviteModal")?.addEventListener("click", function(e) {
+            if (e.target === this) closeInviteModal();
+        });
+
+        // Phone search with debounce
+        let searchTimer = null;
+        function debouncedPhoneSearch(val) {
+            clearTimeout(searchTimer);
+            if (val.trim().length < 7) {
+                document.getElementById("phoneSearchResult").innerHTML = "";
+                document.getElementById("invInvitedMemberId").value = "";
+                return;
+            }
+            searchTimer = setTimeout(() => searchByPhone(), 500);
+        }
+
+        async function searchByPhone() {
+            const phone = document.getElementById("invPhoneInput").value.trim();
+            if (!phone) return;
+
+            const resultEl = document.getElementById("phoneSearchResult");
+            resultEl.innerHTML = '<span style="color:var(--t3);">Searching...</span>';
+
+            try {
+                const res = await fetch(`/Invitations/SearchMember?phone=${encodeURIComponent(phone)}`);
+                const data = await res.json();
+
+                if (data.found) {
+                    document.getElementById("invInvitedMemberId").value = data.memberId;
+                    document.getElementById("invGuestName").value = data.name;
+                    resultEl.innerHTML = `<span style="color:var(--green);font-weight:600;"><i class="bi bi-check-circle-fill"></i> Member found: ${data.name}</span>`;
+                } else {
+                    document.getElementById("invInvitedMemberId").value = "";
+                    resultEl.innerHTML = '<span style="color:var(--t3);"><i class="bi bi-info-circle"></i> Not a registered member — enter name manually.</span>';
+                }
+            } catch {
+                resultEl.innerHTML = '<span style="color:var(--red);">Search failed. Try again.</span>';
+            }
+        }
     </script>
 }

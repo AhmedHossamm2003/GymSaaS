@@ -174,10 +174,52 @@ namespace GymSaaS.Models
         public int TotalAttendance { get; set; }
         public int AttendanceThisMonth { get; set; }
 
+        // Invitations
+        public List<MemberInvitationListItem> Invitations { get; set; } = new();
+        public int InvitationsRemaining { get; set; }
+        public Guid? ActivePackageWithInvitationsId { get; set; }
+
         public string Initials => string.Concat(
             FullName.Split(' ', StringSplitOptions.RemoveEmptyEntries)
                     .Take(2)
                     .Select(w => w[0].ToString().ToUpper()));
+    }
+
+    // ── Invitations ──────────────────────────────
+    public class MemberInvitationListItem
+    {
+        public Guid MemberInvitationId { get; set; }
+        public string GuestName { get; set; } = string.Empty;
+        public string GuestPhone { get; set; } = string.Empty;
+        public string? InvitedMemberName { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public string? Notes { get; set; }
+        public DateTime CreatedAtUtc { get; set; }
+        public DateTime? UsedAtUtc { get; set; }
+        public string PackageName { get; set; } = string.Empty;
+
+        public bool IsPending => Status == "PENDING";
+        public bool IsUsed => Status == "USED";
+        public bool IsCancelled => Status == "CANCELLED";
+    }
+
+    public class CreateInvitationViewModel
+    {
+        public Guid MemberId { get; set; }
+
+        [Required(ErrorMessage = "Guest name is required")]
+        [MaxLength(200)]
+        public string GuestName { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Guest phone is required")]
+        [MaxLength(30)]
+        public string GuestPhone { get; set; } = string.Empty;
+
+        // Set when the guest was found as an existing member
+        public Guid? InvitedMemberId { get; set; }
+
+        [MaxLength(500)]
+        public string? Notes { get; set; }
     }
 
     // ── Helpers ───────────────────────────────────

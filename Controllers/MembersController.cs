@@ -224,6 +224,30 @@ namespace GymSaaS.Controllers
                 .Select(a => (DateTime?)a.CheckInAtUtc)
                 .FirstOrDefaultAsync();
 
+            // Invitations
+            var invitations = await _db.MemberInvitations
+                .Where(i => i.MemberId == id)
+                .OrderByDescending(i => i.CreatedAtUtc)
+                .Select(i => new MemberInvitationListItem
+                {
+                    MemberInvitationId = i.MemberInvitationId,
+                    GuestName        = i.GuestName,
+                    GuestPhone       = i.GuestPhone,
+                    InvitedMemberName = i.InvitedMember != null ? i.InvitedMember.FullName : null,
+                    Status           = i.Status,
+                    Notes            = i.Notes,
+                    CreatedAtUtc     = i.CreatedAtUtc,
+                    UsedAtUtc        = i.UsedAtUtc,
+                    PackageName      = i.MemberPackage.PackageNameSnapshot,
+                })
+                .ToListAsync();
+
+            // Find the first active package with invitations remaining
+            var activeInvPkg = allPkgs
+                .Where(x => (x.p.InvitationsRemaining ?? 0) > 0)
+                .OrderBy(x => x.p.ValidToDate)
+                .FirstOrDefault();
+
             var vm = new MemberDetailsViewModel
             {
                 MemberId = m.MemberId,
@@ -248,6 +272,9 @@ namespace GymSaaS.Controllers
                 PackageGroups = packageGroups,
                 TotalAttendance = await _db.AttendanceRecords.CountAsync(a => a.MemberId == id),
                 AttendanceThisMonth = await _db.AttendanceRecords.CountAsync(a => a.MemberId == id && a.CheckInAtUtc >= bom),
+                Invitations = invitations,
+                InvitationsRemaining = activeInvPkg?.p.InvitationsRemaining ?? 0,
+                ActivePackageWithInvitationsId = activeInvPkg?.p.MemberPackageId,
             };
 
             ViewData["Title"] = vm.FullName;
