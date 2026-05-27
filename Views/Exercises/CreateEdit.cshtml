@@ -1,0 +1,198 @@
+@model GymSaaS.Models.ExerciseFormViewModel
+
+<div class="page-header">
+    <div>
+        <div class="page-title">Exercise Library</div>
+        <div class="page-subtitle">@ViewData["Subtitle"]</div>
+    </div>
+    <a asp-controller="Exercises" asp-action="Index" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
+</div>
+
+<div style="max-width:780px">
+    <form asp-controller="Exercises"
+          asp-action="@(Model.IsEdit ? "Edit" : "Create")"
+          asp-route-id="@Model.ExerciseId"
+          method="post" enctype="multipart/form-data">
+        @Html.AntiForgeryToken()
+
+        <!-- Basic info -->
+        <div class="card" style="margin-bottom:20px">
+            <div class="card-header">
+                <span class="card-title">Basic Information</span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="ExerciseName">Exercise Name</label>
+                <input asp-for="ExerciseName" type="text" placeholder="e.g. Barbell Bench Press" />
+                <span asp-validation-for="ExerciseName" style="color:#dc2626;font-size:11px"></span>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+                <div class="form-group" style="margin-bottom:0">
+                    <label asp-for="ExerciseCategoryId">Category</label>
+                    <select asp-for="ExerciseCategoryId">
+                        <option value="">— Select Category —</option>
+                        @foreach (var c in Model.Categories)
+                        {
+                            <option value="@c.ExerciseCategoryId">@c.CategoryName</option>
+                        }
+                    </select>
+                    <span asp-validation-for="ExerciseCategoryId" style="color:#dc2626;font-size:11px"></span>
+                </div>
+                <div class="form-group" style="margin-bottom:0">
+                    <label asp-for="Difficulty">Difficulty Level</label>
+                    <select asp-for="Difficulty">
+                        <option value="1">Beginner</option>
+                        <option value="2">Intermediate</option>
+                        <option value="3">Advanced</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-top:16px;margin-bottom:0">
+                <label asp-for="Equipment">Equipment</label>
+                <input asp-for="Equipment" type="text" list="equipmentSuggestions"
+                       placeholder="e.g. Barbell, Dumbbell, Bodyweight, Machine…" />
+                <datalist id="equipmentSuggestions">
+                    <option value="Bodyweight"/>
+                    <option value="Barbell"/>
+                    <option value="Dumbbell"/>
+                    <option value="Kettlebell"/>
+                    <option value="Resistance Band"/>
+                    <option value="Cable Machine"/>
+                    <option value="Machine"/>
+                    <option value="Pull-up Bar"/>
+                    <option value="Bench"/>
+                    <option value="TRX"/>
+                </datalist>
+            </div>
+        </div>
+
+        <!-- Description & Instructions -->
+        <div class="card" style="margin-bottom:20px">
+            <div class="card-header">
+                <span class="card-title">Details</span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Description">Short Description</label>
+                <textarea asp-for="Description" rows="2"
+                          placeholder="Brief summary of this exercise and its purpose…"
+                          style="resize:vertical"></textarea>
+            </div>
+
+            <div class="form-group" style="margin-bottom:0">
+                <label asp-for="Instructions">Instructions</label>
+                <textarea asp-for="Instructions" rows="4"
+                          placeholder="Step-by-step instructions on how to perform the exercise correctly…"
+                          style="resize:vertical"></textarea>
+            </div>
+        </div>
+
+        <!-- Muscle Groups -->
+        <div class="card" style="margin-bottom:20px">
+            <div class="card-header">
+                <span class="card-title">Muscle Groups</span>
+            </div>
+
+            @{
+                var bodyParts = Model.AllMuscleGroups.GroupBy(m => m.BodyPart).OrderBy(g => g.Key);
+            }
+            <div style="display:flex;flex-direction:column;gap:16px">
+                @foreach (var group in bodyParts)
+                {
+                    <div>
+                        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-faint);margin-bottom:8px">@group.Key</div>
+                        <div style="display:flex;flex-wrap:wrap;gap:8px">
+                            @foreach (var mg in group)
+                            {
+                                var isChecked = Model.SelectedMuscleGroupIds.Contains(mg.MuscleGroupId);
+                                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;padding:5px 12px;border-radius:var(--radius-sm);border:1px solid var(--border);background:@(isChecked ? "var(--orange)15" : "var(--bg-raised)")">
+                                    <input type="checkbox" name="SelectedMuscleGroupIds" value="@mg.MuscleGroupId"
+                                           @(isChecked ? "checked" : "")
+                                           style="accent-color:var(--orange);width:14px;height:14px"
+                                           onchange="this.parentElement.style.background=this.checked?'var(--orange)15':'var(--bg-raised)'"/>
+                                    @mg.MuscleGroupName
+                                </label>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Media -->
+        <div class="card" style="margin-bottom:20px">
+            <div class="card-header">
+                <span class="card-title">Media</span>
+            </div>
+
+            <!-- Photo -->
+            <div style="display:flex;align-items:center;gap:20px;margin-bottom:20px">
+                <div id="photoPreviewWrap" style="flex-shrink:0">
+                    @if (!string.IsNullOrEmpty(Model.ExistingPhotoUrl))
+                    {
+                        <img id="photoPreview" src="@Model.ExistingPhotoUrl"
+                             style="width:80px;height:80px;border-radius:8px;object-fit:cover;border:2px solid var(--border)"/>
+                    }
+                    else
+                    {
+                        <div id="photoPreview" style="width:80px;height:80px;border-radius:8px;background:var(--bg-raised);display:flex;align-items:center;justify-content:center;border:2px dashed var(--border)">
+                            <i class="bi bi-image" style="font-size:28px;color:var(--text-faint)"></i>
+                        </div>
+                    }
+                </div>
+                <div>
+                    <label style="text-transform:none;font-size:13px;font-weight:500;margin-bottom:6px;display:block" for="Photo">
+                        Exercise photo (JPG, PNG, WebP)
+                    </label>
+                    <input type="file" name="Photo" id="Photo" accept=".jpg,.jpeg,.png,.webp"
+                           onchange="previewPhoto(this)"
+                           style="font-size:13px;border:none;padding:0"/>
+                </div>
+            </div>
+
+            <!-- Video URL -->
+            <div class="form-group" style="margin-bottom:0">
+                <label asp-for="VideoUrl">Demo Video URL (optional)</label>
+                <input asp-for="VideoUrl" type="url" placeholder="https://www.youtube.com/watch?v=..." />
+                <span asp-validation-for="VideoUrl" style="color:#dc2626;font-size:11px"></span>
+            </div>
+        </div>
+
+        <!-- Status -->
+        <div class="card" style="margin-bottom:24px">
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin:0">
+                <input asp-for="IsActive" type="checkbox" style="width:16px;height:16px;accent-color:var(--orange)" />
+                <span style="font-size:13.5px;font-weight:500">Active — exercise is visible in the library</span>
+            </label>
+        </div>
+
+        <!-- Submit -->
+        <div style="display:flex;gap:10px">
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-check-lg"></i>
+                @(Model.IsEdit ? "Save Changes" : "Create Exercise")
+            </button>
+            <a asp-controller="Exercises" asp-action="Index" class="btn btn-secondary">Cancel</a>
+        </div>
+
+    </form>
+</div>
+
+@section Scripts {
+    <script>
+        function previewPhoto(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    const wrap = document.getElementById('photoPreviewWrap');
+                    wrap.innerHTML = `<img src="${e.target.result}" style="width:80px;height:80px;border-radius:8px;object-fit:cover;border:2px solid var(--border)"/>`;
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+    </script>
+}

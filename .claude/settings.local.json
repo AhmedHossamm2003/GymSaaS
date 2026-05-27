@@ -8,7 +8,13 @@
       "Bash(git push *)",
       "Bash(xargs grep -l \"BranchAccessPolicyTypes\")",
       "Bash(dotnet build *)",
-      "PowerShell(cd \"C:\\\\Users\\\\hadel\\\\source\\\\repos\\\\GymSaaS\"; dotnet build --no-restore 2>&1 | Where-Object { $_ -match \"error \\(CS|RZ\\)\\\\d+\" })"
+      "PowerShell(cd \"C:\\\\Users\\\\hadel\\\\source\\\\repos\\\\GymSaaS\"; dotnet build --no-restore 2>&1 | Where-Object { $_ -match \"error \\(CS|RZ\\)\\\\d+\" })",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\hadel\\\\source\\\\repos\\\\GymSaaS\" -Recurse -Depth 2)",
+      "Bash(Select-Object FullName, PSIsContainer)",
+      "Bash(Sort-Object FullName)",
+      "Bash(Format-Table -AutoSize)",
+      "WebSearch",
+      "WebFetch(domain:www.youtube.com)"
     ]
   }
 }

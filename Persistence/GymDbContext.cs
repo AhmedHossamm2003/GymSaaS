@@ -58,6 +58,18 @@ public partial class GymDbContext : DbContext
 
     public virtual DbSet<GymClass> GymClasses { get; set; }
 
+    public virtual DbSet<Exercise> Exercises { get; set; }
+
+    public virtual DbSet<ExerciseCategory> ExerciseCategories { get; set; }
+
+    public virtual DbSet<MuscleGroup> MuscleGroups { get; set; }
+
+    public virtual DbSet<ExerciseMuscleGroup> ExerciseMuscleGroups { get; set; }
+
+    public virtual DbSet<WorkoutTemplate> WorkoutTemplates { get; set; }
+
+    public virtual DbSet<WorkoutTemplateExercise> WorkoutTemplateExercises { get; set; }
+
     public virtual DbSet<VwActiveMemberPackage> VwActiveMemberPackages { get; set; }
 
     public virtual DbSet<VwCurrentBranchPresence> VwCurrentBranchPresences { get; set; }
@@ -411,6 +423,71 @@ public partial class GymDbContext : DbContext
             entity.HasOne(d => d.Coach).WithMany(p => p.GymClasses)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_GymClasses_Coaches");
+        });
+
+        modelBuilder.Entity<ExerciseCategory>(entity =>
+        {
+            entity.Property(e => e.ExerciseCategoryId).ValueGeneratedNever();
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+        });
+
+        modelBuilder.Entity<MuscleGroup>(entity =>
+        {
+            entity.Property(e => e.MuscleGroupId).ValueGeneratedNever();
+        });
+
+        modelBuilder.Entity<Exercise>(entity =>
+        {
+            entity.Property(e => e.ExerciseId).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.CreatedAtUtc).HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+            entity.Property(e => e.Difficulty).HasDefaultValue((byte)1);
+
+            entity.HasOne(e => e.Tenant).WithMany()
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Exercises_Tenants");
+
+            entity.HasOne(e => e.Category).WithMany(c => c.Exercises)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Exercises_Categories");
+        });
+
+        modelBuilder.Entity<WorkoutTemplate>(entity =>
+        {
+            entity.Property(e => e.WorkoutTemplateId).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.CreatedAtUtc).HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+            entity.Property(e => e.Difficulty).HasDefaultValue((byte)1);
+
+            entity.HasOne(e => e.Tenant).WithMany()
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_WorkoutTemplates_Tenants");
+        });
+
+        modelBuilder.Entity<WorkoutTemplateExercise>(entity =>
+        {
+            entity.Property(e => e.WorkoutTemplateExerciseId).HasDefaultValueSql("(newsequentialid())");
+
+            entity.HasOne(e => e.WorkoutTemplate).WithMany(t => t.WorkoutTemplateExercises)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_WorkoutTemplateExercises_Template");
+
+            entity.HasOne(e => e.Exercise).WithMany()
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_WorkoutTemplateExercises_Exercise");
+        });
+
+        modelBuilder.Entity<ExerciseMuscleGroup>(entity =>
+        {
+            entity.HasKey(e => new { e.ExerciseId, e.MuscleGroupId });
+
+            entity.HasOne(e => e.Exercise).WithMany(e => e.ExerciseMuscleGroups)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_ExerciseMuscleGroups_Exercise");
+
+            entity.HasOne(e => e.MuscleGroup).WithMany(m => m.ExerciseMuscleGroups)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_ExerciseMuscleGroups_MuscleGroup");
         });
 
         modelBuilder.Entity<MemberInvitation>(entity =>

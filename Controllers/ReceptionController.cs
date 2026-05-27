@@ -101,6 +101,29 @@ namespace GymSaaS.Controllers
             return Ok(result);
         }
 
+        // ── GET /Reception/Stats  (AJAX) ─────────────────────────
+        /// <summary>
+        /// Returns live stats for a branch — called after each check-in to refresh counters.
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> Stats(Guid branchId)
+        {
+            if (branchId == Guid.Empty)
+                return BadRequest();
+
+            var tenantId = CurrentTenantId;
+            var dashboard = await _receptionService.GetDashboardAsync(branchId, tenantId);
+
+            if (dashboard == null)
+                return NotFound();
+
+            return Ok(new
+            {
+                currentlyPresentCount = dashboard.CurrentlyPresentCount,
+                todayEntryCount       = dashboard.TodayEntryCount
+            });
+        }
+
         // ── POST /Reception/MarkAttendance  (AJAX) ────────────────
         /// <summary>
         /// Called when receptionist picks a package in the conflict popup.

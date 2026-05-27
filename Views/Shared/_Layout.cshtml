@@ -1078,6 +1078,10 @@
                        class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Exercises" ? "active" : "")">
                         <i class="bi bi-activity"></i> Exercise Library
                     </a>
+                    <a asp-controller="WorkoutTemplates" asp-action="Index"
+                       class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "WorkoutTemplates" ? "active" : "")">
+                        <i class="bi bi-journal-text"></i> Workout Templates
+                    </a>
                 </div>
 
                 <div class="nav-section">

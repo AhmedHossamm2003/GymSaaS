@@ -1,0 +1,308 @@
+@model GymSaaS.Models.WorkoutTemplateFormViewModel
+@using System.Text.Json
+
+<div class="page-header">
+    <div>
+        <div class="page-title">Workout Templates</div>
+        <div class="page-subtitle">@ViewData["Subtitle"]</div>
+    </div>
+    <a asp-controller="WorkoutTemplates" asp-action="Index" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
+</div>
+
+<div style="max-width:860px">
+    <form asp-controller="WorkoutTemplates"
+          asp-action="@(Model.IsEdit ? "Edit" : "Create")"
+          asp-route-id="@Model.WorkoutTemplateId"
+          method="post">
+        @Html.AntiForgeryToken()
+
+        <!-- Template info -->
+        <div class="card" style="margin-bottom:20px">
+            <div class="card-header">
+                <span class="card-title">Template Details</span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="TemplateName">Template Name</label>
+                <input asp-for="TemplateName" type="text" placeholder="e.g. Push Day A, Full Body Beginner, HIIT Circuit" />
+                <span asp-validation-for="TemplateName" style="color:#dc2626;font-size:11px"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Description">Description</label>
+                <textarea asp-for="Description" rows="2"
+                          placeholder="What is this routine for? Who is it designed for?"
+                          style="resize:vertical"></textarea>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+                <div class="form-group" style="margin-bottom:0">
+                    <label asp-for="Difficulty">Difficulty Level</label>
+                    <select asp-for="Difficulty">
+                        <option value="1">Beginner</option>
+                        <option value="2">Intermediate</option>
+                        <option value="3">Advanced</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:0">
+                    <label asp-for="EstimatedMinutes">Estimated Duration (minutes)</label>
+                    <input asp-for="EstimatedMinutes" type="number" min="1" max="600" placeholder="e.g. 45" />
+                    <span asp-validation-for="EstimatedMinutes" style="color:#dc2626;font-size:11px"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Exercise Builder -->
+        <div class="card" style="margin-bottom:20px">
+            <div class="card-header" style="display:flex;align-items:center;justify-content:space-between">
+                <span class="card-title">Exercise Plan</span>
+                <span id="exerciseCount" style="font-size:12px;color:var(--text-faint)">0 exercises</span>
+            </div>
+
+            <!-- Search picker -->
+            <div style="position:relative;margin-bottom:16px">
+                <div style="display:flex;align-items:center;gap:8px;background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius-sm);padding:0 12px">
+                    <i class="bi bi-search" style="color:var(--text-faint);font-size:13px"></i>
+                    <input type="text" id="exerciseSearch"
+                           placeholder="Type to search and add exercises…"
+                           autocomplete="off"
+                           oninput="filterExercises(this.value)"
+                           onfocus="showAllDropdown()"
+                           onblur="scheduleHide()"
+                           style="border:none;background:transparent;outline:none;padding:9px 0;font-size:13px;width:100%"/>
+                </div>
+                <div id="exerciseDropdown"
+                     style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-sm);box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:50;max-height:280px;overflow-y:auto;margin-top:4px">
+                </div>
+            </div>
+
+            <!-- Exercise rows (dynamically rendered) -->
+            <div id="builderRows"></div>
+
+            <!-- Empty state -->
+            <div id="emptyState" style="display:flex;flex-direction:column;align-items:center;padding:32px 0;color:var(--text-faint)">
+                <i class="bi bi-collection" style="font-size:32px;margin-bottom:8px"></i>
+                <span style="font-size:13px">Search above to add exercises to this template</span>
+            </div>
+        </div>
+
+        <!-- Status -->
+        <div class="card" style="margin-bottom:24px">
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin:0">
+                <input asp-for="IsActive" type="checkbox" style="width:16px;height:16px;accent-color:var(--orange)" />
+                <span style="font-size:13.5px;font-weight:500">Active — template is available for use</span>
+            </label>
+        </div>
+
+        <!-- Submit -->
+        <div style="display:flex;gap:10px">
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-check-lg"></i>
+                @(Model.IsEdit ? "Save Changes" : "Create Template")
+            </button>
+            <a asp-controller="WorkoutTemplates" asp-action="Index" class="btn btn-secondary">Cancel</a>
+        </div>
+
+    </form>
+</div>
+
+@section Scripts {
+<script>
+// ── Data ──────────────────────────────────────────────────────────────
+const pool = @Html.Raw(JsonSerializer.Serialize(Model.AvailableExercises.Select(e => new {
+    exerciseId = e.ExerciseId,
+    exerciseName = e.ExerciseName,
+    categoryName = e.CategoryName
+})));
+
+let rows = @Html.Raw(JsonSerializer.Serialize(Model.Exercises.Select(e => new {
+    exerciseId = e.ExerciseId,
+    exerciseName = e.ExerciseName,
+    categoryName = e.CategoryName,
+    sets = e.Sets,
+    reps = e.Reps,
+    durationSeconds = e.DurationSeconds,
+    restSeconds = e.RestSeconds,
+    notes = e.Notes ?? ""
+})));
+
+// ── Helpers ───────────────────────────────────────────────────────────
+function escHtml(s) {
+    return (s ?? '').toString()
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function escAttr(s) { return escHtml(s); }
+
+// ── Render builder rows ───────────────────────────────────────────────
+function render() {
+    const container = document.getElementById('builderRows');
+    const empty     = document.getElementById('emptyState');
+    const countEl   = document.getElementById('exerciseCount');
+
+    countEl.textContent = rows.length + (rows.length === 1 ? ' exercise' : ' exercises');
+
+    if (rows.length === 0) {
+        container.innerHTML = '';
+        empty.style.display = 'flex';
+        return;
+    }
+    empty.style.display = 'none';
+
+    container.innerHTML = rows.map((r, i) => `
+        <div style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:8px;background:var(--bg-raised)">
+
+            <!-- hidden fields for form binding -->
+            <input type="hidden" name="Exercises[${i}].ExerciseId"       value="${escAttr(r.exerciseId)}">
+            <input type="hidden" name="Exercises[${i}].ExerciseName"      value="${escAttr(r.exerciseName)}">
+            <input type="hidden" name="Exercises[${i}].CategoryName"      value="${escAttr(r.categoryName)}">
+            <input type="hidden" name="Exercises[${i}].SortOrder"         value="${i}">
+
+            <!-- row header: number + name + actions -->
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+                <span style="font-size:11px;font-weight:700;color:var(--text-faint);min-width:18px;flex-shrink:0">${i+1}</span>
+                <div style="flex:1;min-width:0">
+                    <div style="font-weight:600;font-size:13.5px;color:var(--black);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(r.exerciseName)}</div>
+                    <div style="font-size:11px;color:var(--orange);font-weight:500">${escHtml(r.categoryName)}</div>
+                </div>
+                <div style="display:flex;gap:4px;flex-shrink:0">
+                    <button type="button" onclick="moveUp(${i})" ${i===0?'disabled':''} class="btn btn-ghost" style="padding:3px 7px;font-size:12px" title="Move up">
+                        <i class="bi bi-chevron-up"></i>
+                    </button>
+                    <button type="button" onclick="moveDown(${i})" ${i===rows.length-1?'disabled':''} class="btn btn-ghost" style="padding:3px 7px;font-size:12px" title="Move down">
+                        <i class="bi bi-chevron-down"></i>
+                    </button>
+                    <button type="button" onclick="removeRow(${i})" class="btn btn-danger" style="padding:3px 7px;font-size:12px" title="Remove">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- metrics row -->
+            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+                <label style="display:flex;flex-direction:column;gap:3px">
+                    <span style="font-size:10px;color:var(--text-faint);font-weight:700;text-transform:uppercase;letter-spacing:.05em">Sets</span>
+                    <input type="number" name="Exercises[${i}].Sets"
+                           value="${r.sets != null ? r.sets : ''}"
+                           min="1" max="20" placeholder="—"
+                           oninput="rows[${i}].sets = this.value ? +this.value : null"
+                           style="width:54px;text-align:center">
+                </label>
+                <label style="display:flex;flex-direction:column;gap:3px">
+                    <span style="font-size:10px;color:var(--text-faint);font-weight:700;text-transform:uppercase;letter-spacing:.05em">Reps</span>
+                    <input type="number" name="Exercises[${i}].Reps"
+                           value="${r.reps != null ? r.reps : ''}"
+                           min="1" max="200" placeholder="—"
+                           oninput="rows[${i}].reps = this.value ? +this.value : null"
+                           style="width:54px;text-align:center">
+                </label>
+                <label style="display:flex;flex-direction:column;gap:3px">
+                    <span style="font-size:10px;color:var(--text-faint);font-weight:700;text-transform:uppercase;letter-spacing:.05em">Duration (s)</span>
+                    <input type="number" name="Exercises[${i}].DurationSeconds"
+                           value="${r.durationSeconds != null ? r.durationSeconds : ''}"
+                           min="1" placeholder="—"
+                           oninput="rows[${i}].durationSeconds = this.value ? +this.value : null"
+                           style="width:72px;text-align:center">
+                </label>
+                <label style="display:flex;flex-direction:column;gap:3px">
+                    <span style="font-size:10px;color:var(--text-faint);font-weight:700;text-transform:uppercase;letter-spacing:.05em">Rest (s)</span>
+                    <input type="number" name="Exercises[${i}].RestSeconds"
+                           value="${r.restSeconds != null ? r.restSeconds : ''}"
+                           min="0" placeholder="—"
+                           oninput="rows[${i}].restSeconds = this.value ? +this.value : null"
+                           style="width:66px;text-align:center">
+                </label>
+                <label style="display:flex;flex-direction:column;gap:3px;flex:1;min-width:120px">
+                    <span style="font-size:10px;color:var(--text-faint);font-weight:700;text-transform:uppercase;letter-spacing:.05em">Notes</span>
+                    <input type="text" name="Exercises[${i}].Notes"
+                           value="${escAttr(r.notes || '')}"
+                           placeholder="optional…"
+                           oninput="rows[${i}].notes = this.value">
+                </label>
+            </div>
+        </div>
+    `).join('');
+}
+
+// ── Reorder / Remove ──────────────────────────────────────────────────
+function moveUp(i) {
+    if (i === 0) return;
+    [rows[i-1], rows[i]] = [rows[i], rows[i-1]];
+    render();
+}
+function moveDown(i) {
+    if (i === rows.length - 1) return;
+    [rows[i+1], rows[i]] = [rows[i], rows[i+1]];
+    render();
+}
+function removeRow(i) {
+    rows.splice(i, 1);
+    render();
+}
+
+// ── Add exercise ──────────────────────────────────────────────────────
+function addExercise(exerciseId, exerciseName, categoryName) {
+    if (rows.some(r => r.exerciseId === exerciseId)) {
+        document.getElementById('exerciseSearch').value = '';
+        hideDropdown();
+        return;
+    }
+    rows.push({ exerciseId, exerciseName, categoryName, sets: 3, reps: 10, durationSeconds: null, restSeconds: 60, notes: '' });
+    render();
+    document.getElementById('exerciseSearch').value = '';
+    hideDropdown();
+}
+
+// ── Dropdown ─────────────────────────────────────────────────────────
+let filtered = [];
+
+function filterExercises(term) {
+    const t = term.trim().toLowerCase();
+    filtered = t
+        ? pool.filter(e => e.exerciseName.toLowerCase().includes(t) || e.categoryName.toLowerCase().includes(t))
+        : pool.slice(0, 20);
+    renderDropdown();
+}
+
+function showAllDropdown() {
+    filtered = pool.slice(0, 20);
+    renderDropdown();
+}
+
+function renderDropdown() {
+    const dd = document.getElementById('exerciseDropdown');
+    if (filtered.length === 0) { dd.style.display = 'none'; return; }
+
+    dd.innerHTML = filtered.slice(0, 10).map(e => `
+        <div class="picker-row"
+             data-id="${escAttr(e.exerciseId)}"
+             data-name="${escAttr(e.exerciseName)}"
+             data-cat="${escAttr(e.categoryName)}"
+             style="padding:9px 14px;cursor:pointer;border-bottom:1px solid var(--border)">
+            <div style="font-weight:600;font-size:13px;color:var(--black)">${escHtml(e.exerciseName)}</div>
+            <div style="font-size:11px;color:var(--text-faint)">${escHtml(e.categoryName)}</div>
+        </div>
+    `).join('');
+
+    dd.querySelectorAll('.picker-row').forEach(el => {
+        el.addEventListener('mouseenter', () => el.style.background = 'var(--bg-raised)');
+        el.addEventListener('mouseleave', () => el.style.background = '');
+        el.addEventListener('mousedown', () => {
+            addExercise(el.dataset.id, el.dataset.name, el.dataset.cat);
+        });
+    });
+
+    dd.style.display = 'block';
+}
+
+function hideDropdown() {
+    document.getElementById('exerciseDropdown').style.display = 'none';
+}
+function scheduleHide() { setTimeout(hideDropdown, 150); }
+
+// ── Init ──────────────────────────────────────────────────────────────
+render();
+</script>
+}

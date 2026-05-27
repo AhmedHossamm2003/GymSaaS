@@ -1,0 +1,182 @@
+@model List<GymSaaS.Models.QuickMediaEditItem>
+
+@{
+    var grouped = Model.GroupBy(e => e.CategoryName).OrderBy(g => g.Key).ToList();
+}
+
+<!-- Page header -->
+<div class="page-header">
+    <div>
+        <div class="page-title">Exercise Library</div>
+        <div class="page-subtitle">Quick Media Edit — add YouTube links for all exercises</div>
+    </div>
+    <a asp-controller="Exercises" asp-action="Index" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
+</div>
+
+<!-- Toolbar -->
+<div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
+    <div style="flex:1;min-width:220px;display:flex;align-items:center;gap:8px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:0 12px">
+        <i class="bi bi-search" style="color:var(--text-faint);font-size:13px"></i>
+        <input id="searchInput" type="text" placeholder="Filter exercises…"
+               oninput="filterRows(this.value)"
+               style="border:none;background:transparent;outline:none;padding:8px 0;font-size:13px;width:100%"/>
+    </div>
+    <span id="countLabel" style="font-size:12px;color:var(--text-faint);white-space:nowrap">
+        @Model.Count exercises
+    </span>
+    <span style="font-size:12px;color:var(--text-faint)">|</span>
+    <span id="filledLabel" style="font-size:12px;color:#16a34a;white-space:nowrap">
+        @Model.Count(e => !string.IsNullOrEmpty(e.VideoUrl)) with video
+    </span>
+    <button form="mediaForm" type="submit" class="btn btn-primary" style="margin-left:auto">
+        <i class="bi bi-check-lg"></i> Save All Changes
+    </button>
+</div>
+
+<!-- Tip -->
+<div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:16px;font-size:12.5px;color:#0369a1;display:flex;gap:8px;align-items:flex-start">
+    <i class="bi bi-info-circle" style="flex-shrink:0;margin-top:1px"></i>
+    <span>Paste any YouTube URL (e.g. <code>https://www.youtube.com/watch?v=rT7DgCr-3pg</code>). The thumbnail auto-previews instantly and serves as the exercise card image.</span>
+</div>
+
+<form id="mediaForm" asp-controller="Exercises" asp-action="QuickMediaEdit" method="post">
+    @Html.AntiForgeryToken()
+
+    @for (int i = 0; i < Model.Count; i++)
+    {
+        <input type="hidden" name="exercises[@i].ExerciseId"   value="@Model[i].ExerciseId" />
+        <input type="hidden" name="exercises[@i].CategoryName" value="@Model[i].CategoryName" />
+        <input type="hidden" name="exercises[@i].CategoryId"   value="@Model[i].CategoryId" />
+    }
+
+    @foreach (var group in grouped)
+    {
+        <!-- Category header -->
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-faint);margin:20px 0 8px;padding-left:2px"
+             data-cat-header="@group.Key.ToLower()">
+            <i class="bi bi-collection" style="margin-right:4px"></i>@group.Key
+            <span style="font-weight:400;color:var(--text-faint);margin-left:6px">(@group.Count() exercises)</span>
+        </div>
+
+        <div class="card" style="padding:0;overflow:hidden;margin-bottom:4px">
+            @foreach (var ex in group)
+            {
+                var idx = Model.IndexOf(ex);
+                <div class="ex-row"
+                     data-name="@ex.ExerciseName.ToLower()"
+                     data-cat="@ex.CategoryName.ToLower()"
+                     style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--border)">
+
+                    <!-- Exercise name -->
+                    <div style="width:240px;flex-shrink:0">
+                        <div style="font-weight:600;font-size:13px;color:var(--black)">@ex.ExerciseName</div>
+                    </div>
+
+                    <!-- URL input -->
+                    <div style="flex:1;position:relative">
+                        <input type="text"
+                               name="exercises[@idx].VideoUrl"
+                               value="@ex.VideoUrl"
+                               id="url-@ex.ExerciseId"
+                               placeholder="https://www.youtube.com/watch?v=…"
+                               oninput="previewThumb(this,'thumb-@ex.ExerciseId','filled-@ex.ExerciseId')"
+                               style="width:100%;font-size:12.5px;padding-right:32px" />
+                        <span id="filled-@ex.ExerciseId"
+                              style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:13px;display:@(!string.IsNullOrEmpty(ex.VideoUrl) ? "block" : "none")">
+                            ✅
+                        </span>
+                    </div>
+
+                    <!-- Thumbnail preview -->
+                    <div id="thumb-@ex.ExerciseId"
+                         style="width:80px;height:45px;border-radius:6px;overflow:hidden;background:var(--bg-raised);border:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center">
+                        @if (ex.YoutubeThumbnail != null)
+                        {
+                            <img src="@ex.YoutubeThumbnail"
+                                 style="width:100%;height:100%;object-fit:cover"
+                                 onerror="this.style.display='none'"/>
+                        }
+                        else
+                        {
+                            <i class="bi bi-camera-video" style="color:var(--text-faint);font-size:16px"></i>
+                        }
+                    </div>
+
+                </div>
+            }
+        </div>
+    }
+
+    <!-- Save at the bottom too -->
+    <div style="display:flex;justify-content:flex-end;margin-top:20px;padding-bottom:40px">
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-lg"></i> Save All Changes
+        </button>
+    </div>
+</form>
+
+@section Scripts {
+<script>
+// ── YouTube ID extraction ──────────────────────────────────────────
+function extractYtId(url) {
+    if (!url) return null;
+    const m = url.match(/(?:youtu\.be\/|[?&]v=|\/embed\/)([A-Za-z0-9_-]{11})/);
+    return m ? m[1] : null;
+}
+
+// ── Live thumbnail preview ─────────────────────────────────────────
+function previewThumb(input, thumbId, filledId) {
+    const id  = extractYtId(input.value.trim());
+    const box = document.getElementById(thumbId);
+    const chk = document.getElementById(filledId);
+    if (id) {
+        box.innerHTML = `<img src="https://img.youtube.com/vi/${id}/default.jpg"
+                              style="width:100%;height:100%;object-fit:cover"
+                              onerror="this.style.display='none'">`;
+        if (chk) chk.style.display = 'block';
+    } else {
+        box.innerHTML = `<i class="bi bi-camera-video" style="color:var(--text-faint);font-size:16px"></i>`;
+        if (chk) chk.style.display = 'none';
+    }
+    updateFilledCount();
+}
+
+// ── Filter rows ────────────────────────────────────────────────────
+function filterRows(term) {
+    const t = term.toLowerCase().trim();
+    let visible = 0;
+
+    document.querySelectorAll('.ex-row').forEach(row => {
+        const show = !t || row.dataset.name.includes(t) || row.dataset.cat.includes(t);
+        row.style.display = show ? '' : 'none';
+        if (show) visible++;
+    });
+
+    // Hide category headers if all rows in group are hidden
+    document.querySelectorAll('[data-cat-header]').forEach(header => {
+        const cat = header.dataset.catHeader;
+        const hasVisible = [...document.querySelectorAll('.ex-row')].some(
+            r => r.dataset.cat === cat && r.style.display !== 'none'
+        );
+        header.style.display = hasVisible ? '' : 'none';
+        // Also hide the card below
+        const card = header.nextElementSibling;
+        if (card) card.style.display = hasVisible ? '' : 'none';
+    });
+
+    document.getElementById('countLabel').textContent = visible + ' exercises';
+}
+
+// ── Count filled ──────────────────────────────────────────────────
+function updateFilledCount() {
+    const filled = [...document.querySelectorAll('input[id^="url-"]')]
+        .filter(i => extractYtId(i.value.trim()) !== null).length;
+    const el = document.getElementById('filledLabel');
+    if (el) el.textContent = filled + ' with video';
+}
+
+updateFilledCount();
+</script>
+}
