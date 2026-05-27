@@ -17,6 +17,8 @@ namespace GymSaaS.Models
         public string PackageTypeCode { get; set; } = string.Empty;
         public string PackageTypeName { get; set; } = string.Empty;
         public string BranchAccessPolicy { get; set; } = string.Empty;
+        public Guid? RestrictedToBranchId { get; set; }
+        public string? RestrictedToBranchName { get; set; }
         public int? SessionCount { get; set; }
         public int? DurationDays { get; set; }
         public int? OpenGymDurationDays { get; set; }
@@ -56,6 +58,16 @@ namespace GymSaaS.Models
         public string PackageTypeCode { get; set; } = string.Empty;
 
         public Guid BranchAccessPolicyTypeId { get; set; }
+
+        // Null = available at all branches; set = only assignable to members of that branch
+        public Guid? RestrictedToBranchId { get; set; }
+
+        // Only used when policy = SELECTED_BRANCHES
+        [Range(1, 999)]
+        public int? CrossBranchVisitLimit { get; set; }
+
+        // For the branch restriction dropdown
+        public List<BranchDropdownItem> AvailableBranches { get; set; } = new();
 
         // SESSION + COMBINED: number of sessions
         [Range(1, 9999, ErrorMessage = "Must be between 1 and 9999")]

@@ -629,10 +629,11 @@
                         if (matchingPolicy == null) continue;
                         bool polSelected = Model.BranchAccessPolicyTypeId == matchingPolicy.BranchAccessPolicyTypeId;
 
-                        <label class="policy-option @(polSelected ? "pol-selected" : "")"
-                               onclick="selectPolicy(this)">
+                        <label class="policy-option @(polSelected ? "pol-selected" : "")">
                             <input type="radio" name="BranchAccessPolicyTypeId"
                                    value="@matchingPolicy.BranchAccessPolicyTypeId"
+                                   data-policy-code="@pol.Code"
+                                   onchange="selectPolicy(this)"
                             @(polSelected ? "checked" : "") />
                             <div class="policy-option-icon">@pol.Icon</div>
                             <div class="policy-option-name">@pol.Name</div>
@@ -646,10 +647,41 @@
                     <div class="field-error visible" style="margin-top:8px;">@ViewData.ModelState["BranchAccessPolicyTypeId"]!.Errors[0].ErrorMessage</div>
                 }
             </div>
+
+            <div class="field" id="crossBranchLimitField" style="display:@(Model.BranchAccessPolicyTypeId != Guid.Empty && Model.BranchPolicies.Any(p => p.BranchAccessPolicyTypeId == Model.BranchAccessPolicyTypeId && p.PolicyCode == "SELECTED_BRANCHES") ? "block" : "none"); margin-top:16px; max-width:260px;">
+                <label class="field-label" asp-for="CrossBranchVisitLimit">
+                    <i class="bi bi-signpost-split" style="color:var(--blue);margin-right:5px;"></i>
+                    Cross-Branch Visit Limit
+                </label>
+                <input asp-for="CrossBranchVisitLimit" type="number" min="1" max="999" placeholder="e.g. 5" />
+                <div class="field-hint">Maximum number of visits allowed at non-home branches per package period.</div>
+            </div>
         </div>
     </div>
 
-    <!-- ── 7. Settings ── -->
+    <!-- ── 7. Branch Restriction ── -->
+    <div class="form-card">
+        <div class="form-section-head">
+            <div class="form-section-icon"><i class="bi bi-pin-map"></i></div>
+            <span class="form-section-title">Branch Restriction</span>
+        </div>
+        <div class="form-body">
+            <div class="field">
+                <label class="field-label" style="margin-bottom:6px; display:block;">Available At</label>
+                <div class="field-hint" style="margin-bottom:10px;">Limit which branch can assign this package. Leave as "All Branches" to make it available network-wide.</div>
+                <select name="RestrictedToBranchId" class="form-select" style="max-width:320px;">
+                    <option value="">All Branches (no restriction)</option>
+                    @foreach (var b in Model.AvailableBranches)
+                    {
+                        var isBranchSelected = Model.RestrictedToBranchId == b.BranchId;
+                        <option value="@b.BranchId" selected="@isBranchSelected">@b.BranchName</option>
+                    }
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── 8. Settings ── -->
     <div class="form-card">
         <div class="form-section-head">
             <div class="form-section-icon"><i class="bi bi-sliders"></i></div>
@@ -736,10 +768,18 @@
             copyValues(type);
         }
 
-        function selectPolicy(el) {
+        function selectPolicy(radio) {
             document.querySelectorAll('.policy-option').forEach(o => o.classList.remove('pol-selected'));
-            el.classList.add('pol-selected');
-            el.querySelector('input[type=radio]').checked = true;
+            radio.closest('.policy-option').classList.add('pol-selected');
+            const isLimited = radio.dataset.policyCode === 'SELECTED_BRANCHES';
+            const limitField = document.getElementById('crossBranchLimitField');
+            if (limitField) {
+                limitField.style.display = isLimited ? 'block' : 'none';
+                if (!isLimited) {
+                    const input = limitField.querySelector('input');
+                    if (input) input.value = '';
+                }
+            }
         }
 
         function copyValues(type) {

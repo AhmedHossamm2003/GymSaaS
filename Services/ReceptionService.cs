@@ -133,11 +133,13 @@ namespace GymSaaS.Services.Reception
                 {
                     "ALL_BRANCHES"         => true,
                     "HOME_ONLY"            => pkg.HomeBranchId == branchId,
+                    "SELECTED_BRANCHES"    => pkg.HomeBranchId == branchId
+                                             || pkg.CrossBranchVisitsUsed < (pkg.CrossBranchVisitLimit ?? 0),
                     "HOME_PLUS_LIMITED"    => pkg.HomeBranchId == branchId
                                              || pkg.CrossBranchVisitsUsed < (pkg.CrossBranchVisitLimit ?? 0),
                     "CROSS_BRANCH_LIMITED" => pkg.HomeBranchId == branchId
                                              || pkg.CrossBranchVisitsUsed < (pkg.CrossBranchVisitLimit ?? 0),
-                    "CUSTOM"               => true, // custom — allow, handle edge cases later
+                    "CUSTOM"               => true,
                     _                      => false
                 };
 

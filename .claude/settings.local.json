@@ -5,7 +5,10 @@
       "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\hadel\\\\source\\\\repos\\\\GymSaaS\\\\wwwroot\" -Recurse -File | Group-Object Name | Where-Object { $_.Count -gt 1 } | Select-Object Name, Count)",
       "PowerShell(dotnet --version)",
       "PowerShell(dotnet clean \"C:\\\\Users\\\\hadel\\\\source\\\\repos\\\\GymSaaS\\\\GymSaaS.csproj\" -c Release 2>&1)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(xargs grep -l \"BranchAccessPolicyTypes\")",
+      "Bash(dotnet build *)",
+      "PowerShell(cd \"C:\\\\Users\\\\hadel\\\\source\\\\repos\\\\GymSaaS\"; dotnet build --no-restore 2>&1 | Where-Object { $_ -match \"error \\(CS|RZ\\)\\\\d+\" })"
     ]
   }
 }

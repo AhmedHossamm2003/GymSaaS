@@ -48,6 +48,8 @@ namespace GymSaaS.Controllers
                     PackageTypeCode = x.pt.PackageTypeCode,
                     PackageTypeName = x.pt.PackageTypeName,
                     BranchAccessPolicy = x.bp.PolicyCode,
+                    RestrictedToBranchId = x.p.RestrictedToBranchId,
+                    RestrictedToBranchName = x.p.RestrictedToBranch != null ? x.p.RestrictedToBranch.BranchName : null,
                     SessionCount = x.p.SessionCount,
                     DurationDays = x.p.DurationDays,
                     OpenGymDurationDays = x.p.OpenGymDurationDays,
@@ -96,6 +98,7 @@ namespace GymSaaS.Controllers
             {
                 BranchPolicies = await GetPoliciesAsync(),
                 AvailableClasses = await GetClassesAsync(),
+                AvailableBranches = await GetBranchesAsync(),
             };
             ViewData["Title"] = "Package Catalog";
             ViewData["Subtitle"] = "New Package";
@@ -115,6 +118,7 @@ namespace GymSaaS.Controllers
             {
                 model.BranchPolicies = await GetPoliciesAsync();
                 model.AvailableClasses = await GetClassesAsync();
+                model.AvailableBranches = await GetBranchesAsync();
                 ViewData["Title"] = "Package Catalog";
                 ViewData["Subtitle"] = "New Package";
                 return View("CreateEdit", model);
@@ -126,6 +130,7 @@ namespace GymSaaS.Controllers
                 ModelState.AddModelError(nameof(model.PackageTypeCode), $"Invalid package type: '{model.PackageTypeCode}'");
                 model.BranchPolicies = await GetPoliciesAsync();
                 model.AvailableClasses = await GetClassesAsync();
+                model.AvailableBranches = await GetBranchesAsync();
                 ViewData["Title"] = "Package Catalog";
                 ViewData["Subtitle"] = "New Package";
                 return View("CreateEdit", model);
@@ -142,6 +147,8 @@ namespace GymSaaS.Controllers
                 Description = model.Description?.Trim(),
                 PackageTypeId = typeId.Value,
                 BranchAccessPolicyTypeId = model.BranchAccessPolicyTypeId,
+                RestrictedToBranchId = model.RestrictedToBranchId,
+                CrossBranchVisitLimit = model.CrossBranchVisitLimit,
                 SessionCount = model.HasSessions ? model.SessionCount : null,
                 GymClassId = model.HasSessions ? model.GymClassId : null,
                 DurationDays = model.DurationDays,
@@ -202,8 +209,11 @@ namespace GymSaaS.Controllers
                 AllowQueuedRenewal = pkg.AllowQueuedRenewal,
                 IsActive = pkg.IsActive,
                 SortOrder = pkg.SortOrder,
+                RestrictedToBranchId = pkg.RestrictedToBranchId,
+                CrossBranchVisitLimit = pkg.CrossBranchVisitLimit,
                 BranchPolicies = await GetPoliciesAsync(),
                 AvailableClasses = await GetClassesAsync(),
+                AvailableBranches = await GetBranchesAsync(),
             };
 
             ViewData["Title"] = "Package Catalog";
@@ -230,6 +240,7 @@ namespace GymSaaS.Controllers
             {
                 model.BranchPolicies = await GetPoliciesAsync();
                 model.AvailableClasses = await GetClassesAsync();
+                model.AvailableBranches = await GetBranchesAsync();
                 ViewData["Title"] = "Package Catalog";
                 ViewData["Subtitle"] = "Edit Package";
                 return View("CreateEdit", model);
@@ -238,6 +249,8 @@ namespace GymSaaS.Controllers
             pkg.PackageName = model.PackageName.Trim();
             pkg.Description = model.Description?.Trim();
             pkg.BranchAccessPolicyTypeId = model.BranchAccessPolicyTypeId;
+            pkg.RestrictedToBranchId = model.RestrictedToBranchId;
+            pkg.CrossBranchVisitLimit = model.CrossBranchVisitLimit;
             pkg.SessionCount = model.HasSessions ? model.SessionCount : null;
             pkg.GymClassId = model.HasSessions ? model.GymClassId : null;
             pkg.InvitationCount = model.InvitationCount;
@@ -301,6 +314,13 @@ namespace GymSaaS.Controllers
                       })
                 .OrderBy(c => c.BranchName)
                 .ThenBy(c => c.ClassName)
+                .ToListAsync();
+
+        private async Task<List<BranchDropdownItem>> GetBranchesAsync() =>
+            await _db.Branches
+                .Where(b => b.TenantId == TenantId && b.IsActive)
+                .OrderBy(b => b.BranchName)
+                .Select(b => new BranchDropdownItem { BranchId = b.BranchId, BranchName = b.BranchName })
                 .ToListAsync();
 
         private async Task<List<BranchPolicyDropdownItem>> GetPoliciesAsync()

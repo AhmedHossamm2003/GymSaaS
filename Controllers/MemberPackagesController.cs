@@ -47,7 +47,7 @@ namespace GymSaaS.Controllers
                 HomeBranchId = member.HomeBranchId,
                 HomeBranchName = homeBranch?.BranchName ?? "—",
                 CustomStartDate = DateOnly.FromDateTime(DateTime.UtcNow),
-                AvailablePackages = await GetAvailablePackagesAsync(),
+                AvailablePackages = await GetAvailablePackagesAsync(member.HomeBranchId),
                 CurrentPackages = await GetCurrentPackagesAsync(memberId),
                 AllBranches = await GetBranchesAsync(),
             };
@@ -64,12 +64,17 @@ namespace GymSaaS.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Assign(AssignPackageViewModel model, List<Guid> selectedBranchIds)
         {
+            var member = await _db.Members
+                .FirstOrDefaultAsync(m => m.MemberId == model.MemberId && m.TenantId == TenantId);
+
+            if (member == null) return NotFound();
+
             if (model.PackageDefinitionId == null)
                 ModelState.AddModelError(nameof(model.PackageDefinitionId), "Please select a package.");
 
             if (!ModelState.IsValid)
             {
-                model.AvailablePackages = await GetAvailablePackagesAsync();
+                model.AvailablePackages = await GetAvailablePackagesAsync(member.HomeBranchId);
                 model.CurrentPackages = await GetCurrentPackagesAsync(model.MemberId);
                 model.AllBranches = await GetBranchesAsync();
                 ViewData["Title"] = model.MemberName;
@@ -84,11 +89,6 @@ namespace GymSaaS.Controllers
                                        && p.TenantId == TenantId);
 
             if (pkgDef == null) return NotFound();
-
-            var member = await _db.Members
-                .FirstOrDefaultAsync(m => m.MemberId == model.MemberId && m.TenantId == TenantId);
-
-            if (member == null) return NotFound();
 
             var startDate = model.CustomStartDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
             var typeCode = pkgDef.PackageType?.PackageTypeCode ?? "";
@@ -132,6 +132,7 @@ namespace GymSaaS.Controllers
                     PackageTypeId = sessionTypeId,
                     BranchAccessPolicyTypeId = pkgDef.BranchAccessPolicyTypeId,
                     HomeBranchId = member.HomeBranchId,
+                    CrossBranchVisitLimit = pkgDef.CrossBranchVisitLimit,
                     Status = "ACTIVE",
                     IsCustomPackage = model.CustomSessionCount.HasValue,
                     SessionCountOriginal = sessionCount,
@@ -172,6 +173,7 @@ namespace GymSaaS.Controllers
                     PackageTypeId = gymTypeId,
                     BranchAccessPolicyTypeId = pkgDef.BranchAccessPolicyTypeId,
                     HomeBranchId = member.HomeBranchId,
+                    CrossBranchVisitLimit = pkgDef.CrossBranchVisitLimit,
                     Status = "ACTIVE",
                     IsCustomPackage = model.CustomOpenGymExpiry.HasValue,
                     SessionCountOriginal = null,
@@ -221,6 +223,7 @@ namespace GymSaaS.Controllers
                     PackageTypeId = typeId,
                     BranchAccessPolicyTypeId = pkgDef.BranchAccessPolicyTypeId,
                     HomeBranchId = member.HomeBranchId,
+                    CrossBranchVisitLimit = pkgDef.CrossBranchVisitLimit,
                     Status = "ACTIVE",
                     IsCustomPackage = model.CustomSessionCount.HasValue || model.CustomSessionExpiry.HasValue,
                     SessionCountOriginal = sessions,
@@ -261,9 +264,10 @@ namespace GymSaaS.Controllers
         // ─────────────────────────────────────────────
         // HELPERS
         // ─────────────────────────────────────────────
-        private async Task<List<PackageDefinitionListItem>> GetAvailablePackagesAsync() =>
+        private async Task<List<PackageDefinitionListItem>> GetAvailablePackagesAsync(Guid homeBranchId) =>
             await _db.PackageDefinitions
-                .Where(p => p.TenantId == TenantId && p.IsActive)
+                .Where(p => p.TenantId == TenantId && p.IsActive
+                         && (p.RestrictedToBranchId == null || p.RestrictedToBranchId == homeBranchId))
                 .Join(_db.PackageTypes, p => p.PackageTypeId, pt => pt.PackageTypeId, (p, pt) => new { p, pt })
                 .Join(_db.BranchAccessPolicyTypes, x => x.p.BranchAccessPolicyTypeId, bp => bp.BranchAccessPolicyTypeId, (x, bp) => new { x.p, x.pt, bp })
                 .OrderBy(x => x.pt.PackageTypeCode).ThenBy(x => x.p.SortOrder).ThenBy(x => x.p.PackageName)

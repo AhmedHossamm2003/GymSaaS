@@ -282,6 +282,10 @@ public partial class GymDbContext : DbContext
             entity.HasOne(d => d.GymClass).WithMany()
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_PackageDefinitions_GymClasses");
+
+            entity.HasOne(d => d.RestrictedToBranch).WithMany()
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_PackageDefinitions_RestrictedBranch");
         });
 
         modelBuilder.Entity<PackageType>(entity =>

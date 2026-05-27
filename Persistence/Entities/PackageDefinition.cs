@@ -84,6 +84,12 @@ public partial class PackageDefinition
     [Column(TypeName = "decimal(10, 2)")]
     public decimal? Price { get; set; }
 
+    // When set, only members whose home branch matches may be assigned this package.
+    public Guid? RestrictedToBranchId { get; set; }
+
+    [ForeignKey("RestrictedToBranchId")]
+    public virtual Branch? RestrictedToBranch { get; set; }
+
     [ForeignKey("BranchAccessPolicyTypeId")]
     [InverseProperty("PackageDefinitions")]
     public virtual BranchAccessPolicyType BranchAccessPolicyType { get; set; } = null!;
