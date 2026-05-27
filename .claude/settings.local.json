@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C \"C:\\\\Users\\\\hadel\\\\source\\\\repos\\\\GymSaaS\" status)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\hadel\\\\source\\\\repos\\\\GymSaaS\\\\wwwroot\" -Recurse -File | Group-Object Name | Where-Object { $_.Count -gt 1 } | Select-Object Name, Count)",
+      "PowerShell(dotnet --version)",
+      "PowerShell(dotnet clean \"C:\\\\Users\\\\hadel\\\\source\\\\repos\\\\GymSaaS\\\\GymSaaS.csproj\" -c Release 2>&1)"
+    ]
+  }
+}

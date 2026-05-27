@@ -4,6 +4,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <CompressStaticWebAssets>false</CompressStaticWebAssets>
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
     <ContainerRuntimeIdentifier>win-x64</ContainerRuntimeIdentifier>
     <ContainerBaseImage>mcr.microsoft.com/dotnet/aspnet:8.0-nanoserver-1809</ContainerBaseImage>
@@ -16,7 +17,12 @@
     <ContainerPort Include="8081" />
   </ItemGroup>
 
+  <!-- Workaround: SDK 9.0.300 bug — DiscoverPrecompressedAssets throws on duplicate keys.
+       Override the parent target so the task never runs (safe: CompressStaticWebAssets=false). -->
+  <Target Name="ResolveBuildCompressedStaticWebAssetsConfiguration" />
+
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation" Version="8.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

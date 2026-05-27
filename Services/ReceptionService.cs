@@ -78,13 +78,16 @@ namespace GymSaaS.Services.Reception
         public async Task<ScanResultDto> ProcessScanAsync(
             string membershipNumber, Guid branchId, Guid tenantId)
         {
-            // 1. Find member
-            var member = await _db.Members
-     .Include(m => m.MemberStatus)
-     .Where(m => m.TenantId == tenantId
-              && m.MembershipNumber == membershipNumber
-              && !m.IsDeleted)
-     .FirstOrDefaultAsync();
+            // 1. Find member by membership number or phone number
+            var query = membershipNumber.All(char.IsDigit) && membershipNumber.Length >= 7
+                ? _db.Members.Include(m => m.MemberStatus)
+                      .Where(m => m.TenantId == tenantId && !m.IsDeleted &&
+                                  (m.MembershipNumber == membershipNumber || m.PhoneNumber == membershipNumber))
+                : _db.Members.Include(m => m.MemberStatus)
+                      .Where(m => m.TenantId == tenantId && !m.IsDeleted &&
+                                  m.MembershipNumber == membershipNumber);
+
+            var member = await query.FirstOrDefaultAsync();
 
             if (member == null)
                 return Fail("MEMBER_NOT_FOUND", "Member not found.");

@@ -148,6 +148,34 @@ namespace GymSaaS.Controllers
         }
 
         // ─────────────────────────────────────────────
+        // GET /Members/QuickSearch?q=…  (AJAX)
+        // ─────────────────────────────────────────────
+        [HttpGet]
+        public async Task<IActionResult> QuickSearch(string? q)
+        {
+            if (string.IsNullOrWhiteSpace(q) || q.Trim().Length < 2)
+                return Json(Array.Empty<object>());
+
+            var term = q.Trim();
+
+            var results = await _db.Members
+                .Where(m => m.TenantId == TenantId && !m.IsDeleted &&
+                            (m.MembershipNumber.Contains(term) || m.PhoneNumber.Contains(term)))
+                .Take(8)
+                .Select(m => new
+                {
+                    m.MemberId,
+                    m.MembershipNumber,
+                    FullName = m.FullName ?? (m.FirstName + " " + m.LastName),
+                    m.PhoneNumber,
+                    m.ProfileImageUrl
+                })
+                .ToListAsync();
+
+            return Json(results);
+        }
+
+        // ─────────────────────────────────────────────
         // GET /Members/Details/id
         // ─────────────────────────────────────────────
         public async Task<IActionResult> Details(Guid id)
@@ -321,7 +349,7 @@ namespace GymSaaS.Controllers
                 .FirstOrDefaultAsync();
 
             var memberId = Guid.NewGuid();
-            var memberNumber = await GenerateMembershipNumberAsync(model.FirstName, model.LastName);
+            var memberNumber = await GenerateMembershipNumberAsync();
             var imageUrl = await SaveProfileImageAsync(model.ProfileImage, memberId);
             var password = string.IsNullOrWhiteSpace(model.Password)
                                 ? GeneratePassword(model.FirstName)
@@ -537,22 +565,27 @@ namespace GymSaaS.Controllers
             }
         }
 
-        private async Task<string> GenerateMembershipNumberAsync(string firstName, string lastName)
+        private async Task<string> GenerateMembershipNumberAsync()
         {
-            // Format: IW-{first2letters}{last2letters}-{4digits}
-            // e.g. IW-MAHM-4821
-            var prefix = (firstName.Length >= 2 ? firstName[..2] : firstName).ToUpperInvariant();
-            var suffix = (lastName.Length >= 2 ? lastName[..2] : lastName).ToUpperInvariant();
-            var tag = $"IW-{prefix}{suffix}";
+            var existing = await _db.Members
+                .Where(m => m.TenantId == TenantId)
+                .Select(m => m.MembershipNumber)
+                .ToListAsync();
 
-            string number;
+            int next = 1000;
+            foreach (var num in existing)
+                if (int.TryParse(num, out var n) && n >= next)
+                    next = n + 1;
+
+            string candidate;
             do
             {
-                number = $"{tag}-{Random.Shared.Next(1000, 9999)}";
+                candidate = next.ToString();
+                next++;
             }
-            while (await _db.Members.AnyAsync(m => m.TenantId == TenantId && m.MembershipNumber == number));
+            while (await _db.Members.AnyAsync(m => m.TenantId == TenantId && m.MembershipNumber == candidate));
 
-            return number;
+            return candidate;
         }
 
         private static string GeneratePassword(string firstName)

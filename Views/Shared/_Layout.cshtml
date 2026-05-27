@@ -1130,9 +1130,10 @@
             </div>
 
             <div class="topbar-actions">
-                <div class="search-bar">
+                <div class="search-bar" style="position:relative;">
                     <i class="bi bi-search"></i>
-                    <input type="text" placeholder="Search..." />
+                    <input type="text" id="globalSearch" placeholder="Client ID or phone..." autocomplete="off" />
+                    <div id="globalSearchDropdown" style="display:none; position:absolute; top:calc(100% + 6px); left:0; right:0; background:#fff; border:1px solid #e0e0e0; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,.12); z-index:9999; overflow:hidden;"></div>
                 </div>
 
                 <div class="topbar-branch">
@@ -1216,6 +1217,63 @@
     </script>
 
     @await RenderSectionAsync("Scripts", required: false)
+
+    <script>
+    (function () {
+        const input = document.getElementById('globalSearch');
+        const dropdown = document.getElementById('globalSearchDropdown');
+        if (!input) return;
+
+        let timer;
+
+        input.addEventListener('input', function () {
+            clearTimeout(timer);
+            const q = this.value.trim();
+            if (q.length < 2) { dropdown.style.display = 'none'; return; }
+            timer = setTimeout(() => fetchResults(q), 300);
+        });
+
+        input.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') { dropdown.style.display = 'none'; this.value = ''; }
+        });
+
+        document.addEventListener('click', function (e) {
+            if (!input.contains(e.target) && !dropdown.contains(e.target))
+                dropdown.style.display = 'none';
+        });
+
+        async function fetchResults(q) {
+            try {
+                const res = await fetch('/Members/QuickSearch?q=' + encodeURIComponent(q));
+                if (!res.ok) return;
+                const data = await res.json();
+                renderDropdown(data, q);
+            } catch { dropdown.style.display = 'none'; }
+        }
+
+        function renderDropdown(items, q) {
+            if (!items.length) {
+                dropdown.innerHTML = '<div style="padding:12px 16px; color:#888; font-size:13px;">No members found</div>';
+                dropdown.style.display = 'block';
+                return;
+            }
+            dropdown.innerHTML = items.map(m => {
+                const avatar = m.profileImageUrl
+                    ? `<img src="${m.profileImageUrl}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0;">`
+                    : `<div style="width:32px;height:32px;border-radius:50%;background:#e8f0fe;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="bi bi-person" style="color:#4f6ef7;font-size:16px;"></i></div>`;
+                return `<a href="/Members/Details/${m.memberId}" style="display:flex;align-items:center;gap:10px;padding:10px 14px;text-decoration:none;color:inherit;border-bottom:1px solid #f0f0f0;"
+                    onmouseover="this.style.background='#f5f7ff'" onmouseout="this.style.background='transparent'">
+                    ${avatar}
+                    <div style="min-width:0;">
+                        <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${m.fullName}</div>
+                        <div style="font-size:11px;color:#888;">${m.membershipNumber} &middot; ${m.phoneNumber}</div>
+                    </div>
+                </a>`;
+            }).join('');
+            dropdown.style.display = 'block';
+        }
+    })();
+    </script>
 
 </body>
 </html>

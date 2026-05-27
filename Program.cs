@@ -7,7 +7,7 @@ using GymSaaS.Services.Reception;
 var builder = WebApplication.CreateBuilder(args);
 
 // ── MVC ──────────────────────────────────────────
-builder.Services.AddControllersWithViews();
+builder.Services.AddControllersWithViews().AddRazorRuntimeCompilation();
 
 // ── Database ─────────────────────────────────────
 builder.Services.AddDbContext<GymDbContext>(options =>
