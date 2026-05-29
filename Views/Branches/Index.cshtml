@@ -13,19 +13,34 @@
     }
 
     .branch-card {
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: var(--r-lg);
-        box-shadow: var(--sh-sm);
+        background: #ffffff;
+        border: 1px solid rgba(15,23,42,0.06);
+        border-radius: 16px;
+        box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 4px 14px rgba(15,23,42,0.04);
         overflow: hidden;
-        transition: box-shadow .2s, transform .2s;
+        transition: box-shadow .25s ease, transform .25s ease, border-color .25s ease;
         display: flex;
         flex-direction: column;
+        position: relative;
     }
+        .branch-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 20px;
+            right: 20px;
+            height: 2px;
+            background: linear-gradient(90deg, var(--fire), #fdba74, transparent);
+            border-radius: 0 0 2px 2px;
+            opacity: 0;
+            transition: opacity .25s ease;
+        }
     .branch-card:hover {
-        box-shadow: var(--sh-md);
-        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(15,23,42,0.05), 0 14px 32px rgba(15,23,42,0.10);
+        transform: translateY(-3px);
+        border-color: rgba(15,23,42,0.10);
     }
+        .branch-card:hover::before { opacity: 1; }
     .branch-card.inactive { opacity: .65; }
 
     .bc-top {
@@ -136,10 +151,10 @@
         grid-column: 1 / -1;
         text-align: center;
         padding: 60px 24px;
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: var(--r-lg);
-        box-shadow: var(--sh-sm);
+        background: #ffffff;
+        border: 1px solid rgba(15,23,42,0.06);
+        border-radius: 16px;
+        box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 4px 14px rgba(15,23,42,0.04);
     }
     .empty-icon {
         width: 64px; height: 64px;
@@ -242,8 +257,22 @@
                         <div class="bc-stat-lbl">Today</div>
                     </div>
                     <div class="bc-stat">
-                        <div class="bc-stat-val fire">@b.InsideNow</div>
+                        <div class="bc-stat-val fire">
+                            @b.InsideNow
+                            @if (b.Capacity.HasValue)
+                            {
+                                <span style="font-size:12px;font-weight:600;color:var(--t3);">/@b.Capacity</span>
+                            }
+                        </div>
                         <div class="bc-stat-lbl">Inside Now</div>
+                        @if (b.Capacity.HasValue && b.Capacity.Value > 0)
+                        {
+                            var pct = Math.Min(100, (int)Math.Round(b.InsideNow * 100.0 / b.Capacity.Value));
+                            var fill = pct >= 100 ? "var(--red)" : pct >= 80 ? "var(--yellow)" : "var(--fire)";
+                            <div style="margin-top:4px;height:3px;background:var(--border);border-radius:3px;overflow:hidden;">
+                                <div style="height:100%;width:@(pct)%;background:@fill;border-radius:3px;"></div>
+                            </div>
+                        }
                     </div>
                 </div>
 

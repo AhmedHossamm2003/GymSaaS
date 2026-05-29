@@ -1,0 +1,375 @@
+@model List<GymSaaS.Models.InvitationAttendanceItem>
+@{
+    ViewData["Title"] = "Invitations";
+    ViewData["Subtitle"] = "Guest Attendance Log";
+
+    var currentStatus = ViewData["Status"] as string ?? "";
+    var currentSearch = ViewData["Search"] as string ?? "";
+    var page          = (int)(ViewData["Page"] ?? 1);
+    var totalPages    = (int)(ViewData["TotalPages"] ?? 1);
+    var totalCount    = (int)(ViewData["TotalCount"] ?? 0);
+    var totalPending  = (int)(ViewData["TotalPending"] ?? 0);
+    var totalUsed     = (int)(ViewData["TotalUsed"] ?? 0);
+    var totalCancelled = (int)(ViewData["TotalCancelled"] ?? 0);
+    var total         = totalPending + totalUsed + totalCancelled;
+    int conversionPct = total > 0 ? (int)Math.Round((double)totalUsed / total * 100) : 0;
+}
+
+@section Styles {
+<style>
+    .inv-shell { max-width: 1100px; }
+
+    .inv-stat-row {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 14px;
+        margin-bottom: 20px;
+    }
+
+    @@media (max-width: 768px) {
+        .inv-stat-row { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    .inv-stat {
+        background: #ffffff;
+        border: 1px solid rgba(15,23,42,0.06);
+        border-radius: 16px;
+        box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 4px 14px rgba(15,23,42,0.04);
+        padding: 18px 22px;
+        position: relative;
+        overflow: hidden;
+        transition: box-shadow 0.25s ease, transform 0.25s ease, border-color 0.25s ease;
+    }
+
+        .inv-stat::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.9), transparent);
+            pointer-events: none;
+        }
+
+        .inv-stat:hover {
+            box-shadow: 0 4px 8px rgba(15,23,42,0.05), 0 12px 28px rgba(15,23,42,0.08);
+            border-color: rgba(15,23,42,0.10);
+            transform: translateY(-2px);
+        }
+
+    .inv-stat-val {
+        font-family: var(--font-display);
+        font-size: 28px;
+        font-weight: 800;
+        color: var(--t1);
+        line-height: 1;
+        margin-bottom: 5px;
+        letter-spacing: -0.01em;
+    }
+
+    .inv-stat-lbl {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+        color: var(--t3);
+    }
+
+    .filter-bar {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+    }
+
+    .filter-pill {
+        padding: 6px 16px;
+        border-radius: 999px;
+        border: 1px solid rgba(15,23,42,0.08);
+        background: #ffffff;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--t2);
+        cursor: pointer;
+        text-decoration: none;
+        transition: all .18s ease;
+        box-shadow: 0 1px 2px rgba(15,23,42,0.04);
+    }
+
+    .filter-pill:hover {
+        border-color: rgba(249,115,22,0.40);
+        color: var(--fire);
+        transform: translateY(-1px);
+        box-shadow: 0 2px 6px rgba(15,23,42,0.06);
+    }
+
+    .filter-pill.active {
+        border-color: var(--fire);
+        background: linear-gradient(135deg, var(--fire-soft), rgba(249,115,22,0.10));
+        color: var(--fire-text);
+        box-shadow: 0 1px 2px rgba(249,115,22,0.12), 0 4px 10px rgba(249,115,22,0.10);
+    }
+
+    .inv-table-wrap {
+        background: #ffffff;
+        border: 1px solid rgba(15,23,42,0.06);
+        border-radius: 16px;
+        box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 4px 14px rgba(15,23,42,0.04);
+        overflow: hidden;
+        transition: box-shadow 0.25s ease, border-color 0.25s ease;
+    }
+
+        .inv-table-wrap:hover {
+            box-shadow: 0 2px 4px rgba(15,23,42,0.05), 0 8px 22px rgba(15,23,42,0.06);
+            border-color: rgba(15,23,42,0.09);
+        }
+
+    .inv-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .inv-table thead th {
+        background: linear-gradient(to bottom, #fafafa, #f5f5f7);
+        padding: 12px 18px;
+        text-align: left;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+        color: var(--t3);
+        border-bottom: 1px solid rgba(15,23,42,0.08);
+        white-space: nowrap;
+    }
+
+    .inv-table tbody tr {
+        border-bottom: 1px solid rgba(15,23,42,0.04);
+        transition: background .15s ease, box-shadow .15s ease;
+        position: relative;
+    }
+
+    .inv-table tbody tr:last-child { border-bottom: none; }
+
+    .inv-table tbody tr:hover {
+        background: #fafafa;
+        box-shadow: inset 3px 0 0 var(--fire);
+    }
+
+    .inv-table td {
+        padding: 13px 18px;
+        vertical-align: middle;
+        font-size: 13px;
+    }
+
+    .conversion-bar-wrap {
+        height: 6px;
+        background: rgba(15,23,42,0.06);
+        border-radius: 999px;
+        overflow: hidden;
+        margin-top: 8px;
+        box-shadow: inset 0 1px 2px rgba(15,23,42,0.05);
+    }
+
+    .conversion-bar-fill {
+        height: 100%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, var(--fire), #fdba74);
+        box-shadow: 0 0 8px rgba(249,115,22,0.30);
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 52px 20px;
+        color: var(--t3);
+    }
+</style>
+}
+
+<div class="inv-shell">
+
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+        <div>
+            <h1 style="font-family:var(--font-display);font-size:22px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--t1);margin:0;">
+                Guest Invitations
+            </h1>
+            <p style="font-size:13px;color:var(--t3);margin:3px 0 0;">Track who your members are bringing in — conversion potential.</p>
+        </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="inv-stat-row">
+        <div class="inv-stat">
+            <div class="inv-stat-val">@total</div>
+            <div class="inv-stat-lbl">Total Invitations</div>
+        </div>
+        <div class="inv-stat">
+            <div class="inv-stat-val" style="color:var(--yellow);">@totalPending</div>
+            <div class="inv-stat-lbl">Pending</div>
+        </div>
+        <div class="inv-stat">
+            <div class="inv-stat-val" style="color:var(--green);">@totalUsed</div>
+            <div class="inv-stat-lbl">Attended (Used)</div>
+        </div>
+        <div class="inv-stat">
+            <div class="inv-stat-val" style="color:var(--fire);">@conversionPct%</div>
+            <div class="inv-stat-lbl">Conversion Rate</div>
+            <div class="conversion-bar-wrap">
+                <div class="conversion-bar-fill" style="width:@conversionPct%;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <form method="get" class="filter-bar">
+        <input type="text" name="search" value="@currentSearch" class="form-control"
+               placeholder="Search guest name, phone, or member..." style="max-width:280px;" />
+
+        <a href="@Url.Action("Index", new { })" class="filter-pill @(string.IsNullOrEmpty(currentStatus) ? "active" : "")">All</a>
+        <a href="@Url.Action("Index", new { status = "PENDING", search = currentSearch })" class="filter-pill @(currentStatus == "PENDING" ? "active" : "")">Pending</a>
+        <a href="@Url.Action("Index", new { status = "USED", search = currentSearch })" class="filter-pill @(currentStatus == "USED" ? "active" : "")">Used</a>
+        <a href="@Url.Action("Index", new { status = "CANCELLED", search = currentSearch })" class="filter-pill @(currentStatus == "CANCELLED" ? "active" : "")">Cancelled</a>
+
+        <button type="submit" class="btn btn-ghost" style="border:1px solid var(--border);">
+            <i class="bi bi-search"></i> Search
+        </button>
+    </form>
+
+    <!-- Table -->
+    <div class="inv-table-wrap">
+        @if (!Model.Any())
+        {
+            <div class="empty-state">
+                <i class="bi bi-ticket-detailed" style="font-size:40px;display:block;margin-bottom:12px;color:var(--fire);opacity:.4;"></i>
+                <div style="font-weight:700;font-size:14px;color:var(--t2);margin-bottom:4px;">No invitations found</div>
+                <div style="font-size:13px;">Invitations recorded from Member profiles or the Reception desk appear here.</div>
+            </div>
+        }
+        else
+        {
+            <table class="inv-table">
+                <thead>
+                    <tr>
+                        <th>Guest</th>
+                        <th>Invited By</th>
+                        <th>Package</th>
+                        <th>Date</th>
+                        <th>Used</th>
+                        <th>Status</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var inv in Model)
+                    {
+                        <tr>
+                            <td>
+                                <div style="font-weight:700;color:var(--t1);">@inv.GuestName</div>
+                                <div style="font-size:11.5px;color:var(--t3);">@inv.GuestPhone</div>
+                                @if (!string.IsNullOrEmpty(inv.InvitedMemberName))
+                                {
+                                    <div style="font-size:11px;color:var(--fire);margin-top:2px;">
+                                        <i class="bi bi-person-check" style="font-size:10px;"></i> @inv.InvitedMemberName
+                                    </div>
+                                }
+                                @if (!string.IsNullOrEmpty(inv.Notes))
+                                {
+                                    <div style="font-size:11px;color:var(--t3);font-style:italic;margin-top:2px;">@inv.Notes</div>
+                                }
+                            </td>
+                            <td>
+                                <a asp-controller="Members" asp-action="Details" asp-route-id="@inv.InviterMemberId"
+                                   style="font-weight:600;color:var(--fire);">@inv.InviterName</a>
+                                <div style="font-size:11px;color:var(--t3);">#@inv.InviterMembershipNumber</div>
+                            </td>
+                            <td style="color:var(--t2);font-size:12px;">@inv.PackageName</td>
+                            <td style="color:var(--t3);font-size:12px;white-space:nowrap;">
+                                @inv.CreatedAtUtc.ToLocalTime().ToString("MMM d, yyyy")
+                                <div style="font-size:11px;">@inv.CreatedAtUtc.ToLocalTime().ToString("h:mm tt")</div>
+                            </td>
+                            <td style="font-size:12px;">
+                                @if (inv.UsedAtUtc.HasValue)
+                                {
+                                    <span style="color:var(--green);font-weight:600;">
+                                        @inv.UsedAtUtc.Value.ToLocalTime().ToString("MMM d, yyyy")
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span style="color:var(--t3);">—</span>
+                                }
+                            </td>
+                            <td>
+                                @if (inv.IsPending)
+                                {
+                                    <span class="badge badge-pending">Pending</span>
+                                }
+                                else if (inv.IsUsed)
+                                {
+                                    <span class="badge badge-active">Used</span>
+                                }
+                                else
+                                {
+                                    <span class="badge badge-inactive">Cancelled</span>
+                                }
+                            </td>
+                            <td>
+                                @if (inv.IsPending)
+                                {
+                                    <div style="display:flex;gap:5px;">
+                                        <form asp-controller="Invitations" asp-action="MarkUsed" method="post" style="display:inline;">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@inv.MemberInvitationId" />
+                                            <input type="hidden" name="memberId" value="@inv.InviterMemberId" />
+                                            <input type="hidden" name="returnToIndex" value="true" />
+                                            <button type="submit" class="btn btn-ghost" style="font-size:11px;padding:3px 9px;border:1px solid var(--border);" title="Mark as used">
+                                                <i class="bi bi-check-lg"></i> Used
+                                            </button>
+                                        </form>
+                                        <form asp-controller="Invitations" asp-action="Cancel" method="post" style="display:inline;"
+                                              onsubmit="return confirm('Cancel this invitation?')">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@inv.MemberInvitationId" />
+                                            <input type="hidden" name="memberId" value="@inv.InviterMemberId" />
+                                            <input type="hidden" name="returnToIndex" value="true" />
+                                            <button type="submit" class="btn btn-ghost" style="font-size:11px;padding:3px 9px;border:1px solid var(--border);color:var(--red);" title="Cancel">
+                                                <i class="bi bi-x-lg"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+
+            @if (totalPages > 1)
+            {
+                <div style="padding:14px 18px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+                    <span style="font-size:12px;color:var(--t3);">@totalCount total invitation@(totalCount != 1 ? "s" : "")</span>
+                    <div style="display:flex;gap:6px;">
+                        @if (page > 1)
+                        {
+                            <a href="@Url.Action("Index", new { status = currentStatus, search = currentSearch, page = page - 1 })"
+                               class="btn btn-ghost" style="padding:5px 12px;border:1px solid var(--border);font-size:12px;">
+                                <i class="bi bi-chevron-left"></i>
+                            </a>
+                        }
+                        <span style="padding:5px 12px;font-size:12px;font-weight:600;color:var(--t2);">@(page) / @totalPages</span>
+                        @if (page < totalPages)
+                        {
+                            <a href="@Url.Action("Index", new { status = currentStatus, search = currentSearch, page = page + 1 })"
+                               class="btn btn-ghost" style="padding:5px 12px;border:1px solid var(--border);font-size:12px;">
+                                <i class="bi bi-chevron-right"></i>
+                            </a>
+                        }
+                    </div>
+                </div>
+            }
+        }
+    </div>
+
+</div>

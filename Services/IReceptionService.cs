@@ -20,11 +20,29 @@ namespace GymSaaS.Services.Reception
         public int MaxCapacity { get; set; }
         public int CurrentlyPresentCount { get; set; }
         public int TodayEntryCount { get; set; }
+        public int TodayClassesCount { get; set; }
+        public List<TodayClassItem> TodayClasses { get; set; } = new();
 
         // Derived — shown as progress bar
         public int CapacityPercent => MaxCapacity > 0
             ? Math.Min(100, (int)Math.Round((double)CurrentlyPresentCount / MaxCapacity * 100))
             : 0;
+    }
+
+    /// <summary>
+    /// A single class scheduled for today, with live/upcoming status.
+    /// </summary>
+    public class TodayClassItem
+    {
+        public Guid GymClassId { get; set; }
+        public string ClassName { get; set; } = null!;
+        public string TimeDisplay { get; set; } = null!;
+        public string? CoachName { get; set; }
+        public int? Capacity { get; set; }
+        public string? PhotoUrl { get; set; }
+        public bool IsLive { get; set; }
+        public bool IsUpcoming { get; set; }
+        public bool IsDone => !IsLive && !IsUpcoming;
     }
 
     /// <summary>

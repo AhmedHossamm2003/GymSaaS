@@ -65,12 +65,49 @@ namespace GymSaaS.Services.Reception
                          && a.CheckInAtUtc < todayUtc.AddDays(1))
                 .CountAsync();
 
+            // Today's classes (use local time so day-of-week matches the schedule)
+            var localNow  = DateTime.Now;
+            var todayDow  = (int)localNow.DayOfWeek;
+            var nowTime   = TimeOnly.FromDateTime(localNow);
+
+            var rawClasses = await _db.GymClasses
+                .Where(g => g.BranchId == branchId && g.TenantId == tenantId
+                         && !g.IsDeleted && g.IsActive && g.DayOfWeek == todayDow)
+                .OrderBy(g => g.StartTime)
+                .Select(g => new { g.GymClassId, g.ClassName, g.StartTime, g.EndTime,
+                                   g.CoachId, g.Capacity, g.PhotoUrl })
+                .ToListAsync();
+
+            var coachIds = rawClasses
+                .Where(c => c.CoachId.HasValue).Select(c => c.CoachId!.Value).Distinct().ToList();
+            var coachMap = coachIds.Count > 0
+                ? await _db.Coaches
+                    .Where(c => coachIds.Contains(c.CoachId))
+                    .Select(c => new { c.CoachId, Name = c.FirstName + " " + c.LastName })
+                    .ToDictionaryAsync(c => c.CoachId, c => c.Name.Trim())
+                : new Dictionary<Guid, string>();
+
+            var todayClasses = rawClasses.Select(g => new TodayClassItem
+            {
+                GymClassId  = g.GymClassId,
+                ClassName   = g.ClassName,
+                TimeDisplay = $"{g.StartTime:HH:mm} – {g.EndTime:HH:mm}",
+                CoachName   = g.CoachId.HasValue && coachMap.TryGetValue(g.CoachId.Value, out var cn) ? cn : null,
+                Capacity    = g.Capacity,
+                PhotoUrl    = g.PhotoUrl,
+                IsLive      = nowTime >= g.StartTime && nowTime <= g.EndTime,
+                IsUpcoming  = nowTime < g.StartTime,
+            }).ToList();
+
             return new ReceptionDashboardDto
             {
-                BranchId            = branch.BranchId,
-                BranchName          = branch.BranchName,
+                BranchId              = branch.BranchId,
+                BranchName            = branch.BranchName,
+                MaxCapacity           = branch.Capacity ?? 0,
                 CurrentlyPresentCount = currentlyPresent,
-                TodayEntryCount     = todayEntries
+                TodayEntryCount       = todayEntries,
+                TodayClassesCount     = todayClasses.Count,
+                TodayClasses          = todayClasses,
             };
         }
 
@@ -78,16 +115,28 @@ namespace GymSaaS.Services.Reception
         public async Task<ScanResultDto> ProcessScanAsync(
             string membershipNumber, Guid branchId, Guid tenantId)
         {
-            // 1. Find member by membership number or phone number
-            var query = membershipNumber.All(char.IsDigit) && membershipNumber.Length >= 7
-                ? _db.Members.Include(m => m.MemberStatus)
-                      .Where(m => m.TenantId == tenantId && !m.IsDeleted &&
-                                  (m.MembershipNumber == membershipNumber || m.PhoneNumber == membershipNumber))
-                : _db.Members.Include(m => m.MemberStatus)
-                      .Where(m => m.TenantId == tenantId && !m.IsDeleted &&
-                                  m.MembershipNumber == membershipNumber);
+            // 1. Find member by membership number or phone number.
+            //    Normalise the input to digits-only for a robust phone match
+            //    (handles inputs like "+20 123 456 789" or "050-123-4567").
+            var digitsOnly = new string(membershipNumber.Where(char.IsDigit).ToArray());
+            bool couldBePhone = digitsOnly.Length >= 7;
 
-            var member = await query.FirstOrDefaultAsync();
+            // First pass: exact match on membership number OR exact match on raw phone
+            var member = await _db.Members.Include(m => m.MemberStatus)
+                .Where(m => m.TenantId == tenantId && !m.IsDeleted &&
+                            (m.MembershipNumber == membershipNumber ||
+                             (couldBePhone && m.PhoneNumber == membershipNumber)))
+                .FirstOrDefaultAsync();
+
+            // Second pass: if not found, try normalised phone comparison (strips +, -, spaces)
+            if (member == null && couldBePhone)
+            {
+                member = await _db.Members.Include(m => m.MemberStatus)
+                    .Where(m => m.TenantId == tenantId && !m.IsDeleted && m.PhoneNumber != null &&
+                                m.PhoneNumber.Replace("+", "").Replace("-", "")
+                                             .Replace(" ", "").Replace("(", "").Replace(")", "") == digitsOnly)
+                    .FirstOrDefaultAsync();
+            }
 
             if (member == null)
                 return Fail("MEMBER_NOT_FOUND", "Member not found.");

@@ -222,6 +222,27 @@ namespace GymSaaS.Models
         public string? Notes { get; set; }
     }
 
+    // ── Invitations Attendance (dedicated page) ──
+    public class InvitationAttendanceItem
+    {
+        public Guid MemberInvitationId { get; set; }
+        public string GuestName { get; set; } = string.Empty;
+        public string GuestPhone { get; set; } = string.Empty;
+        public string? InvitedMemberName { get; set; }
+        public string InviterName { get; set; } = string.Empty;
+        public string InviterMembershipNumber { get; set; } = string.Empty;
+        public Guid InviterMemberId { get; set; }
+        public string PackageName { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+        public string? Notes { get; set; }
+        public DateTime CreatedAtUtc { get; set; }
+        public DateTime? UsedAtUtc { get; set; }
+
+        public bool IsPending => Status == "PENDING";
+        public bool IsUsed => Status == "USED";
+        public bool IsCancelled => Status == "CANCELLED";
+    }
+
     // ── Helpers ───────────────────────────────────
     public class BranchDropdownItem
     {

@@ -23,6 +23,8 @@
     );
 
     var today = (int)DateTime.Now.DayOfWeek;
+    var nowTime = TimeOnly.FromDateTime(DateTime.Now);
+    var todaysClasses = byDay[today];
 
     // Accent colors cycling for class cards
     string[] cardColors = {
@@ -74,6 +76,73 @@
             @Model.Count @(Model.Count == 1 ? "class" : "classes") shown
         </div>
     </form>
+</div>
+
+<!-- Today's classes panel -->
+@{
+    var liveClasses     = todaysClasses.Where(c => nowTime >= c.StartTime && nowTime <= c.EndTime).ToList();
+    var upcomingClasses = todaysClasses.Where(c => nowTime < c.StartTime).ToList();
+    var doneClasses     = todaysClasses.Where(c => nowTime > c.EndTime).ToList();
+}
+<div class="card" style="margin-bottom:20px;overflow:hidden;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border);background:var(--surface-2);">
+        <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-family:var(--font-display);font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--t1);">
+                Today — @dayNames[today]
+            </span>
+            @if (liveClasses.Any())
+            {
+                <span style="background:#dcfce7;color:#16a34a;font-size:11px;font-weight:800;padding:2px 9px;border-radius:999px;">@liveClasses.Count LIVE</span>
+            }
+        </div>
+        <span style="font-size:12px;color:var(--t3);">@todaysClasses.Count @(todaysClasses.Count == 1 ? "class" : "classes") today</span>
+    </div>
+
+    @if (!todaysClasses.Any())
+    {
+        <div style="padding:28px 20px;text-align:center;color:var(--t3);font-size:13px;">
+            No active classes scheduled for today.
+        </div>
+    }
+    else
+    {
+        <div style="display:flex;flex-wrap:wrap;gap:10px;padding:16px 20px;">
+            @foreach (var cls in todaysClasses.OrderBy(c => c.StartTime))
+            {
+                bool isLive     = nowTime >= cls.StartTime && nowTime <= cls.EndTime;
+                bool isUpcoming = nowTime < cls.StartTime;
+                bool isDone     = !isLive && !isUpcoming;
+
+                var cardBorder  = isLive ? "#16a34a" : isUpcoming ? "#3b82f6" : "var(--border)";
+                var badgeBg     = isLive ? "#dcfce7" : isUpcoming ? "#eff6ff" : "#f3f4f6";
+                var badgeColor  = isLive ? "#16a34a" : isUpcoming ? "#2563eb" : "#9ca3af";
+                var badgeText   = isLive ? "LIVE NOW" : isUpcoming ? "UPCOMING" : "DONE";
+
+                <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:12px;border:1px solid @cardBorder;background:@(isLive ? "#f0fdf4" : isUpcoming ? "#fff" : "#f9fafb");min-width:220px;flex:1;max-width:340px;">
+                    @if (!string.IsNullOrEmpty(cls.PhotoUrl))
+                    {
+                        <img src="@cls.PhotoUrl" alt="@cls.ClassName"
+                             style="width:40px;height:40px;object-fit:cover;border-radius:8px;flex-shrink:0;" />
+                    }
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-weight:700;font-size:13px;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                            @cls.ClassName
+                        </div>
+                        <div style="font-size:11.5px;color:var(--t3);margin-top:2px;">
+                            @cls.TimeDisplay
+                            @if (cls.CoachId.HasValue)
+                            {
+                                <span> · @cls.CoachName</span>
+                            }
+                        </div>
+                    </div>
+                    <span style="flex-shrink:0;font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:999px;background:@badgeBg;color:@badgeColor;letter-spacing:.04em;">
+                        @badgeText
+                    </span>
+                </div>
+            }
+        </div>
+    }
 </div>
 
 <!-- Weekly grid -->

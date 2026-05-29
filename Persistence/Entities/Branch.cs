@@ -51,6 +51,8 @@ public partial class Branch
 
     public bool IsActive { get; set; }
 
+    public int? Capacity { get; set; }
+
     public int CurrentQrVersion { get; set; }
 
     public int MemberPresenceWindowMinutes { get; set; }

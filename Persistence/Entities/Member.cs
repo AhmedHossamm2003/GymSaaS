@@ -44,6 +44,7 @@ public partial class Member
     public string LastName { get; set; } = null!;
 
     [StringLength(201)]
+    [DatabaseGenerated(DatabaseGeneratedOption.Computed)]
     public string? FullName { get; set; }
 
     [StringLength(30)]

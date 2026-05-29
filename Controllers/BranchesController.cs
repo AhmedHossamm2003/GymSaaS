@@ -59,6 +59,7 @@ namespace GymSaaS.Controllers
                     MemberCount = _db.Members.Count(m => m.HomeBranchId == b.BranchId && !m.IsDeleted),
                     TodayCheckins = _db.AttendanceRecords.Count(a => a.BranchId == b.BranchId && a.CheckInAtUtc.Date == now.Date),
                     InsideNow = _db.AttendanceRecords.Count(a => a.BranchId == b.BranchId && a.PresenceUntilUtc > now),
+                    Capacity = b.Capacity,
                 })
                 .ToListAsync();
 
@@ -99,6 +100,7 @@ namespace GymSaaS.Controllers
                 MemberCount = await _db.Members.CountAsync(m => m.HomeBranchId == id && !m.IsDeleted),
                 TodayCheckins = await _db.AttendanceRecords.CountAsync(a => a.BranchId == id && a.CheckInAtUtc.Date == now.Date),
                 InsideNow = await _db.AttendanceRecords.CountAsync(a => a.BranchId == id && a.PresenceUntilUtc > now),
+                Capacity = b.Capacity,
                 QrCodeValue = qr?.QrCodeValue,
                 QrVersionNo = qr?.VersionNo,
                 QrGeneratedAt = qr?.CreatedAtUtc,
@@ -163,6 +165,7 @@ namespace GymSaaS.Controllers
                 ContactEmail = model.ContactEmail?.Trim(),
                 IsActive = model.IsActive,
                 MemberPresenceWindowMinutes = model.MemberPresenceWindowMinutes,
+                Capacity = model.Capacity,
                 CurrentQrVersion = 1,
                 CreatedAtUtc = DateTime.UtcNow,
             };
@@ -203,6 +206,7 @@ namespace GymSaaS.Controllers
                 ContactEmail = b.ContactEmail,
                 IsActive = b.IsActive,
                 MemberPresenceWindowMinutes = b.MemberPresenceWindowMinutes,
+                Capacity = b.Capacity,
             };
 
             ViewData["Title"] = "Branches";
@@ -240,6 +244,7 @@ namespace GymSaaS.Controllers
             b.ContactEmail = model.ContactEmail?.Trim();
             b.IsActive = model.IsActive;
             b.MemberPresenceWindowMinutes = model.MemberPresenceWindowMinutes;
+            b.Capacity = model.Capacity;
             b.UpdatedAtUtc = DateTime.UtcNow;
 
             await _db.SaveChangesAsync();

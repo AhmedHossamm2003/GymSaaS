@@ -11,17 +11,30 @@
         }
 
         .profile-hero {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: var(--r-lg);
-            box-shadow: var(--sh-sm);
-            padding: 24px;
+            background: linear-gradient(135deg, #ffffff 0%, #fbfbfd 100%);
+            border: 1px solid rgba(15,23,42,0.06);
+            border-radius: 18px;
+            box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 6px 20px rgba(15,23,42,0.05);
+            padding: 26px;
             display: flex;
             align-items: flex-start;
             gap: 22px;
-            margin-bottom: 16px;
+            margin-bottom: 18px;
             flex-wrap: wrap;
+            position: relative;
+            overflow: hidden;
         }
+
+            .profile-hero::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 24px;
+                right: 24px;
+                height: 2px;
+                background: linear-gradient(90deg, var(--fire, #f97316), #fdba74, transparent);
+                border-radius: 0 0 2px 2px;
+            }
 
         .ph-avatar {
             width: 80px;
@@ -112,28 +125,49 @@
         }
 
         .s4-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: var(--r-lg);
-            box-shadow: var(--sh-sm);
-            padding: 16px 18px;
+            background: #ffffff;
+            border: 1px solid rgba(15,23,42,0.06);
+            border-radius: 16px;
+            box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 4px 14px rgba(15,23,42,0.04);
+            padding: 18px 20px;
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 14px;
+            transition: box-shadow 0.25s ease, transform 0.25s ease, border-color 0.25s ease;
+            position: relative;
+            overflow: hidden;
         }
 
+            .s4-card::after {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 1px;
+                background: linear-gradient(90deg, transparent, rgba(255,255,255,0.9), transparent);
+                pointer-events: none;
+            }
+
+            .s4-card:hover {
+                box-shadow: 0 4px 8px rgba(15,23,42,0.05), 0 12px 28px rgba(15,23,42,0.08);
+                border-color: rgba(15,23,42,0.10);
+                transform: translateY(-2px);
+            }
+
         .s4-icon {
-            width: 34px;
-            height: 34px;
-            border-radius: var(--r-sm);
-            background: var(--surface-2);
-            border: 1px solid var(--border);
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #fafafa, #f4f4f5);
+            border: 1px solid rgba(15,23,42,0.06);
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 15px;
             color: var(--fire);
             flex-shrink: 0;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.8);
         }
 
         .s4-val {
@@ -154,21 +188,27 @@
         }
 
         .info-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: var(--r-lg);
-            box-shadow: var(--sh-sm);
+            background: #ffffff;
+            border: 1px solid rgba(15,23,42,0.06);
+            border-radius: 16px;
+            box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 4px 14px rgba(15,23,42,0.04);
             overflow: hidden;
-            margin-bottom: 16px;
+            margin-bottom: 18px;
+            transition: box-shadow 0.25s ease, border-color 0.25s ease;
         }
+
+            .info-card:hover {
+                box-shadow: 0 2px 4px rgba(15,23,42,0.05), 0 8px 24px rgba(15,23,42,0.06);
+                border-color: rgba(15,23,42,0.09);
+            }
 
         .ic-head {
             display: flex;
             align-items: center;
             gap: 10px;
             padding: 14px 20px;
-            border-bottom: 1px solid var(--border);
-            background: var(--surface-2);
+            border-bottom: 1px solid rgba(15,23,42,0.05);
+            background: linear-gradient(to bottom, #fafafa, #f5f5f7);
             justify-content: space-between;
         }
 
@@ -691,8 +731,8 @@
                     <div id="phoneSearchResult" style="margin-top:6px;font-size:12px;"></div>
                 </div>
 
-                <!-- Hidden field for matched member id -->
-                <input type="hidden" id="invInvitedMemberId" name="InvitedMemberId" value="" />
+                <!-- Hidden field for matched member id (name attr managed by JS) -->
+                <input type="hidden" id="invInvitedMemberId" />
 
                 <!-- Guest name -->
                 <div class="form-field" style="margin-bottom:14px;">
@@ -776,9 +816,21 @@
             document.getElementById("inviteModal").style.display = "flex";
             document.getElementById("invPhoneInput").value = "";
             document.getElementById("invGuestName").value = "";
-            document.getElementById("invInvitedMemberId").value = "";
+            clearInvitedMember();
             document.getElementById("phoneSearchResult").innerHTML = "";
             document.getElementById("invPhoneInput").focus();
+        }
+
+        function clearInvitedMember() {
+            const f = document.getElementById("invInvitedMemberId");
+            f.removeAttribute("name");
+            f.value = "";
+        }
+
+        function setInvitedMember(id) {
+            const f = document.getElementById("invInvitedMemberId");
+            f.name = "InvitedMemberId";
+            f.value = id;
         }
 
         function closeInviteModal() {
@@ -813,11 +865,11 @@
                 const data = await res.json();
 
                 if (data.found) {
-                    document.getElementById("invInvitedMemberId").value = data.memberId;
+                    setInvitedMember(data.memberId);
                     document.getElementById("invGuestName").value = data.name;
                     resultEl.innerHTML = `<span style="color:var(--green);font-weight:600;"><i class="bi bi-check-circle-fill"></i> Member found: ${data.name}</span>`;
                 } else {
-                    document.getElementById("invInvitedMemberId").value = "";
+                    clearInvitedMember();
                     resultEl.innerHTML = '<span style="color:var(--t3);"><i class="bi bi-info-circle"></i> Not a registered member — enter name manually.</span>';
                 }
             } catch {

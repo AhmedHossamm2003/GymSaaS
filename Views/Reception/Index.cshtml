@@ -46,9 +46,37 @@
 
     .reception-card {
         background: #fff;
-        border: 1px solid #eef0f4;
-        border-radius: 22px;
-        box-shadow: 0 8px 22px rgba(15, 23, 42, .04);
+        border: 1px solid rgba(15,23,42,0.06);
+        border-radius: 18px;
+        box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 6px 18px rgba(15,23,42,0.05);
+        position: relative;
+        transition: box-shadow 0.25s ease, transform 0.25s ease, border-color 0.25s ease;
+    }
+
+        .reception-card::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.9), transparent);
+            border-radius: 18px 18px 0 0;
+            pointer-events: none;
+        }
+
+        .reception-card:hover {
+            box-shadow: 0 4px 8px rgba(15,23,42,0.05), 0 14px 32px rgba(15,23,42,0.08);
+            border-color: rgba(15,23,42,0.10);
+        }
+
+    /* Stat cards inside reception-grid lift a bit on hover */
+    .reception-grid .reception-card {
+        transition: box-shadow 0.25s ease, transform 0.25s ease, border-color 0.25s ease;
+    }
+
+    .reception-grid .reception-card:hover {
+        transform: translateY(-2px);
     }
 
     .reception-card-body {
@@ -57,20 +85,25 @@
 
     .stat-label {
         color: #6b7280;
-        font-size: 13px;
-        margin-bottom: 8px;
+        font-size: 11.5px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        margin-bottom: 10px;
     }
 
     .stat-value {
-        font-size: 30px;
+        font-size: 32px;
         font-weight: 800;
         color: #111827;
         margin-bottom: 6px;
+        letter-spacing: -0.01em;
+        line-height: 1;
     }
 
     .stat-note {
         color: #9ca3af;
-        font-size: 13px;
+        font-size: 12.5px;
     }
 
     .main-area {
@@ -80,17 +113,21 @@
     }
 
     .section-title {
-        font-size: 16px;
+        font-family: 'Barlow Condensed', sans-serif;
+        font-size: 17px;
         font-weight: 800;
         margin-bottom: 18px;
         color: #111827;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
     }
 
     .form-label-clean {
         display: block;
-        font-size: 12px;
+        font-size: 11px;
         color: #6b7280;
-        font-weight: 800;
+        font-weight: 700;
+        letter-spacing: 0.08em;
         text-transform: uppercase;
         margin-bottom: 8px;
     }
@@ -104,30 +141,50 @@
     .scan-input {
         flex: 1;
         min-height: 48px;
-        border-radius: 14px;
-        border: 1px solid #fb6a16;
+        border-radius: 12px;
+        border: 1.5px solid rgba(251, 106, 22, 0.45);
         padding: 0 16px;
         outline: none;
         font-size: 14px;
+        background: #fff;
+        box-shadow: 0 1px 2px rgba(15,23,42,0.04);
+        transition: all 0.18s ease;
     }
 
+        .scan-input:hover {
+            border-color: rgba(251, 106, 22, 0.65);
+        }
+
         .scan-input:focus {
-            box-shadow: 0 0 0 4px rgba(251, 106, 22, .12);
+            border-color: #fb6a16;
+            box-shadow: 0 0 0 4px rgba(251, 106, 22, .14), 0 2px 6px rgba(251, 106, 22, .08);
         }
 
     .orange-btn {
         min-height: 48px;
         border: none;
-        border-radius: 14px;
+        border-radius: 12px;
         padding: 0 22px;
-        background: #ff5b14;
+        background: linear-gradient(135deg, #ff5b14, #ea4f0f);
         color: #fff;
         font-weight: 800;
         cursor: pointer;
+        letter-spacing: 0.02em;
+        box-shadow: 0 1px 2px rgba(255,91,20,0.30), 0 4px 12px rgba(255,91,20,0.22), inset 0 1px 0 rgba(255,255,255,0.18);
+        transition: all 0.18s ease;
     }
 
+        .orange-btn:hover:not(:disabled) {
+            box-shadow: 0 4px 10px rgba(255,91,20,0.32), 0 8px 20px rgba(255,91,20,0.24), inset 0 1px 0 rgba(255,255,255,0.18);
+            transform: translateY(-1px);
+        }
+
+        .orange-btn:active:not(:disabled) {
+            transform: translateY(0) scale(0.98);
+        }
+
         .orange-btn:disabled {
-            opacity: .65;
+            opacity: .55;
             cursor: not-allowed;
         }
 
@@ -294,6 +351,11 @@
         display: none !important;
     }
 
+    @@keyframes pulse-dot {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50%       { opacity: .5; transform: scale(1.3); }
+    }
+
     @@media (max-width: 1200px) {
         .reception-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -360,8 +422,16 @@
             <div class="reception-card">
                 <div class="reception-card-body">
                     <div class="stat-label">Gym Capacity</div>
-                    <div class="stat-value">@dashboard.CurrentlyPresentCount / @dashboard.MaxCapacity</div>
-                    <div class="stat-note">@dashboard.CapacityPercent% full</div>
+                    @if (dashboard.MaxCapacity > 0)
+                    {
+                        <div class="stat-value">@dashboard.CurrentlyPresentCount <span style="font-size:18px;font-weight:500;color:#9ca3af;">/ @dashboard.MaxCapacity</span></div>
+                        <div class="stat-note">@dashboard.CapacityPercent% full</div>
+                    }
+                    else
+                    {
+                        <div class="stat-value">@dashboard.CurrentlyPresentCount</div>
+                        <div class="stat-note">No capacity limit set</div>
+                    }
                 </div>
             </div>
 
@@ -384,8 +454,24 @@
             <div class="reception-card">
                 <div class="reception-card-body">
                     <div class="stat-label">Classes Today</div>
-                    <div class="stat-value">—</div>
-                    <div class="stat-note">Classes module coming soon</div>
+                    <div class="stat-value">@dashboard.TodayClassesCount</div>
+                    <div class="stat-note">
+                        @{
+                            var liveCount = dashboard.TodayClasses.Count(c => c.IsLive);
+                        }
+                        @if (liveCount > 0)
+                        {
+                            <span style="color:#16a34a;font-weight:700;">@liveCount live now</span>
+                        }
+                        else if (dashboard.TodayClassesCount == 0)
+                        {
+                            <span>No classes scheduled</span>
+                        }
+                        else
+                        {
+                            <span>scheduled today</span>
+                        }
+                    </div>
                 </div>
             </div>
         </div>
@@ -418,24 +504,193 @@
                 </div>
 
                 <div class="reception-card">
-                    <div class="reception-card-body">
-                        <div class="section-title">Today's Schedule</div>
-
-                        <div class="schedule-empty">
-                            <div class="schedule-empty-icon">📅</div>
-                            <h6 style="font-weight:800;margin-bottom:6px;">Classes module not yet built.</h6>
-                            <div>Schedule will appear here once classes are configured.</div>
-                        </div>
+                    <!-- Schedule header -->
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px 0;">
+                        <div class="section-title" style="margin-bottom:0;">Today's Schedule</div>
+                        @if (dashboard.TodayClasses.Any(c => c.IsLive))
+                        {
+                            <span style="display:inline-flex;align-items:center;gap:6px;background:#dcfce7;color:#16a34a;font-size:11.5px;font-weight:800;padding:4px 12px;border-radius:999px;">
+                                <span style="width:7px;height:7px;border-radius:50%;background:#16a34a;display:inline-block;animation:pulse-dot 1.4s ease-in-out infinite;"></span>
+                                LIVE NOW
+                            </span>
+                        }
                     </div>
+
+                    @if (!dashboard.TodayClasses.Any())
+                    {
+                        <div class="reception-card-body">
+                            <div class="schedule-empty">
+                                <div class="schedule-empty-icon">📅</div>
+                                <div style="font-weight:700;margin-bottom:4px;">No classes today</div>
+                                <div style="font-size:13px;">Check the <a href="/Classes/Schedule" style="color:#ff5b14;">weekly schedule</a>.</div>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <!-- Timeline -->
+                        <div style="padding:18px 22px 22px;display:flex;flex-direction:column;gap:0;">
+                            @{ int schedIdx = 0; }
+                            @foreach (var cls in dashboard.TodayClasses)
+                            {
+                                bool isFirst = schedIdx == 0;
+                                bool isLast  = schedIdx == dashboard.TodayClasses.Count - 1;
+                                schedIdx++;
+
+                                string dotColor  = cls.IsLive ? "#ff5b14" : cls.IsUpcoming ? "#3b82f6" : "#d1d5db";
+                                string dotBg     = cls.IsLive ? "#fff4ed" : cls.IsUpcoming ? "#eff6ff" : "#f9fafb";
+                                string cardBg    = cls.IsLive ? "#fff8f5" : cls.IsUpcoming ? "#fff" : "#fafafa";
+                                string cardBorderColor = cls.IsLive ? "#ff5b14" : cls.IsUpcoming ? "#bfdbfe" : "#e5e7eb";
+                                string nameColor = cls.IsDone ? "#9ca3af" : "#111827";
+                                string timeColor = cls.IsLive ? "#ff5b14" : cls.IsUpcoming ? "#3b82f6" : "#9ca3af";
+
+                                <div style="display:flex;gap:14px;position:relative;">
+                                    <!-- Timeline spine -->
+                                    <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:28px;">
+                                        <div style="width:12px;height:12px;border-radius:50%;background:@dotBg;border:2px solid @dotColor;flex-shrink:0;margin-top:14px;
+                                                    @(cls.IsLive ? "box-shadow:0 0 0 3px rgba(255,91,20,.15);" : "")">
+                                        </div>
+                                        @if (!isLast)
+                                        {
+                                            <div style="width:2px;flex:1;background:@(cls.IsLive ? "#fdba74" : "#e5e7eb");min-height:14px;margin-top:4px;"></div>
+                                        }
+                                    </div>
+
+                                    <!-- Class card -->
+                                    <div style="flex:1;margin-bottom:@(isLast ? "0" : "10px");">
+                                        <div style="border:1px solid @cardBorderColor;border-radius:16px;background:@cardBg;overflow:hidden;
+                                                    @(cls.IsLive ? "box-shadow:0 2px 12px rgba(255,91,20,.10);" : "")">
+
+                                            <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;">
+                                                <!-- Photo / icon -->
+                                                @if (!string.IsNullOrEmpty(cls.PhotoUrl))
+                                                {
+                                                    <img src="@cls.PhotoUrl" alt="@cls.ClassName"
+                                                         style="width:42px;height:42px;object-fit:cover;border-radius:10px;flex-shrink:0;@(cls.IsDone ? "filter:grayscale(60%);" : "")" />
+                                                }
+                                                else
+                                                {
+                                                    <div style="width:42px;height:42px;border-radius:10px;background:@dotBg;border:1px solid @cardBorderColor;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:19px;">
+                                                        🏋️
+                                                    </div>
+                                                }
+
+                                                <!-- Info -->
+                                                <div style="flex:1;min-width:0;">
+                                                    <div style="font-weight:800;font-size:13.5px;color:@nameColor;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                                                        @cls.ClassName
+                                                    </div>
+                                                    <div style="font-size:11.5px;color:@timeColor;font-weight:600;margin-top:2px;">
+                                                        @cls.TimeDisplay
+                                                    </div>
+                                                    @if (!string.IsNullOrEmpty(cls.CoachName) || cls.Capacity.HasValue)
+                                                    {
+                                                        <div style="font-size:11px;color:#9ca3af;margin-top:2px;">
+                                                            @if (!string.IsNullOrEmpty(cls.CoachName)) { <span>@cls.CoachName</span> }
+                                                            @if (!string.IsNullOrEmpty(cls.CoachName) && cls.Capacity.HasValue) { <span> · </span> }
+                                                            @if (cls.Capacity.HasValue) { <span>max @cls.Capacity</span> }
+                                                        </div>
+                                                    }
+                                                </div>
+
+                                                <!-- Status badge -->
+                                                @if (cls.IsLive)
+                                                {
+                                                    <span style="flex-shrink:0;display:inline-flex;align-items:center;gap:5px;background:#fff4ed;color:#ff5b14;font-size:11px;font-weight:800;padding:4px 10px;border-radius:999px;border:1px solid #fed7aa;">
+                                                        <span style="width:6px;height:6px;border-radius:50%;background:#ff5b14;display:inline-block;animation:pulse-dot 1.4s ease-in-out infinite;"></span>
+                                                        LIVE
+                                                    </span>
+                                                }
+                                                else if (cls.IsUpcoming)
+                                                {
+                                                    <span style="flex-shrink:0;background:#eff6ff;color:#3b82f6;font-size:11px;font-weight:800;padding:4px 10px;border-radius:999px;border:1px solid #bfdbfe;">NEXT</span>
+                                                }
+                                                else
+                                                {
+                                                    <span style="flex-shrink:0;background:#f3f4f6;color:#d1d5db;font-size:11px;font-weight:700;padding:4px 10px;border-radius:999px;">DONE</span>
+                                                }
+                                            </div>
+
+                                            @* Progress bar for live classes *@
+                                            @if (cls.IsLive)
+                                            {
+                                                <div style="height:3px;background:#fee2d0;">
+                                                    <div id="liveBar_@schedIdx" style="height:100%;background:#ff5b14;border-radius:0 2px 2px 0;width:0%;transition:width .5s;"></div>
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
                 </div>
             </div>
 
-            <div class="reception-card">
-                <div class="reception-card-body">
-                    <div class="section-title">Reception Notes</div>
-                    <div class="stat-note" style="line-height:1.8;">
-                        Search by membership number, QR, or NFC card value.
-                        If the member has multiple active packages, the system will ask which package should be used.
+            <div style="display:flex;flex-direction:column;gap:18px;">
+                <div class="reception-card">
+                    <div class="reception-card-body">
+                        <div class="section-title">Reception Notes</div>
+                        <div class="stat-note" style="line-height:1.8;">
+                            Search by membership number, QR, or NFC card value.
+                            If the member has multiple active packages, the system will ask which package should be used.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Invitation Widget -->
+                <div class="reception-card" id="invWidgetCard">
+                    <div class="reception-card-body">
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+                            <div class="section-title" style="margin-bottom:0;">Record Invitation</div>
+                            <a href="/Invitations/Index" style="font-size:11.5px;color:#ff5b14;font-weight:700;">View Log →</a>
+                        </div>
+
+                        <!-- Step 1: find the member -->
+                        <div id="invStep1">
+                            <label class="form-label-clean">Member (by # or phone)</label>
+                            <div style="display:flex;gap:8px;">
+                                <input type="text" id="invMemberSearch" class="scan-input" style="min-height:40px;font-size:13px;"
+                                       placeholder="Membership # or phone..." autocomplete="off" />
+                                <button type="button" id="invSearchBtn" class="orange-btn" style="min-height:40px;padding:0 14px;font-size:12px;">
+                                    Find
+                                </button>
+                            </div>
+                            <div id="invMemberResult" style="margin-top:10px;font-size:12.5px;"></div>
+                        </div>
+
+                        <!-- Step 2: enter guest details (hidden until member found with slots) -->
+                        <div id="invStep2" style="display:none;margin-top:14px;border-top:1px solid #e5e7eb;padding-top:14px;">
+                            <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+                                <img id="invMemberPhoto" src="/images/avatar-placeholder.png"
+                                     style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:1px solid #e5e7eb;" />
+                                <div>
+                                    <div id="invMemberName" style="font-weight:800;font-size:13px;color:#111827;"></div>
+                                    <div id="invMemberSlots" style="font-size:11px;color:#ff5b14;font-weight:700;"></div>
+                                </div>
+                            </div>
+
+                            <div style="margin-bottom:10px;">
+                                <label class="form-label-clean">Guest Name</label>
+                                <input type="text" id="invGuestNameR" class="scan-input" style="min-height:38px;font-size:13px;" placeholder="Full name" />
+                            </div>
+
+                            <div style="margin-bottom:12px;">
+                                <label class="form-label-clean">Guest Phone</label>
+                                <input type="text" id="invGuestPhoneR" class="scan-input" style="min-height:38px;font-size:13px;" placeholder="+20 1xx xxxxxxx" />
+                            </div>
+
+                            <div id="invFeedback" style="font-size:12px;margin-bottom:10px;"></div>
+
+                            <div style="display:flex;gap:8px;">
+                                <button type="button" id="invSubmitBtn" class="orange-btn" style="flex:1;min-height:38px;font-size:13px;">
+                                    <i class="bi bi-ticket-detailed"></i> Record
+                                </button>
+                                <button type="button" id="invResetBtn" class="orange-btn" style="min-height:38px;padding:0 12px;background:#f3f4f6;color:#6b7280;font-size:12px;">
+                                    ✕
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -681,6 +936,38 @@
                 }
             }
 
+            // Fill progress bars for live classes based on elapsed time
+            (function initLiveBars() {
+                @{ int barIdx = 0; }
+                @foreach (var cls in (dashboard?.TodayClasses ?? new()))
+                {
+                    barIdx++;
+                    if (cls.IsLive)
+                    {
+                        // Parse start/end from TimeDisplay "HH:mm – HH:mm"
+                        var parts = cls.TimeDisplay.Split('–');
+                        if (parts.Length == 2)
+                        {
+                            var startStr = parts[0].Trim();
+                            var endStr   = parts[1].Trim();
+                            <text>
+                            (function() {
+                                var bar = document.getElementById('liveBar_@barIdx');
+                                if (!bar) return;
+                                var now   = new Date();
+                                var start = new Date(now.getFullYear(), now.getMonth(), now.getDate(),
+                                                     parseInt('@startStr'.split(':')[0]), parseInt('@startStr'.split(':')[1]));
+                                var end   = new Date(now.getFullYear(), now.getMonth(), now.getDate(),
+                                                     parseInt('@endStr'.split(':')[0]),  parseInt('@endStr'.split(':')[1]));
+                                var pct   = Math.min(100, Math.max(0, (now - start) / (end - start) * 100));
+                                bar.style.width = pct.toFixed(1) + '%';
+                            })();
+                            </text>
+                        }
+                    }
+                }
+            })();
+
             async function refreshStats() {
                 try {
                     const res = await fetch(`/Reception/Stats?branchId=${branchId}`);
@@ -728,6 +1015,145 @@
                     BRANCH_ACCESS_DENIED: 'Access Denied',
                     BRANCH_NOT_FOUND: 'Branch Not Found'
                 })[code] ?? 'Entry Denied';
+            }
+        })();
+
+        // ── Invitation Widget ──────────────────────────────────────
+        (function () {
+            let currentMemberId = null;
+
+            const searchInput  = document.getElementById('invMemberSearch');
+            const searchBtn    = document.getElementById('invSearchBtn');
+            const resultEl     = document.getElementById('invMemberResult');
+            const step2        = document.getElementById('invStep2');
+            const memberPhoto  = document.getElementById('invMemberPhoto');
+            const memberName   = document.getElementById('invMemberName');
+            const memberSlots  = document.getElementById('invMemberSlots');
+            const guestName    = document.getElementById('invGuestNameR');
+            const guestPhone   = document.getElementById('invGuestPhoneR');
+            const feedback     = document.getElementById('invFeedback');
+            const submitBtn    = document.getElementById('invSubmitBtn');
+            const resetBtn     = document.getElementById('invResetBtn');
+            const antiforgery  = document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '';
+
+            if (!searchBtn) return;
+
+            searchBtn.addEventListener('click', doMemberLookup);
+            searchInput?.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') doMemberLookup();
+            });
+
+            resetBtn?.addEventListener('click', resetWidget);
+            submitBtn?.addEventListener('click', doSubmitInvitation);
+
+            async function doMemberLookup() {
+                const q = searchInput.value.trim();
+                if (!q) return;
+
+                resultEl.innerHTML = '<span style="color:#9ca3af;">Searching...</span>';
+
+                try {
+                    const res  = await fetch(`/Invitations/MemberLookup?q=${encodeURIComponent(q)}`);
+                    const data = await res.json();
+
+                    if (!data.found) {
+                        resultEl.innerHTML = '<span style="color:#b42318;">Member not found.</span>';
+                        step2.style.display = 'none';
+                        currentMemberId = null;
+                        return;
+                    }
+
+                    if (!data.hasInvitations) {
+                        resultEl.innerHTML = `<span style="color:#b54708;">⚠ <strong>${data.name}</strong> has no invitation slots remaining.</span>`;
+                        step2.style.display = 'none';
+                        currentMemberId = null;
+                        return;
+                    }
+
+                    resultEl.innerHTML = '';
+                    currentMemberId = data.memberId;
+
+                    memberPhoto.src  = data.photoUrl ?? '/images/avatar-placeholder.png';
+                    memberName.textContent  = data.name + ' — #' + data.membershipNumber;
+                    memberSlots.textContent = data.invitationsRemaining + ' invitation slot' + (data.invitationsRemaining !== 1 ? 's' : '') + ' remaining';
+
+                    step2.style.display = 'block';
+                    feedback.innerHTML  = '';
+                    guestName.value     = '';
+                    guestPhone.value    = '';
+                    guestName.focus();
+                }
+                catch {
+                    resultEl.innerHTML = '<span style="color:#b42318;">Search failed. Try again.</span>';
+                }
+            }
+
+            async function doSubmitInvitation() {
+                if (!currentMemberId) return;
+
+                const name  = guestName.value.trim();
+                const phone = guestPhone.value.trim();
+
+                if (!name) {
+                    feedback.innerHTML = '<span style="color:#b42318;">Guest name is required.</span>';
+                    guestName.focus();
+                    return;
+                }
+                if (!phone) {
+                    feedback.innerHTML = '<span style="color:#b42318;">Guest phone is required.</span>';
+                    guestPhone.focus();
+                    return;
+                }
+
+                submitBtn.disabled = true;
+                feedback.innerHTML = '<span style="color:#9ca3af;">Recording...</span>';
+
+                try {
+                    const res  = await fetch('/Invitations/CreateAtReception', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'RequestVerificationToken': antiforgery
+                        },
+                        body: JSON.stringify({
+                            memberId: currentMemberId,
+                            guestName: name,
+                            guestPhone: phone,
+                        })
+                    });
+
+                    const data = await res.json();
+
+                    if (data.success) {
+                        feedback.innerHTML = `<span style="color:#027a48;font-weight:700;">✓ Invitation recorded for ${data.guestName}!</span>`;
+                        memberSlots.textContent = data.invitationsRemaining + ' invitation slot' + (data.invitationsRemaining !== 1 ? 's' : '') + ' remaining';
+                        guestName.value  = '';
+                        guestPhone.value = '';
+
+                        if (data.invitationsRemaining === 0) {
+                            setTimeout(resetWidget, 2000);
+                        }
+                    } else {
+                        feedback.innerHTML = `<span style="color:#b42318;">${data.message ?? 'Failed to record invitation.'}</span>`;
+                    }
+                }
+                catch {
+                    feedback.innerHTML = '<span style="color:#b42318;">Network error. Try again.</span>';
+                }
+                finally {
+                    submitBtn.disabled = false;
+                }
+            }
+
+            function resetWidget() {
+                searchInput.value      = '';
+                resultEl.innerHTML     = '';
+                step2.style.display    = 'none';
+                currentMemberId        = null;
+                guestName.value        = '';
+                guestPhone.value       = '';
+                feedback.innerHTML     = '';
+                searchInput.focus();
             }
         })();
     </script>

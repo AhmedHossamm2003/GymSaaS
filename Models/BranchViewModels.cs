@@ -17,6 +17,7 @@ namespace GymSaaS.Models
         public int MemberCount { get; set; }
         public int TodayCheckins { get; set; }
         public int InsideNow { get; set; }
+        public int? Capacity { get; set; }
     }
 
     public class BranchDetailsViewModel
@@ -38,6 +39,7 @@ namespace GymSaaS.Models
         public int MemberCount { get; set; }
         public int TodayCheckins { get; set; }
         public int InsideNow { get; set; }
+        public int? Capacity { get; set; }
         public string? QrCodeValue { get; set; }
         public int? QrVersionNo { get; set; }
         public DateTime? QrGeneratedAt { get; set; }
@@ -79,6 +81,9 @@ namespace GymSaaS.Models
 
         [Range(15, 480, ErrorMessage = "Must be between 15 and 480 minutes")]
         public int MemberPresenceWindowMinutes { get; set; } = 120;
+
+        [Range(1, 10000, ErrorMessage = "Capacity must be between 1 and 10,000")]
+        public int? Capacity { get; set; }
 
         public bool IsEdit => BranchId.HasValue;
     }

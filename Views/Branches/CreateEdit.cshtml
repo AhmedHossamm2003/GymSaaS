@@ -333,22 +333,41 @@
         </div>
         <div class="form-body">
 
-            <div class="field">
-                <label class="field-label" asp-for="MemberPresenceWindowMinutes">
-                    Presence Window (minutes)
-                </label>
-                <input asp-for="MemberPresenceWindowMinutes"
-                       type="number"
-                       min="15"
-                       max="480"
-                       style="max-width:160px;" />
-                <div class="field-hint">
-                    How long a member is counted as "inside" after scanning. Default is 120 minutes.
+            <div class="form-grid-2">
+                <div class="field">
+                    <label class="field-label" asp-for="MemberPresenceWindowMinutes">
+                        Presence Window (minutes)
+                    </label>
+                    <input asp-for="MemberPresenceWindowMinutes"
+                           type="number"
+                           min="15"
+                           max="480" />
+                    <div class="field-hint">
+                        How long a member is counted as "inside" after scanning. Default is 120 minutes.
+                    </div>
+                    @if (!ViewData.ModelState.IsValid && ViewData.ModelState["MemberPresenceWindowMinutes"]?.Errors.Count > 0)
+                    {
+                        <div class="field-error visible">@ViewData.ModelState["MemberPresenceWindowMinutes"]!.Errors[0].ErrorMessage</div>
+                    }
                 </div>
-                @if (!ViewData.ModelState.IsValid && ViewData.ModelState["MemberPresenceWindowMinutes"]?.Errors.Count > 0)
-                {
-                    <div class="field-error visible">@ViewData.ModelState["MemberPresenceWindowMinutes"]!.Errors[0].ErrorMessage</div>
-                }
+
+                <div class="field">
+                    <label class="field-label" asp-for="Capacity">
+                        Max Capacity <span style="font-weight:400;color:var(--t3);">(optional)</span>
+                    </label>
+                    <input asp-for="Capacity"
+                           type="number"
+                           min="1"
+                           max="10000"
+                           placeholder="e.g. 150" />
+                    <div class="field-hint">
+                        Maximum number of members allowed inside at once. Leave blank if unlimited.
+                    </div>
+                    @if (!ViewData.ModelState.IsValid && ViewData.ModelState["Capacity"]?.Errors.Count > 0)
+                    {
+                        <div class="field-error visible">@ViewData.ModelState["Capacity"]!.Errors[0].ErrorMessage</div>
+                    }
+                </div>
             </div>
 
             <div class="toggle-row">

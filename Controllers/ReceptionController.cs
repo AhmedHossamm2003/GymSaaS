@@ -26,7 +26,7 @@ namespace GymSaaS.Controllers
             Guid.Parse(User.FindFirstValue("TenantId")!);
 
         private Guid CurrentUserId =>
-            Guid.Parse(User.FindFirstValue("UserId")!);
+            Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
         private string CurrentRole =>
             User.FindFirstValue(ClaimTypes.Role) ?? "";
