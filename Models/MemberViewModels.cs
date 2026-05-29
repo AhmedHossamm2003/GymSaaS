@@ -28,6 +28,17 @@ namespace GymSaaS.Models
 
         public bool HasAnyPackage => ActivePackages.Count > 0;
 
+        // Perk totals across all active packages
+        public int TotalInvitationsRemaining => ActivePackages.Sum(p => p.InvitationsRemaining ?? 0);
+        public int TotalPtSessionsRemaining  => ActivePackages.Sum(p => p.PtSessionsRemaining ?? 0);
+        public int TotalInBodyRemaining      => ActivePackages.Sum(p => p.InBodyRemaining ?? 0);
+        public int TotalFreezeRemainingDays  => ActivePackages.Sum(p => p.FreezeRemainingDays ?? 0);
+        public bool HasAnyPerks =>
+            TotalInvitationsRemaining > 0 ||
+            TotalPtSessionsRemaining  > 0 ||
+            TotalInBodyRemaining      > 0 ||
+            TotalFreezeRemainingDays  > 0;
+
         // For the sessions pill on the list — show the one expiring soonest
         public ActivePackageSummary? PrimaryPackage =>
             ActivePackages.OrderBy(p => p.ValidToDate ?? DateOnly.MaxValue).FirstOrDefault();
@@ -62,6 +73,16 @@ namespace GymSaaS.Models
         public int? SessionsOriginal { get; set; }
         public int? SessionsRemaining { get; set; }
         public Guid? LinkedGroupId { get; set; }
+
+        // Perks
+        public int? InvitationsRemaining { get; set; }
+        public int? InvitationsTotal { get; set; }
+        public int? PtSessionsRemaining { get; set; }
+        public int? PtSessionsTotal { get; set; }
+        public int? InBodyRemaining { get; set; }
+        public int? InBodyTotal { get; set; }
+        public int? FreezeRemainingDays { get; set; }
+        public int? FreezeAllowanceDays { get; set; }
 
         public bool IsSessionBased => ComponentRole == "SESSION" || PackageTypeCode == "SESSION";
         public bool IsOpenGym => ComponentRole == "OPEN_GYM" || PackageTypeCode == "OPEN_GYM";

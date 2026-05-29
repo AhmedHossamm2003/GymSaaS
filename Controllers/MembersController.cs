@@ -106,16 +106,24 @@ namespace GymSaaS.Controllers
 
                 var packageSummaries = activePkgs.Select(x => new ActivePackageSummary
                 {
-                    MemberPackageId = x.p.MemberPackageId,
-                    PackageName = x.p.PackageNameSnapshot,
-                    PackageTypeCode = x.pt.PackageTypeCode,
-                    // PackageComponentRole and LinkedPackageGroupId added after migration + re-scaffold
-                    ComponentRole = null,
-                    ValidFromDate = x.p.ValidFromDate,
-                    ValidToDate = x.p.ValidToDate,
-                    SessionsOriginal = x.p.SessionCountOriginal,
-                    SessionsRemaining = x.p.SessionCountRemaining,
-                    LinkedGroupId = null,
+                    MemberPackageId      = x.p.MemberPackageId,
+                    PackageName          = x.p.PackageNameSnapshot,
+                    PackageTypeCode      = x.pt.PackageTypeCode,
+                    ComponentRole        = null,
+                    ValidFromDate        = x.p.ValidFromDate,
+                    ValidToDate          = x.p.ValidToDate,
+                    SessionsOriginal     = x.p.SessionCountOriginal,
+                    SessionsRemaining    = x.p.SessionCountRemaining,
+                    LinkedGroupId        = null,
+                    // Perks
+                    InvitationsRemaining = x.p.InvitationsRemaining,
+                    InvitationsTotal     = x.p.InvitationsTotal,
+                    PtSessionsRemaining  = x.p.PtSessionsRemaining,
+                    PtSessionsTotal      = x.p.PtSessionsTotal,
+                    InBodyRemaining      = x.p.InBodyRemaining,
+                    InBodyTotal          = x.p.InBodyTotal,
+                    FreezeRemainingDays  = x.p.FreezeRemainingDays,
+                    FreezeAllowanceDays  = x.p.FreezeAllowanceDays,
                 }).ToList();
 
                 members.Add(new MemberListItem

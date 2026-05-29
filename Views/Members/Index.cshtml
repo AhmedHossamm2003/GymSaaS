@@ -181,6 +181,33 @@
     .session-pill.danger  { background: var(--red-bg);    color: var(--red-text);    border-color: var(--red-border); }
     .session-pill.unlimited { background: var(--blue-bg); color: var(--blue-text);   border-color: var(--blue-border); }
 
+    /* Perks chips */
+    .perks-cell {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        min-width: 100px;
+    }
+
+    .perk-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        padding: 2px 7px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+        white-space: nowrap;
+        border: 1px solid;
+        line-height: 1.5;
+    }
+
+    .perk-chip.invite  { background: rgba(249,115,22,.07); color: #c2540d; border-color: rgba(249,115,22,.20); }
+    .perk-chip.pt      { background: rgba(22,163,74,.07);  color: #15803d; border-color: rgba(22,163,74,.20); }
+    .perk-chip.inbody  { background: rgba(59,130,246,.07); color: #1d4ed8; border-color: rgba(59,130,246,.20); }
+    .perk-chip.freeze  { background: rgba(100,116,139,.07); color: #475569; border-color: rgba(100,116,139,.20); }
+    .perk-chip.zero    { opacity: .4; }
+
     /* Checkin cell */
     .checkin-cell { font-size: 12.5px; color: var(--t2); white-space: nowrap; }
     .checkin-cell.never { color: var(--t4); font-style: italic; }
@@ -342,6 +369,7 @@
                     <th>Branch</th>
                     <th>Package</th>
                     <th>Sessions</th>
+                    <th>Perks</th>
                     <th>Status</th>
                     <th>Last Check-in</th>
                     <th style="width:60px;"></th>
@@ -351,7 +379,7 @@
                 @if (!Model.Any())
                 {
                     <tr class="empty-row">
-                        <td colspan="9">
+                        <td colspan="10">
                             <i class="bi bi-people"></i>
                             @(string.IsNullOrEmpty(search) && string.IsNullOrEmpty(status)
                                 ? "No members yet. Add your first member."
@@ -447,6 +475,47 @@
                                     </span>
                                 }
                                 @if (sp == null && gp == null)
+                                {
+                                    <span style="color:var(--t4); font-size:12px;">—</span>
+                                }
+                            </td>
+
+                            <!-- Perks -->
+                            <td>
+                                @if (m.HasAnyPerks)
+                                {
+                                    <div class="perks-cell">
+                                        @if (m.TotalInvitationsRemaining > 0)
+                                        {
+                                            <span class="perk-chip invite" title="Invitations remaining">
+                                                <i class="bi bi-ticket-detailed" style="font-size:9px;"></i>
+                                                @m.TotalInvitationsRemaining
+                                            </span>
+                                        }
+                                        @if (m.TotalPtSessionsRemaining > 0)
+                                        {
+                                            <span class="perk-chip pt" title="PT sessions remaining">
+                                                <i class="bi bi-person-arms-up" style="font-size:9px;"></i>
+                                                @m.TotalPtSessionsRemaining
+                                            </span>
+                                        }
+                                        @if (m.TotalInBodyRemaining > 0)
+                                        {
+                                            <span class="perk-chip inbody" title="InBody scans remaining">
+                                                <i class="bi bi-activity" style="font-size:9px;"></i>
+                                                @m.TotalInBodyRemaining
+                                            </span>
+                                        }
+                                        @if (m.TotalFreezeRemainingDays > 0)
+                                        {
+                                            <span class="perk-chip freeze" title="Freeze days remaining">
+                                                <i class="bi bi-snow" style="font-size:9px;"></i>
+                                                @m.TotalFreezeRemainingDays<span style="font-size:9px;opacity:.7;">d</span>
+                                            </span>
+                                        }
+                                    </div>
+                                }
+                                else
                                 {
                                     <span style="color:var(--t4); font-size:12px;">—</span>
                                 }
