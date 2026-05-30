@@ -1,0 +1,233 @@
+@model List<GymSaaS.Models.ManualIncomeListItem>
+@using GymSaaS.Models
+@{
+    ViewData["Title"] = "Income";
+    ViewData["Subtitle"] = "Manual income entries";
+
+    var category   = ViewData["Category"] as string ?? "";
+    var branchId   = ViewData["BranchId"] as Guid?;
+    var fromDate   = (DateOnly)ViewData["FromDate"]!;
+    var toDate     = (DateOnly)ViewData["ToDate"]!;
+    var page       = (int)(ViewData["Page"] ?? 1);
+    var totalPages = (int)(ViewData["TotalPages"] ?? 1);
+    var totalCount = (int)(ViewData["TotalCount"] ?? 0);
+    var totalAmount= (decimal)(ViewData["TotalAmount"] ?? 0m);
+    var branches   = ViewData["Branches"] as List<BranchDropdownItem> ?? new();
+}
+
+@section Styles {
+<style>
+    .fin-shell { max-width: 1100px; }
+    .fin-toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 18px; }
+    .total-badge {
+        display: inline-flex; align-items: center; gap: 8px;
+        background: linear-gradient(135deg, rgba(22,163,74,0.08), rgba(22,163,74,0.14));
+        border: 1px solid rgba(22,163,74,0.20);
+        border-radius: 12px;
+        padding: 10px 16px;
+        margin-left: auto;
+    }
+    .total-badge .lbl {
+        font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase;
+        font-weight: 700; color: #15803d; opacity: .9;
+    }
+    .total-badge .val {
+        font-family: var(--font-display);
+        font-size: 22px; font-weight: 800;
+        color: #15803d; letter-spacing: -.01em;
+    }
+    .fin-table-card {
+        background: #fff;
+        border: 1px solid rgba(15,23,42,0.06);
+        border-radius: 16px;
+        box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 4px 14px rgba(15,23,42,0.04);
+        overflow: hidden;
+    }
+    .fin-table { width: 100%; border-collapse: collapse; }
+    .fin-table thead th {
+        background: linear-gradient(to bottom, #fafafa, #f5f5f7);
+        padding: 12px 18px; text-align: left;
+        font-size: 11px; font-weight: 700; letter-spacing: .08em;
+        text-transform: uppercase; color: var(--t3);
+        border-bottom: 1px solid rgba(15,23,42,0.08);
+    }
+    .fin-table tbody tr {
+        border-bottom: 1px solid rgba(15,23,42,0.04);
+        transition: background .15s ease, box-shadow .15s ease;
+    }
+    .fin-table tbody tr:hover {
+        background: #fafafa;
+        box-shadow: inset 3px 0 0 #16a34a;
+    }
+    .fin-table tbody td { padding: 13px 18px; font-size: 13px; vertical-align: middle; }
+    .amount-cell {
+        font-family: var(--font-display);
+        font-size: 15px; font-weight: 800;
+        color: #16a34a; white-space: nowrap;
+    }
+    .cat-pill {
+        display: inline-flex; align-items: center; gap: 5px;
+        padding: 3px 10px; border-radius: 999px;
+        font-size: 11.5px; font-weight: 700;
+        background: rgba(22,163,74,0.08);
+        color: #15803d;
+        border: 1px solid rgba(22,163,74,0.18);
+    }
+    .info-note {
+        background: rgba(59,130,246,0.06);
+        border: 1px solid rgba(59,130,246,0.18);
+        border-radius: 12px;
+        padding: 12px 16px;
+        color: #1d4ed8;
+        font-size: 12.5px;
+        margin-bottom: 16px;
+    }
+    .empty-state { text-align: center; padding: 60px 20px; color: var(--t3); }
+    .empty-state i { font-size: 42px; opacity: .35; display: block; margin-bottom: 14px; color: #16a34a; }
+    .empty-state .lbl { font-weight: 700; color: var(--t2); margin-bottom: 6px; font-size: 14px; }
+</style>
+}
+
+<div class="fin-shell">
+
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+        <div>
+            <h1 style="font-family:var(--font-display);font-size:22px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--t1);margin:0;">
+                Manual Income
+            </h1>
+            <p style="font-size:13px;color:var(--t3);margin:3px 0 0;">Day passes, merchandise, and other non-package income</p>
+        </div>
+        <a asp-action="Create" class="btn btn-primary">
+            <i class="bi bi-plus-lg"></i> Add Income
+        </a>
+    </div>
+
+    <div class="info-note">
+        <i class="bi bi-info-circle" style="margin-right:5px;"></i>
+        <strong>Package sales</strong> are tracked automatically. This page is only for <strong>non-package income</strong> (day passes, merch, etc.) — for the full picture, see the <a href="/Reports" style="color:#1d4ed8;font-weight:700;text-decoration:underline;">Reports page</a>.
+    </div>
+
+    <form method="get" class="fin-toolbar">
+        <select name="category" class="form-control" style="max-width:200px;" onchange="this.form.submit()">
+            <option value="">All Categories</option>
+            @foreach (var (code, name) in IncomeCategories.All)
+            {
+                if (code == category)
+                {
+                    <option value="@code" selected>@name</option>
+                }
+                else
+                {
+                    <option value="@code">@name</option>
+                }
+            }
+        </select>
+
+        <select name="branchId" class="form-control" style="max-width:180px;" onchange="this.form.submit()">
+            <option value="">All Branches</option>
+            @foreach (var b in branches)
+            {
+                if (branchId == b.BranchId)
+                {
+                    <option value="@b.BranchId" selected>@b.BranchName</option>
+                }
+                else
+                {
+                    <option value="@b.BranchId">@b.BranchName</option>
+                }
+            }
+        </select>
+
+        <input type="date" name="fromDate" value="@fromDate.ToString("yyyy-MM-dd")" class="form-control" style="max-width:160px;" />
+        <span style="color:var(--t3);font-weight:600;">→</span>
+        <input type="date" name="toDate" value="@toDate.ToString("yyyy-MM-dd")" class="form-control" style="max-width:160px;" />
+
+        <button type="submit" class="btn btn-secondary"><i class="bi bi-funnel"></i> Apply</button>
+
+        <div class="total-badge">
+            <div>
+                <div class="lbl">Total</div>
+                <div class="val">@totalAmount.ToString("N2")</div>
+            </div>
+        </div>
+    </form>
+
+    <div class="fin-table-card">
+        @if (!Model.Any())
+        {
+            <div class="empty-state">
+                <i class="bi bi-cash-stack"></i>
+                <div class="lbl">No income entries found</div>
+                <div style="font-size:13px;">Try adjusting filters, or <a asp-action="Create" style="color:#16a34a;font-weight:700;">add your first entry</a>.</div>
+            </div>
+        }
+        else
+        {
+            <table class="fin-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Category</th>
+                        <th>Description</th>
+                        <th>Branch</th>
+                        <th>Method</th>
+                        <th style="text-align:right;">Amount</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var i in Model)
+                    {
+                        <tr>
+                            <td style="white-space:nowrap;color:var(--t2);">
+                                <strong style="color:var(--t1);font-weight:700;">@i.IncomeDate.ToString("MMM d")</strong>
+                                <div style="font-size:11px;color:var(--t3);">@i.IncomeDate.ToString("yyyy")</div>
+                            </td>
+                            <td><span class="cat-pill">@i.CategoryName</span></td>
+                            <td style="color:var(--t1);font-weight:600;">@i.Description</td>
+                            <td style="color:var(--t2);font-size:12.5px;">@(i.BranchName ?? "All Branches")</td>
+                            <td style="color:var(--t2);font-size:12px;">@(string.IsNullOrEmpty(i.PaymentMethod) ? "—" : i.PaymentMethod)</td>
+                            <td style="text-align:right;" class="amount-cell">@i.Amount.ToString("N2")</td>
+                            <td style="text-align:right;white-space:nowrap;">
+                                <a asp-action="Edit" asp-route-id="@i.IncomeEntryId" class="btn btn-ghost" style="padding:4px 8px;border:1px solid var(--border);">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <form asp-action="Delete" asp-route-id="@i.IncomeEntryId" method="post" style="display:inline;"
+                                      onsubmit="return confirm('Delete this entry?')">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn btn-ghost" style="padding:4px 8px;color:var(--red);border:1px solid var(--border);">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+
+            @if (totalPages > 1)
+            {
+                <div style="padding:14px 18px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+                    <span style="font-size:12px;color:var(--t3);">@totalCount entr@(totalCount != 1 ? "ies" : "y")</span>
+                    <div style="display:flex;gap:6px;">
+                        @if (page > 1)
+                        {
+                            <a href="@Url.Action("Index", new { category, branchId, fromDate, toDate, page = page - 1 })"
+                               class="btn btn-ghost" style="padding:5px 12px;border:1px solid var(--border);font-size:12px;">
+                                <i class="bi bi-chevron-left"></i>
+                            </a>
+                        }
+                        <span style="padding:5px 12px;font-size:12px;font-weight:600;color:var(--t2);">@(page) / @totalPages</span>
+                        @if (page < totalPages)
+                        {
+                            <a href="@Url.Action("Index", new { category, branchId, fromDate, toDate, page = page + 1 })"
+                               class="btn btn-ghost" style="padding:5px 12px;border:1px solid var(--border);font-size:12px;">
+                                <i class="bi bi-chevron-right"></i>
+                            </a>
+                        }
+                    </div>
+                </div>
+            }
+        }
+    </div>
+</div>

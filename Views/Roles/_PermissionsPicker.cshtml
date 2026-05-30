@@ -1,0 +1,486 @@
+@model GymSaaS.Models.CreateRoleViewModel
+@using GymSaaS.Models
+@{
+    var disabled = (ViewData["DisablePicker"] as bool?) ?? false;
+
+    // Group permissions by friendly group from the catalog
+    var grouped = Model.Permissions
+        .Select((p, idx) => new
+        {
+            Index = idx,
+            Permission = p,
+            Meta = ViewPermissionCatalog.Resolve(p.DisplayName)
+        })
+        .GroupBy(x => x.Meta.Group)
+        .OrderBy(g => Array.IndexOf(ViewPermissionCatalog.GroupOrder, g.Key) < 0
+            ? int.MaxValue
+            : Array.IndexOf(ViewPermissionCatalog.GroupOrder, g.Key))
+        .ToList();
+
+    var totalCount = Model.Permissions.Count;
+    var selectedCount = Model.Permissions.Count(p => p.IsSelected);
+}
+
+<style>
+    .picker-shell {
+        background: #fff;
+        border: 1px solid rgba(15,23,42,0.06);
+        border-radius: 16px;
+        box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 4px 14px rgba(15,23,42,0.04);
+        overflow: hidden;
+    }
+
+    .picker-head {
+        padding: 16px 20px;
+        background: linear-gradient(to bottom, #fafafa, #f5f5f7);
+        border-bottom: 1px solid rgba(15,23,42,0.06);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .picker-head-info {
+        display: flex; align-items: center; gap: 12px; flex: 1; min-width: 200px;
+    }
+
+    .picker-icon {
+        width: 32px; height: 32px;
+        border-radius: 10px;
+        background: linear-gradient(135deg, var(--fire-soft), rgba(249,115,22,0.12));
+        border: 1px solid var(--fire-border);
+        display: flex; align-items: center; justify-content: center;
+        color: var(--fire);
+        font-size: 15px;
+    }
+
+    .picker-title {
+        font-family: var(--font-display);
+        font-size: 13px; font-weight: 800;
+        letter-spacing: .06em; text-transform: uppercase;
+        color: var(--t1);
+    }
+    .picker-sub {
+        font-size: 11.5px;
+        color: var(--t3);
+        margin-top: 2px;
+    }
+
+    .picker-counter {
+        display: inline-flex; align-items: center; gap: 6px;
+        background: rgba(15,23,42,0.05);
+        border: 1px solid rgba(15,23,42,0.08);
+        border-radius: 999px;
+        padding: 5px 12px;
+        font-size: 12px; font-weight: 700;
+        color: var(--t2);
+    }
+    .picker-counter strong {
+        font-family: var(--font-display);
+        font-size: 14px;
+        color: var(--fire);
+    }
+
+    .picker-controls {
+        padding: 14px 20px;
+        border-bottom: 1px solid rgba(15,23,42,0.05);
+        display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+        background: #fafbfc;
+    }
+    .picker-search-wrap {
+        flex: 1;
+        min-width: 200px;
+        position: relative;
+    }
+    .picker-search {
+        width: 100%;
+        padding: 8px 12px 8px 34px;
+        border: 1px solid rgba(15,23,42,0.10);
+        border-radius: 10px;
+        font-size: 13px;
+        background: #fff;
+        transition: all .15s ease;
+    }
+    .picker-search:focus {
+        outline: none;
+        border-color: var(--fire);
+        box-shadow: 0 0 0 3px var(--fire-glow);
+    }
+    .picker-search-icon {
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--t3);
+        font-size: 14px;
+        pointer-events: none;
+    }
+
+    .picker-quick-actions {
+        display: flex; gap: 6px;
+    }
+    .quick-btn {
+        padding: 7px 12px;
+        font-size: 12px;
+        font-weight: 700;
+        border: 1px solid rgba(15,23,42,0.10);
+        border-radius: 10px;
+        background: #fff;
+        color: var(--t2);
+        cursor: pointer;
+        transition: all .15s ease;
+        display: inline-flex; align-items: center; gap: 5px;
+    }
+    .quick-btn:hover {
+        background: #fafafa;
+        color: var(--t1);
+        border-color: rgba(15,23,42,0.16);
+    }
+    .quick-btn.danger:hover {
+        color: var(--red);
+        border-color: rgba(220,38,38,0.30);
+        background: rgba(220,38,38,0.04);
+    }
+
+    .picker-body { padding: 14px 20px 20px; }
+
+    /* Group header */
+    .perm-group {
+        margin-bottom: 18px;
+    }
+    .perm-group:last-child { margin-bottom: 0; }
+
+    .perm-group-head {
+        display: flex; align-items: center; gap: 10px;
+        padding: 6px 0 10px;
+        border-bottom: 1px solid rgba(15,23,42,0.05);
+        margin-bottom: 10px;
+    }
+    .perm-group-title {
+        font-family: var(--font-display);
+        font-size: 11px; font-weight: 800;
+        letter-spacing: .12em; text-transform: uppercase;
+        color: var(--t3);
+        flex: 1;
+    }
+    .group-count {
+        font-size: 11px; font-weight: 700;
+        color: var(--t3);
+    }
+    .group-toggle {
+        font-size: 11px; font-weight: 700;
+        color: var(--fire);
+        cursor: pointer;
+        text-decoration: none;
+        padding: 3px 8px;
+        border-radius: 6px;
+        transition: background .12s ease;
+    }
+    .group-toggle:hover {
+        background: var(--fire-soft);
+    }
+
+    /* Permission chips grid */
+    .perm-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 8px;
+    }
+
+    .perm-chip {
+        display: flex; align-items: center; gap: 10px;
+        padding: 11px 12px;
+        background: #fff;
+        border: 1.5px solid rgba(15,23,42,0.08);
+        border-radius: 12px;
+        cursor: pointer;
+        transition: all .15s ease;
+        position: relative;
+    }
+    .perm-chip:hover {
+        border-color: var(--fire-border);
+        background: rgba(249,115,22,0.02);
+        transform: translateY(-1px);
+        box-shadow: 0 2px 6px rgba(15,23,42,0.06);
+    }
+    .perm-chip.selected {
+        border-color: var(--fire);
+        background: linear-gradient(135deg, var(--fire-soft), rgba(249,115,22,0.10));
+        box-shadow: 0 1px 2px rgba(249,115,22,0.10), 0 4px 12px rgba(249,115,22,0.08);
+    }
+    .perm-chip.selected::after {
+        content: '\F26B';  /* bi-check-lg */
+        font-family: "bootstrap-icons";
+        position: absolute;
+        top: 6px;
+        right: 8px;
+        font-size: 12px;
+        color: #fff;
+        background: var(--fire);
+        width: 18px; height: 18px;
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        box-shadow: 0 1px 2px rgba(249,115,22,0.30);
+    }
+    .perm-chip input[type=checkbox] {
+        display: none;
+    }
+    .perm-chip-icon {
+        width: 30px; height: 30px;
+        border-radius: 8px;
+        background: rgba(15,23,42,0.05);
+        border: 1px solid rgba(15,23,42,0.08);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 14px;
+        color: var(--t2);
+        flex-shrink: 0;
+        transition: all .15s ease;
+    }
+    .perm-chip.selected .perm-chip-icon {
+        background: linear-gradient(135deg, rgba(249,115,22,0.20), rgba(249,115,22,0.10));
+        border-color: var(--fire-border);
+        color: var(--fire);
+    }
+    .perm-chip-label {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--t1);
+        flex: 1;
+        line-height: 1.3;
+    }
+    .perm-chip.disabled {
+        opacity: .55;
+        cursor: not-allowed;
+        pointer-events: none;
+    }
+
+    .perm-no-results {
+        text-align: center;
+        padding: 30px 20px;
+        color: var(--t3);
+        font-size: 13px;
+    }
+    .perm-no-results i {
+        font-size: 28px;
+        display: block;
+        margin-bottom: 10px;
+        opacity: .4;
+    }
+</style>
+
+<div class="picker-shell">
+
+    <!-- Header -->
+    <div class="picker-head">
+        <div class="picker-head-info">
+            <div class="picker-icon"><i class="bi bi-eye-fill"></i></div>
+            <div>
+                <div class="picker-title">Accessible Sections</div>
+                <div class="picker-sub">Choose which parts of the system this role can open</div>
+            </div>
+        </div>
+        <div class="picker-counter">
+            <strong id="pickerSelectedCount">@selectedCount</strong>
+            <span>/ @totalCount selected</span>
+        </div>
+    </div>
+
+    <!-- Search + Quick actions -->
+    @if (!disabled)
+    {
+        <div class="picker-controls">
+            <div class="picker-search-wrap">
+                <i class="bi bi-search picker-search-icon"></i>
+                <input type="text" id="pickerSearch" class="picker-search" placeholder="Search sections…" autocomplete="off" />
+            </div>
+            <div class="picker-quick-actions">
+                <button type="button" class="quick-btn" id="selectAllBtn">
+                    <i class="bi bi-check-square"></i> Select All
+                </button>
+                <button type="button" class="quick-btn danger" id="clearAllBtn">
+                    <i class="bi bi-x-square"></i> Clear All
+                </button>
+            </div>
+        </div>
+    }
+
+    <!-- Body -->
+    <div class="picker-body" id="pickerBody">
+
+        @if (!Model.Permissions.Any())
+        {
+            <div class="perm-no-results">
+                <i class="bi bi-folder-x"></i>
+                <div>No sections available.</div>
+            </div>
+        }
+        else
+        {
+            @foreach (var group in grouped)
+            {
+                var groupCount = group.Count();
+                var groupSelected = group.Count(x => x.Permission.IsSelected);
+
+                <div class="perm-group" data-group="@group.Key">
+                    <div class="perm-group-head">
+                        <span class="perm-group-title">@group.Key</span>
+                        <span class="group-count" data-group-counter="@group.Key">@groupSelected / @groupCount</span>
+                        @if (!disabled)
+                        {
+                            <a class="group-toggle" data-group-toggle="@group.Key">Select group</a>
+                        }
+                    </div>
+
+                    <div class="perm-grid">
+                        @foreach (var item in group)
+                        {
+                            var i = item.Index;
+                            var meta = item.Meta;
+                            var p = item.Permission;
+                            <label class="perm-chip @(p.IsSelected ? "selected" : "") @(disabled ? "disabled" : "")"
+                                   data-perm-chip
+                                   data-search="@meta.Label.ToLowerInvariant()">
+                                <input type="hidden" name="Permissions[@i].ViewPermissionId" value="@p.ViewPermissionId" />
+                                <input type="hidden" name="Permissions[@i].DisplayName" value="@p.DisplayName" />
+                                <input type="hidden" name="Permissions[@i].GroupName" value="@p.GroupName" />
+                                <input type="checkbox"
+                                       name="Permissions[@i].IsSelected"
+                                       value="true"
+                                       @(p.IsSelected ? "checked" : "")
+                                       @(disabled ? "disabled" : "") />
+                                <input type="hidden" name="Permissions[@i].IsSelected" value="false" />
+                                <div class="perm-chip-icon"><i class="bi @meta.Icon"></i></div>
+                                <span class="perm-chip-label">@meta.Label</span>
+                            </label>
+                        }
+                    </div>
+                </div>
+            }
+        }
+    </div>
+</div>
+
+@if (!disabled)
+{
+    <script>
+        (function () {
+            const body          = document.getElementById('pickerBody');
+            const searchInput   = document.getElementById('pickerSearch');
+            const selectAllBtn  = document.getElementById('selectAllBtn');
+            const clearAllBtn   = document.getElementById('clearAllBtn');
+            const countSpan     = document.getElementById('pickerSelectedCount');
+
+            if (!body) return;
+
+            function chipCheckbox(chip) {
+                // The "true" checkbox is the first input[type=checkbox] inside the chip
+                return chip.querySelector('input[type="checkbox"]');
+            }
+
+            function isChipVisible(chip) {
+                return chip.style.display !== 'none';
+            }
+
+            function updateCounters() {
+                const allChips = body.querySelectorAll('[data-perm-chip]');
+                let total = 0;
+                allChips.forEach(c => {
+                    const cb = chipCheckbox(c);
+                    if (cb.checked) total++;
+                });
+                if (countSpan) countSpan.textContent = total;
+
+                // Group counters
+                body.querySelectorAll('.perm-group').forEach(g => {
+                    const groupName = g.dataset.group;
+                    const chips = g.querySelectorAll('[data-perm-chip]');
+                    let selected = 0;
+                    chips.forEach(c => { if (chipCheckbox(c).checked) selected++; });
+                    const counterEl = body.querySelector(`[data-group-counter="${CSS.escape(groupName)}"]`);
+                    if (counterEl) counterEl.textContent = `${selected} / ${chips.length}`;
+                });
+            }
+
+            // Chip click → toggle selected state
+            body.addEventListener('click', function (e) {
+                const chip = e.target.closest('[data-perm-chip]');
+                if (!chip || chip.classList.contains('disabled')) return;
+
+                // Avoid double-firing when clicking the actual <input> (it's display:none anyway)
+                const cb = chipCheckbox(chip);
+                // If click came on a button inside, ignore
+                if (e.target.tagName === 'BUTTON' || e.target.tagName === 'A') return;
+
+                // Let label default behavior happen if user clicks the checkbox; otherwise toggle manually
+                if (e.target !== cb) {
+                    e.preventDefault();
+                    cb.checked = !cb.checked;
+                }
+                chip.classList.toggle('selected', cb.checked);
+                updateCounters();
+            });
+
+            // Search filter
+            searchInput?.addEventListener('input', function () {
+                const term = this.value.trim().toLowerCase();
+                let groupHasVisible = {};
+
+                body.querySelectorAll('[data-perm-chip]').forEach(chip => {
+                    const hay = chip.dataset.search || '';
+                    const match = !term || hay.includes(term);
+                    chip.style.display = match ? '' : 'none';
+                    if (match) {
+                        const group = chip.closest('.perm-group');
+                        if (group) groupHasVisible[group.dataset.group] = true;
+                    }
+                });
+                // Hide empty groups
+                body.querySelectorAll('.perm-group').forEach(g => {
+                    g.style.display = groupHasVisible[g.dataset.group] ? '' : 'none';
+                });
+            });
+
+            // Select All
+            selectAllBtn?.addEventListener('click', function () {
+                body.querySelectorAll('[data-perm-chip]').forEach(chip => {
+                    if (!isChipVisible(chip)) return;
+                    const cb = chipCheckbox(chip);
+                    cb.checked = true;
+                    chip.classList.add('selected');
+                });
+                updateCounters();
+            });
+
+            // Clear All
+            clearAllBtn?.addEventListener('click', function () {
+                body.querySelectorAll('[data-perm-chip]').forEach(chip => {
+                    if (!isChipVisible(chip)) return;
+                    const cb = chipCheckbox(chip);
+                    cb.checked = false;
+                    chip.classList.remove('selected');
+                });
+                updateCounters();
+            });
+
+            // Group toggles
+            body.querySelectorAll('[data-group-toggle]').forEach(btn => {
+                btn.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    const groupName = this.dataset.groupToggle;
+                    const group = body.querySelector(`.perm-group[data-group="${CSS.escape(groupName)}"]`);
+                    if (!group) return;
+                    const chips = Array.from(group.querySelectorAll('[data-perm-chip]'));
+                    const anyUnchecked = chips.some(c => !chipCheckbox(c).checked);
+                    chips.forEach(c => {
+                        const cb = chipCheckbox(c);
+                        cb.checked = anyUnchecked;
+                        c.classList.toggle('selected', anyUnchecked);
+                    });
+                    this.textContent = anyUnchecked ? 'Deselect group' : 'Select group';
+                    updateCounters();
+                });
+            });
+        })();
+    </script>
+}

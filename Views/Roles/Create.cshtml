@@ -1,79 +1,173 @@
-﻿@model GymSaaS.Models.CreateRoleViewModel
+@model GymSaaS.Models.CreateRoleViewModel
 
 @{
-    ViewData["Title"] = "Create Role";
+    ViewData["Title"] = "New Role";
+    ViewData["Subtitle"] = "Create a custom role";
 }
 
-<div class="mb-4">
-    <h2 class="mb-1">Create Role</h2>
-    <p class="text-muted mb-0">Create a global role and assign accessible view folders.</p>
-</div>
+@section Styles {
+<style>
+    .role-form-shell { max-width: 920px; }
 
-<div class="card shadow-sm border-0">
-    <div class="card-body">
-        <form asp-action="Create" method="post">
-            <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+    .role-form-card {
+        background: #fff;
+        border: 1px solid rgba(15,23,42,0.06);
+        border-radius: 16px;
+        box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 4px 14px rgba(15,23,42,0.04);
+        overflow: hidden;
+        position: relative;
+        margin-bottom: 18px;
+    }
+    .role-form-card::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 24px; right: 24px; height: 2px;
+        background: linear-gradient(90deg, var(--fire), #fdba74, transparent);
+        border-radius: 0 0 2px 2px;
+    }
+    .role-form-head {
+        padding: 16px 24px;
+        background: linear-gradient(to bottom, #fafafa, #f5f5f7);
+        border-bottom: 1px solid rgba(15,23,42,0.05);
+        display: flex; align-items: center; gap: 12px;
+    }
+    .role-form-head .ico {
+        width: 32px; height: 32px;
+        border-radius: 10px;
+        background: linear-gradient(135deg, var(--fire-soft), rgba(249,115,22,0.12));
+        border: 1px solid var(--fire-border);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 15px; color: var(--fire);
+    }
+    .role-form-head .ttl {
+        font-family: var(--font-display);
+        font-size: 13px; font-weight: 800;
+        letter-spacing: .06em; text-transform: uppercase;
+        color: var(--t1);
+    }
+    .role-form-head .sub {
+        font-size: 11.5px; color: var(--t3); margin-top: 2px;
+    }
+    .role-form-body { padding: 24px; }
 
-            <div class="row g-3">
-                <div class="col-md-6">
-                    <label asp-for="RoleName" class="form-label"></label>
-                    <input asp-for="RoleName" class="form-control" />
-                    <span asp-validation-for="RoleName" class="text-danger"></span>
+    .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+    .field:last-child { margin-bottom: 0; }
+    .field-label {
+        font-size: 11px; font-weight: 700;
+        letter-spacing: .08em; text-transform: uppercase;
+        color: var(--t3);
+    }
+    .field-error { color: var(--red); font-size: 11.5px; font-weight: 600; }
+
+    .grid-2 {
+        display: grid; grid-template-columns: 2fr 1fr; gap: 18px;
+    }
+    @@media (max-width: 700px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    .toggle-switch {
+        display: flex; align-items: center; gap: 10px;
+        padding: 11px 14px;
+        border: 1px solid rgba(15,23,42,0.08);
+        border-radius: 10px;
+        background: #fafafa;
+        cursor: pointer;
+        transition: all .15s ease;
+    }
+    .toggle-switch:hover {
+        background: #f4f4f5;
+        border-color: rgba(15,23,42,0.14);
+    }
+    .toggle-switch input { margin: 0; }
+    .toggle-switch label {
+        font-size: 13px; font-weight: 600;
+        color: var(--t1);
+        cursor: pointer;
+        margin: 0;
+    }
+    .toggle-switch input:checked + label { color: var(--fire); }
+
+    .form-actions {
+        display: flex; justify-content: flex-end; gap: 10px;
+        margin-top: 18px;
+        padding: 18px 0 0;
+    }
+
+    .validation-summary {
+        background: rgba(220,38,38,0.06);
+        border: 1px solid rgba(220,38,38,0.20);
+        border-radius: 12px;
+        padding: 12px 16px;
+        color: var(--red);
+        font-size: 13px;
+        margin-bottom: 16px;
+    }
+    .validation-summary:empty { display: none; }
+</style>
+}
+
+<div class="role-form-shell">
+
+    <!-- Back link -->
+    <a asp-action="Index" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;color:var(--t2);margin-bottom:16px;">
+        <i class="bi bi-arrow-left"></i> Back to Roles
+    </a>
+
+    <h1 style="font-family:var(--font-display);font-size:22px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--t1);margin-bottom:18px;">
+        New Role
+    </h1>
+
+    <form asp-action="Create" method="post">
+        @Html.AntiForgeryToken()
+
+        <div asp-validation-summary="ModelOnly" class="validation-summary"></div>
+
+        <!-- Role details card -->
+        <div class="role-form-card">
+            <div class="role-form-head">
+                <div class="ico"><i class="bi bi-shield"></i></div>
+                <div>
+                    <div class="ttl">Role Details</div>
+                    <div class="sub">Name and description for this access role</div>
                 </div>
+            </div>
 
-                <div class="col-md-6 d-flex align-items-end">
-                    <div class="form-check form-switch">
-                        <input asp-for="IsActive" class="form-check-input" />
-                        <label asp-for="IsActive" class="form-check-label"></label>
+            <div class="role-form-body">
+                <div class="grid-2">
+                    <div class="field">
+                        <label class="field-label">Role Name *</label>
+                        <input asp-for="RoleName" class="form-control" placeholder="e.g. Branch Manager" />
+                        <span asp-validation-for="RoleName" class="field-error"></span>
+                    </div>
+
+                    <div class="field">
+                        <label class="field-label">Status</label>
+                        <div class="toggle-switch">
+                            <input asp-for="IsActive" type="checkbox" id="IsActiveCheck" />
+                            <label for="IsActiveCheck">Active &amp; assignable</label>
+                        </div>
                     </div>
                 </div>
 
-                <div class="col-12">
-                    <label asp-for="RoleDescription" class="form-label"></label>
-                    <textarea asp-for="RoleDescription" class="form-control" rows="3"></textarea>
-                    <span asp-validation-for="RoleDescription" class="text-danger"></span>
+                <div class="field">
+                    <label class="field-label">Description</label>
+                    <textarea asp-for="RoleDescription" class="form-control" rows="2"
+                              placeholder="Briefly describe what this role can do"></textarea>
+                    <span asp-validation-for="RoleDescription" class="field-error"></span>
                 </div>
             </div>
+        </div>
 
-            <hr class="my-4" />
+        <!-- Permissions picker -->
+        @await Html.PartialAsync("_PermissionsPicker", Model)
 
-            <h5 class="mb-3">Allowed View Folders</h5>
-            <p class="text-muted">
-                Selecting a folder gives this role access to all pages inside that folder.
-            </p>
-
-            @if (!Model.Permissions.Any())
-            {
-                <div class="alert alert-warning">
-                    No eligible view folders were found.
-                </div>
-            }
-            else
-            {
-                <div class="row">
-                    @for (int i = 0; i < Model.Permissions.Count; i++)
-                    {
-                        <div class="col-md-4 mb-3">
-                            <div class="form-check border rounded p-3">
-                                <input type="hidden" asp-for="Permissions[@i].ViewPermissionId" />
-                                <input type="hidden" asp-for="Permissions[@i].DisplayName" />
-                                <input type="hidden" asp-for="Permissions[@i].GroupName" />
-                                <input asp-for="Permissions[@i].IsSelected" class="form-check-input" />
-                                <label asp-for="Permissions[@i].IsSelected" class="form-check-label fw-semibold">
-                                    @Model.Permissions[i].DisplayName
-                                </label>
-                            </div>
-                        </div>
-                    }
-                </div>
-            }
-
-            <div class="mt-4 d-flex gap-2">
-                <button type="submit" class="btn btn-primary">Save Role</button>
-                <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
-            </div>
-        </form>
-    </div>
+        <!-- Actions -->
+        <div class="form-actions">
+            <a asp-action="Index" class="btn btn-ghost" style="border:1px solid var(--border);">Cancel</a>
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-check-lg"></i> Create Role
+            </button>
+        </div>
+    </form>
 </div>
 
 @section Scripts {

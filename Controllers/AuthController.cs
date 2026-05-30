@@ -85,19 +85,34 @@ namespace GymSaaS.Controllers
                     return View(model);
                 }
 
-                // 5. Load roles
-                var userRoles = await _db.UserRoles
+                // 5. Load active role IDs and names
+                var roleRows = await _db.UserRoles
                     .Where(ur => ur.UserId == user.UserId)
-                    .Join(_db.Roles, ur => ur.RoleId, r => r.RoleId, (ur, r) => r.RoleName)
+                    .Join(_db.Roles, ur => ur.RoleId, r => r.RoleId, (ur, r) => r)
+                    .Where(r => r.IsActive && !r.IsDeleted)
+                    .Select(r => new { r.RoleId, r.RoleName })
                     .ToListAsync();
 
-                // 6. Load branch assignments
+                var roleIds = roleRows.Select(r => r.RoleId).ToList();
+                var userRoles = roleRows.Select(r => r.RoleName).ToList();
+
+                // 6. Load allowed view permission codes (e.g. "views.members") for the user's roles
+                var allowedViewCodes = await _db.RoleViewPermissions
+                    .Where(rvp => roleIds.Contains(rvp.RoleId))
+                    .Join(_db.ViewPermissions,
+                          rvp => rvp.ViewPermissionId,
+                          vp => vp.ViewPermissionId,
+                          (rvp, vp) => vp.PermissionCode)
+                    .Distinct()
+                    .ToListAsync();
+
+                // 7. Load branch assignments
                 var branchIds = await _db.UserBranches
                     .Where(ub => ub.UserId == user.UserId && ub.IsActive)
                     .Select(ub => ub.BranchId.ToString())
                     .ToListAsync();
 
-                // 7. Build claims
+                // 8. Build claims
                 var claims = new List<Claim>
                 {
                     new Claim(ClaimTypes.NameIdentifier, user.UserId.ToString()),
@@ -114,7 +129,10 @@ namespace GymSaaS.Controllers
                 foreach (var branchId in branchIds)
                     claims.Add(new Claim("BranchId", branchId));
 
-                // 8. Sign in with cookie
+                foreach (var code in allowedViewCodes)
+                    claims.Add(new Claim("AllowedView", code));
+
+                // 9. Sign in with cookie
                 var identity  = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
                 var principal = new ClaimsPrincipal(identity);
 
@@ -131,7 +149,7 @@ namespace GymSaaS.Controllers
                     principal,
                     authProps);
 
-                // 9. Update last login timestamp
+                // 10. Update last login timestamp
                 user.LastLoginAtUtc = DateTime.UtcNow;
                 await _db.SaveChangesAsync();
 

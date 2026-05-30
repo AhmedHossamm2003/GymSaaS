@@ -1,0 +1,643 @@
+@model List<GymSaaS.Models.AttendanceLogItem>
+@using GymSaaS.Models
+@{
+    ViewData["Title"]    = "Attendance";
+    ViewData["Subtitle"] = "Check-in log";
+
+    var search     = ViewData["Search"]     as string ?? "";
+    var branchId   = ViewData["BranchId"]   as Guid?;
+    var statusCode = ViewData["StatusCode"] as string ?? "";
+    var fromDate   = (DateOnly)ViewData["FromDate"]!;
+    var toDate     = (DateOnly)ViewData["ToDate"]!;
+    var page       = (int)(ViewData["Page"]       ?? 1);
+    var totalPages = (int)(ViewData["TotalPages"] ?? 1);
+    var stats      = (AttendanceStatsDto)ViewData["Stats"]!;
+    var branches   = ViewData["Branches"]  as List<BranchDropdownItem> ?? new();
+    var statuses   = ViewData["Statuses"]  as List<(string StatusCode, string StatusName)> ?? new();
+
+    var ctrl = ViewContext.RouteData.Values["controller"]?.ToString();
+
+    // Helper: build URL preserving all filters except one changed param
+    string FilterUrl(int p, string? sc = null, Guid? bid = null, string? srch = null,
+                     DateOnly? from = null, DateOnly? to = null) =>
+        Url.Action("Index", new {
+            page       = p,
+            statusCode = sc  ?? statusCode,
+            branchId   = bid ?? branchId,
+            search     = srch ?? search,
+            fromDate   = (from ?? fromDate).ToString("yyyy-MM-dd"),
+            toDate     = (to   ?? toDate).ToString("yyyy-MM-dd"),
+        })!;
+}
+
+@section Styles {
+<style>
+    .att-shell { max-width: 1180px; }
+
+    /* ── Stat tiles ── */
+    .att-stats {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 14px;
+        margin-bottom: 20px;
+    }
+    @@media (max-width: 1100px) { .att-stats { grid-template-columns: repeat(3, 1fr); } }
+    @@media (max-width: 640px)  { .att-stats { grid-template-columns: repeat(2, 1fr); } }
+
+    .att-stat {
+        background: #fff;
+        border: 1px solid rgba(15,23,42,0.06);
+        border-radius: 16px;
+        box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 4px 14px rgba(15,23,42,0.04);
+        padding: 16px 18px;
+        display: flex; align-items: center; gap: 12px;
+        position: relative; overflow: hidden;
+        transition: box-shadow .25s ease, transform .25s ease, border-color .25s ease;
+    }
+    .att-stat::after {
+        content: '';
+        position: absolute; top: 0; left: 0; right: 0; height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.9), transparent);
+        pointer-events: none;
+    }
+    .att-stat:hover {
+        box-shadow: 0 4px 8px rgba(15,23,42,0.05), 0 12px 28px rgba(15,23,42,0.08);
+        transform: translateY(-2px);
+        border-color: rgba(15,23,42,0.10);
+    }
+    .att-stat-icon {
+        width: 38px; height: 38px; border-radius: 11px; flex-shrink: 0;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 16px;
+        background: linear-gradient(135deg, rgba(249,115,22,0.10), rgba(249,115,22,0.06));
+        border: 1px solid rgba(249,115,22,0.18);
+        color: var(--fire);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
+    }
+    .att-stat-icon.green {
+        background: linear-gradient(135deg, rgba(22,163,74,0.10), rgba(22,163,74,0.06));
+        border-color: rgba(22,163,74,0.18);
+        color: #16a34a;
+    }
+    .att-stat-icon.blue {
+        background: linear-gradient(135deg, rgba(59,130,246,0.10), rgba(59,130,246,0.06));
+        border-color: rgba(59,130,246,0.18);
+        color: #3b82f6;
+    }
+    .att-stat-icon.slate {
+        background: linear-gradient(135deg, rgba(100,116,139,0.10), rgba(100,116,139,0.06));
+        border-color: rgba(100,116,139,0.18);
+        color: #475569;
+    }
+    .att-stat-icon.yellow {
+        background: linear-gradient(135deg, rgba(202,138,4,0.10), rgba(202,138,4,0.06));
+        border-color: rgba(202,138,4,0.18);
+        color: #ca8a04;
+    }
+    .att-stat-val {
+        font-family: var(--font-display);
+        font-size: 24px; font-weight: 800;
+        color: var(--t1); line-height: 1;
+    }
+    .att-stat-lbl {
+        font-size: 10.5px; font-weight: 700;
+        letter-spacing: .10em; text-transform: uppercase;
+        color: var(--t3); margin-top: 3px;
+    }
+
+    /* ── Filter bar ── */
+    .att-filterbar {
+        background: #fff;
+        border: 1px solid rgba(15,23,42,0.06);
+        border-radius: 16px;
+        box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 4px 14px rgba(15,23,42,0.04);
+        padding: 14px 18px;
+        margin-bottom: 18px;
+        display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+    }
+
+    /* Date preset pills */
+    .date-preset {
+        display: inline-flex; align-items: center;
+        padding: 6px 13px; border-radius: 999px;
+        border: 1px solid rgba(15,23,42,0.08);
+        background: #fff;
+        font-size: 12px; font-weight: 700;
+        color: var(--t2);
+        text-decoration: none;
+        transition: all .15s ease;
+        white-space: nowrap;
+    }
+    .date-preset:hover {
+        border-color: rgba(249,115,22,0.40);
+        color: var(--fire);
+    }
+    .date-preset.active {
+        background: linear-gradient(135deg, var(--fire-soft), rgba(249,115,22,0.10));
+        border-color: var(--fire-border);
+        color: var(--fire-text);
+        box-shadow: 0 1px 2px rgba(249,115,22,0.12);
+    }
+
+    .filter-divider {
+        width: 1px; height: 24px;
+        background: rgba(15,23,42,0.08);
+        flex-shrink: 0;
+    }
+
+    /* Status filter pills */
+    .status-pill {
+        display: inline-flex; align-items: center; gap: 5px;
+        padding: 5px 12px; border-radius: 999px;
+        border: 1px solid rgba(15,23,42,0.08);
+        background: #fff;
+        font-size: 12px; font-weight: 700;
+        color: var(--t2);
+        text-decoration: none;
+        transition: all .15s ease;
+    }
+    .status-pill:hover { border-color: rgba(15,23,42,0.18); color: var(--t1); }
+    .status-pill.active {
+        background: linear-gradient(135deg, var(--fire-soft), rgba(249,115,22,0.10));
+        border-color: var(--fire-border);
+        color: var(--fire-text);
+    }
+
+    /* ── Table card ── */
+    .att-card {
+        background: #fff;
+        border: 1px solid rgba(15,23,42,0.06);
+        border-radius: 16px;
+        box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 4px 14px rgba(15,23,42,0.04);
+        overflow: hidden;
+        transition: box-shadow .25s ease;
+    }
+
+    .att-table { width: 100%; border-collapse: collapse; }
+    .att-table thead th {
+        background: linear-gradient(to bottom, #fafafa, #f5f5f7);
+        padding: 12px 16px;
+        text-align: left;
+        font-size: 10.5px; font-weight: 700;
+        letter-spacing: .10em; text-transform: uppercase;
+        color: var(--t3);
+        border-bottom: 1px solid rgba(15,23,42,0.08);
+        white-space: nowrap;
+    }
+    .att-table tbody tr {
+        border-bottom: 1px solid rgba(15,23,42,0.04);
+        transition: background .13s ease, box-shadow .13s ease;
+        cursor: pointer;
+    }
+    .att-table tbody tr:last-child { border-bottom: none; }
+    .att-table tbody tr:hover {
+        background: #fafafa;
+        box-shadow: inset 3px 0 0 var(--fire);
+    }
+    .att-table tbody td {
+        padding: 12px 16px;
+        font-size: 13px;
+        vertical-align: middle;
+    }
+
+    /* Member cell */
+    .member-cell { display: flex; align-items: center; gap: 10px; }
+    .m-avatar {
+        width: 34px; height: 34px; border-radius: 50%;
+        border: 1.5px solid rgba(15,23,42,0.08);
+        background: var(--fire-soft);
+        color: var(--fire-text);
+        display: flex; align-items: center; justify-content: center;
+        font-family: var(--font-display);
+        font-size: 12px; font-weight: 800;
+        flex-shrink: 0;
+        overflow: hidden;
+    }
+    .m-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+    .m-name { font-size: 13.5px; font-weight: 700; color: var(--t1); }
+    .m-num  { font-size: 11px; font-weight: 600; color: var(--t3); font-family: monospace; }
+
+    /* Time cell */
+    .time-cell .time-main  { font-weight: 700; color: var(--t1); white-space: nowrap; }
+    .time-cell .time-sub   { font-size: 11.5px; color: var(--t3); }
+
+    /* Status badges */
+    .att-badge {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 3px 10px; border-radius: 999px;
+        font-size: 11px; font-weight: 700;
+        border: 1px solid;
+        white-space: nowrap;
+    }
+    .att-badge.success   { background: rgba(22,163,74,.08);  color: #15803d; border-color: rgba(22,163,74,.20); }
+    .att-badge.override  { background: rgba(202,138,4,.08);  color: #92400e; border-color: rgba(202,138,4,.20); }
+    .att-badge.manual    { background: rgba(59,130,246,.08); color: #1d4ed8; border-color: rgba(59,130,246,.20); }
+
+    /* Indicators */
+    .tag {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 2px 8px; border-radius: 6px;
+        font-size: 10.5px; font-weight: 700;
+        background: rgba(15,23,42,0.05);
+        color: var(--t2);
+        border: 1px solid rgba(15,23,42,0.08);
+    }
+    .tag.session  { background: rgba(249,115,22,.07); color: var(--fire); border-color: var(--fire-border); }
+    .tag.cross    { background: rgba(59,130,246,.07); color: #1d4ed8; border-color: rgba(59,130,246,.20); }
+    .tag.inside   { background: rgba(22,163,74,.08);  color: #15803d; border-color: rgba(22,163,74,.20); }
+
+    /* Inside now pulsing dot */
+    .inside-dot {
+        width: 7px; height: 7px; border-radius: 50%;
+        background: #16a34a;
+        display: inline-block;
+        animation: pulse-dot 1.6s ease-in-out infinite;
+    }
+    @@keyframes pulse-dot {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50%       { opacity: .5; transform: scale(1.3); }
+    }
+
+    /* Empty state */
+    .empty-state {
+        text-align: center; padding: 64px 24px;
+        color: var(--t3);
+    }
+    .empty-state i { font-size: 44px; display: block; margin-bottom: 14px; opacity: .3; color: var(--fire); }
+    .empty-state h3 {
+        font-family: var(--font-display);
+        font-size: 17px; font-weight: 800; text-transform: uppercase;
+        color: var(--t2); margin-bottom: 6px;
+    }
+
+    /* Pagination */
+    .pag-bar {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 14px 18px;
+        border-top: 1px solid rgba(15,23,42,0.05);
+        background: #fafafa;
+        gap: 12px; flex-wrap: wrap;
+    }
+    .pag-info { font-size: 12.5px; color: var(--t2); }
+    .pag-btns { display: flex; gap: 5px; align-items: center; }
+    .pag-btn {
+        width: 32px; height: 32px; border-radius: 9px;
+        border: 1px solid rgba(15,23,42,0.09);
+        background: #fff; color: var(--t2);
+        font-size: 13px; font-weight: 600;
+        display: flex; align-items: center; justify-content: center;
+        text-decoration: none;
+        transition: all .13s ease;
+    }
+    .pag-btn:hover { background: #f4f4f5; color: var(--t1); border-color: rgba(15,23,42,0.18); }
+    .pag-btn.active { background: var(--fire); border-color: var(--fire); color: #fff; font-weight: 700; }
+    .pag-btn.disabled { opacity: .35; pointer-events: none; }
+</style>
+}
+
+<div class="att-shell">
+
+    <!-- ── Header ────────────────────────────────────── -->
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+        <div>
+            <h1 style="font-family:var(--font-display);font-size:22px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--t1);margin:0;">
+                Attendance Logs
+            </h1>
+            <p style="font-size:13px;color:var(--t3);margin:3px 0 0;">
+                @fromDate.ToString("MMM d") – @toDate.ToString("MMM d, yyyy")
+                @if (branchId.HasValue && branches.Any(b => b.BranchId == branchId))
+                {
+                    <span> · @branches.First(b => b.BranchId == branchId).BranchName</span>
+                }
+            </p>
+        </div>
+    </div>
+
+    <!-- ── Stats ─────────────────────────────────────── -->
+    <div class="att-stats">
+        <div class="att-stat">
+            <div class="att-stat-icon"><i class="bi bi-qr-code-scan"></i></div>
+            <div>
+                <div class="att-stat-val">@stats.TotalCheckIns</div>
+                <div class="att-stat-lbl">Check-ins</div>
+            </div>
+        </div>
+        <div class="att-stat">
+            <div class="att-stat-icon green"><i class="bi bi-people"></i></div>
+            <div>
+                <div class="att-stat-val">@stats.UniqueMembers</div>
+                <div class="att-stat-lbl">Unique Members</div>
+            </div>
+        </div>
+        <div class="att-stat">
+            <div class="att-stat-icon"><i class="bi bi-ticket-perforated"></i></div>
+            <div>
+                <div class="att-stat-val">@stats.SessionsDeducted</div>
+                <div class="att-stat-lbl">Sessions Used</div>
+            </div>
+        </div>
+        <div class="att-stat">
+            <div class="att-stat-icon blue"><i class="bi bi-arrow-left-right"></i></div>
+            <div>
+                <div class="att-stat-val">@stats.CrossBranchVisits</div>
+                <div class="att-stat-lbl">Cross-Branch</div>
+            </div>
+        </div>
+        <div class="att-stat">
+            <div class="att-stat-icon yellow"><i class="bi bi-shield-check"></i></div>
+            <div>
+                <div class="att-stat-val">@stats.OverrideCheckIns</div>
+                <div class="att-stat-lbl">Overrides</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Filter bar ────────────────────────────────── -->
+    <form method="get" action="@Url.Action("Index")" class="att-filterbar">
+
+        @{
+            var today2 = DateOnly.FromDateTime(DateTime.Today);
+            var yesterday = today2.AddDays(-1);
+            var weekStart = today2.AddDays(-(int)DateTime.Today.DayOfWeek);
+            var monthStart = new DateOnly(today2.Year, today2.Month, 1);
+
+            bool IsPreset(DateOnly f, DateOnly t) => fromDate == f && toDate == t;
+        }
+
+        <!-- Date presets -->
+        <a href="@FilterUrl(1, from: today2, to: today2)"
+           class="date-preset @(IsPreset(today2, today2) ? "active" : "")">Today</a>
+        <a href="@FilterUrl(1, from: yesterday, to: yesterday)"
+           class="date-preset @(IsPreset(yesterday, yesterday) ? "active" : "")">Yesterday</a>
+        <a href="@FilterUrl(1, from: weekStart, to: today2)"
+           class="date-preset @(IsPreset(weekStart, today2) ? "active" : "")">This Week</a>
+        <a href="@FilterUrl(1, from: monthStart, to: today2)"
+           class="date-preset @(IsPreset(monthStart, today2) ? "active" : "")">This Month</a>
+
+        <div class="filter-divider"></div>
+
+        <!-- Custom date range -->
+        <input type="date" name="fromDate" value="@fromDate.ToString("yyyy-MM-dd")"
+               class="form-control" style="max-width:150px;" />
+        <span style="color:var(--t3);font-weight:600;font-size:13px;">→</span>
+        <input type="date" name="toDate" value="@toDate.ToString("yyyy-MM-dd")"
+               class="form-control" style="max-width:150px;" />
+
+        <div class="filter-divider"></div>
+
+        <!-- Search -->
+        <div style="position:relative;flex:1;min-width:180px;">
+            <i class="bi bi-search" style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--t3);font-size:14px;pointer-events:none;"></i>
+            <input type="text" name="search" value="@search"
+                   placeholder="Member name or #…"
+                   class="form-control" style="padding-left:34px;" />
+        </div>
+
+        <!-- Branch -->
+        @if (branches.Count > 1)
+        {
+            <select name="branchId" class="form-control" style="max-width:170px;" onchange="this.form.submit()">
+                <option value="">All Branches</option>
+                @foreach (var b in branches)
+                {
+                    if (b.BranchId == branchId) { <option value="@b.BranchId" selected>@b.BranchName</option> }
+                    else                         { <option value="@b.BranchId">@b.BranchName</option> }
+                }
+            </select>
+        }
+
+        <input type="hidden" name="statusCode" value="@statusCode" />
+
+        <button type="submit" class="btn btn-secondary" style="white-space:nowrap;">
+            <i class="bi bi-funnel"></i> Filter
+        </button>
+
+        @if (!string.IsNullOrEmpty(search) || branchId.HasValue || !string.IsNullOrEmpty(statusCode)
+             || fromDate != today2 || toDate != today2)
+        {
+            <a href="@Url.Action("Index")" class="btn btn-ghost" style="white-space:nowrap;">
+                <i class="bi bi-x"></i> Clear
+            </a>
+        }
+
+    </form>
+
+    <!-- ── Status filter pills (below filter bar) ────── -->
+    @if (statuses.Any())
+    {
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;align-items:center;">
+            <span style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--t3);">Status:</span>
+            <a href="@FilterUrl(1, sc: "")" class="status-pill @(string.IsNullOrEmpty(statusCode) ? "active" : "")">
+                All
+            </a>
+            @foreach (var (sc, sn) in statuses)
+            {
+                <a href="@FilterUrl(1, sc: sc)" class="status-pill @(statusCode == sc ? "active" : "")">
+                    @sn
+                </a>
+            }
+        </div>
+    }
+
+    <!-- ── Table ─────────────────────────────────────── -->
+    <div class="att-card">
+        @if (!Model.Any())
+        {
+            <div class="empty-state">
+                <i class="bi bi-calendar-x"></i>
+                <h3>No check-ins found</h3>
+                <p style="font-size:13px;">Try a different date range or clear the filters.</p>
+            </div>
+        }
+        else
+        {
+            <table class="att-table">
+                <thead>
+                    <tr>
+                        <th>Member</th>
+                        <th>Branch</th>
+                        <th>Check-in</th>
+                        <th>Until</th>
+                        <th>Package</th>
+                        <th>Status</th>
+                        <th>Tags</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var r in Model)
+                    {
+                        <tr onclick="window.location='/Members/Details/@r.MemberId'" title="View member profile">
+                            <!-- Member -->
+                            <td>
+                                <div class="member-cell">
+                                    <div class="m-avatar">
+                                        @if (!string.IsNullOrEmpty(r.MemberPhotoUrl))
+                                        {
+                                            <img src="@r.MemberPhotoUrl" alt="@r.MemberName" />
+                                        }
+                                        else
+                                        {
+                                            @r.MemberInitials
+                                        }
+                                    </div>
+                                    <div>
+                                        <div class="m-name">@r.MemberName</div>
+                                        <div class="m-num">#@r.MembershipNumber</div>
+                                    </div>
+                                </div>
+                            </td>
+
+                            <!-- Branch -->
+                            <td style="color:var(--t2);font-size:12.5px;white-space:nowrap;">
+                                <i class="bi bi-building" style="font-size:11px;color:var(--t3);margin-right:4px;"></i>
+                                @r.BranchName
+                            </td>
+
+                            <!-- Check-in time -->
+                            <td class="time-cell">
+                                <div class="time-main">@r.CheckInLocal.ToString("h:mm tt")</div>
+                                <div class="time-sub">@r.CheckInLocal.ToString("MMM d, yyyy")</div>
+                            </td>
+
+                            <!-- Presence until -->
+                            <td class="time-cell">
+                                @if (r.IsCurrentlyInside)
+                                {
+                                    <span class="tag inside">
+                                        <span class="inside-dot"></span> Inside now
+                                    </span>
+                                }
+                                else
+                                {
+                                    <div class="time-main" style="color:var(--t2);">@r.PresenceLocal.ToString("h:mm tt")</div>
+                                    <div class="time-sub">@r.PresenceLocal.ToString("MMM d")</div>
+                                }
+                            </td>
+
+                            <!-- Package -->
+                            <td style="max-width:180px;">
+                                @if (!string.IsNullOrEmpty(r.PackageName))
+                                {
+                                    <span style="font-size:12px;color:var(--t1);font-weight:500;
+                                                 display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
+                                          title="@r.PackageName">
+                                        @r.PackageName
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span style="color:var(--t4);font-size:12px;">—</span>
+                                }
+                            </td>
+
+                            <!-- Status badge -->
+                            <td>
+                                @{
+                                    var badgeCls = r.StatusCode switch
+                                    {
+                                        "SUCCESS"           => "success",
+                                        "OVERRIDE_APPROVED" => "override",
+                                        "MANUAL"            => "manual",
+                                        _                   => "success"
+                                    };
+                                }
+                                <span class="att-badge @badgeCls">
+                                    @r.StatusName
+                                </span>
+                            </td>
+
+                            <!-- Tags row -->
+                            <td>
+                                <div style="display:flex;gap:4px;flex-wrap:wrap;">
+                                    @if (r.SessionDeducted)
+                                    {
+                                        <span class="tag session" title="@r.SessionsDeducted session(s) deducted">
+                                            <i class="bi bi-ticket-perforated" style="font-size:10px;"></i>
+                                            -@r.SessionsDeducted
+                                        </span>
+                                    }
+                                    @if (r.IsCrossBranch)
+                                    {
+                                        <span class="tag cross" title="Cross-branch visit">
+                                            <i class="bi bi-arrow-left-right" style="font-size:10px;"></i> Cross
+                                        </span>
+                                    }
+                                    @if (r.OverrideApplied)
+                                    {
+                                        <span class="tag" title="Override was applied">
+                                            <i class="bi bi-shield-check" style="font-size:10px;color:var(--yellow);"></i> Override
+                                        </span>
+                                    }
+                                    @if (!r.SessionDeducted && !r.IsCrossBranch && !r.OverrideApplied)
+                                    {
+                                        <span style="color:var(--t4);font-size:12px;">—</span>
+                                    }
+                                </div>
+                            </td>
+
+                        </tr>
+                    }
+                </tbody>
+            </table>
+
+            <!-- Pagination -->
+            @if (totalPages > 1)
+            {
+                <div class="pag-bar">
+                    <div class="pag-info">
+                        Showing page @(page) of @totalPages
+                        (@stats.TotalCheckIns total)
+                    </div>
+                    <div class="pag-btns">
+                        @if (page > 1)
+                        {
+                            <a href="@FilterUrl(page - 1)" class="pag-btn">
+                                <i class="bi bi-chevron-left" style="font-size:11px;"></i>
+                            </a>
+                        }
+                        else
+                        {
+                            <span class="pag-btn disabled">
+                                <i class="bi bi-chevron-left" style="font-size:11px;"></i>
+                            </span>
+                        }
+
+                        @{
+                            int sp = Math.Max(1, page - 2);
+                            int ep = Math.Min(totalPages, page + 2);
+                        }
+                        @if (sp > 1)
+                        {
+                            <a href="@FilterUrl(1)" class="pag-btn">1</a>
+                            if (sp > 2) { <span style="padding:0 4px;color:var(--t3);">…</span> }
+                        }
+                        @for (int p2 = sp; p2 <= ep; p2++)
+                        {
+                            if (p2 == page) { <span class="pag-btn active">@(p2)</span> }
+                            else            { <a href="@FilterUrl(p2)" class="pag-btn">@(p2)</a> }
+                        }
+                        @if (ep < totalPages)
+                        {
+                            if (ep < totalPages - 1) { <span style="padding:0 4px;color:var(--t3);">…</span> }
+                            <a href="@FilterUrl(totalPages)" class="pag-btn">@totalPages</a>
+                        }
+
+                        @if (page < totalPages)
+                        {
+                            <a href="@FilterUrl(page + 1)" class="pag-btn">
+                                <i class="bi bi-chevron-right" style="font-size:11px;"></i>
+                            </a>
+                        }
+                        else
+                        {
+                            <span class="pag-btn disabled">
+                                <i class="bi bi-chevron-right" style="font-size:11px;"></i>
+                            </span>
+                        }
+                    </div>
+                </div>
+            }
+        }
+    </div>
+
+</div>

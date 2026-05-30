@@ -1,122 +1,241 @@
-﻿@model GymSaaS.Models.EditRoleViewModel
+@model GymSaaS.Models.EditRoleViewModel
 
 @{
     ViewData["Title"] = "Edit Role";
+    ViewData["Subtitle"] = Model.RoleName;
+    ViewData["DisablePicker"] = Model.IsSystem;
 }
 
-<div class="mb-4">
-    <h2 class="mb-1">Edit Role</h2>
-    <p class="text-muted mb-0">Update role details and accessible view folders.</p>
-</div>
+@section Styles {
+<style>
+    .role-form-shell { max-width: 920px; }
 
-@if (Model.IsSystem)
-{
-    <div class="alert alert-info">
-        This is a system role and cannot be edited.
-    </div>
+    .role-form-card {
+        background: #fff;
+        border: 1px solid rgba(15,23,42,0.06);
+        border-radius: 16px;
+        box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 4px 14px rgba(15,23,42,0.04);
+        overflow: hidden;
+        position: relative;
+        margin-bottom: 18px;
+    }
+    .role-form-card::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 24px; right: 24px; height: 2px;
+        background: linear-gradient(90deg, var(--fire), #fdba74, transparent);
+        border-radius: 0 0 2px 2px;
+    }
+    .role-form-card.system::before {
+        background: linear-gradient(90deg, #475569, #94a3b8, transparent);
+    }
+    .role-form-head {
+        padding: 16px 24px;
+        background: linear-gradient(to bottom, #fafafa, #f5f5f7);
+        border-bottom: 1px solid rgba(15,23,42,0.05);
+        display: flex; align-items: center; gap: 12px;
+    }
+    .role-form-head .ico {
+        width: 32px; height: 32px;
+        border-radius: 10px;
+        background: linear-gradient(135deg, var(--fire-soft), rgba(249,115,22,0.12));
+        border: 1px solid var(--fire-border);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 15px; color: var(--fire);
+    }
+    .role-form-card.system .role-form-head .ico {
+        background: linear-gradient(135deg, rgba(71,85,105,0.10), rgba(71,85,105,0.16));
+        border-color: rgba(71,85,105,0.20);
+        color: #475569;
+    }
+    .role-form-head .ttl {
+        font-family: var(--font-display);
+        font-size: 13px; font-weight: 800;
+        letter-spacing: .06em; text-transform: uppercase;
+        color: var(--t1);
+    }
+    .role-form-head .sub { font-size: 11.5px; color: var(--t3); margin-top: 2px; }
+    .role-form-body { padding: 24px; }
+
+    .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+    .field:last-child { margin-bottom: 0; }
+    .field-label {
+        font-size: 11px; font-weight: 700;
+        letter-spacing: .08em; text-transform: uppercase;
+        color: var(--t3);
+    }
+    .field-error { color: var(--red); font-size: 11.5px; font-weight: 600; }
+
+    .grid-2 {
+        display: grid; grid-template-columns: 2fr 1fr; gap: 18px;
+    }
+    @@media (max-width: 700px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    .toggle-switch {
+        display: flex; align-items: center; gap: 10px;
+        padding: 11px 14px;
+        border: 1px solid rgba(15,23,42,0.08);
+        border-radius: 10px;
+        background: #fafafa;
+        cursor: pointer;
+        transition: all .15s ease;
+    }
+    .toggle-switch:hover {
+        background: #f4f4f5;
+        border-color: rgba(15,23,42,0.14);
+    }
+    .toggle-switch input { margin: 0; }
+    .toggle-switch label {
+        font-size: 13px; font-weight: 600;
+        color: var(--t1);
+        cursor: pointer;
+        margin: 0;
+    }
+    .toggle-switch input:checked + label { color: var(--fire); }
+    .toggle-switch.disabled { opacity: .55; cursor: not-allowed; }
+    .toggle-switch.disabled label { cursor: not-allowed; }
+
+    .form-actions {
+        display: flex; justify-content: flex-end; gap: 10px;
+        margin-top: 18px;
+        padding: 18px 0 0;
+    }
+
+    .system-notice {
+        background: rgba(71,85,105,0.06);
+        border: 1px solid rgba(71,85,105,0.20);
+        border-radius: 12px;
+        padding: 14px 16px;
+        margin-bottom: 18px;
+        display: flex; align-items: flex-start; gap: 12px;
+    }
+    .system-notice i {
+        font-size: 18px;
+        color: #475569;
+        margin-top: 2px;
+        flex-shrink: 0;
+    }
+    .system-notice .txt {
+        font-size: 13px;
+        color: #334155;
+        line-height: 1.5;
+    }
+    .system-notice strong { color: #0f172a; }
+
+    .validation-summary {
+        background: rgba(220,38,38,0.06);
+        border: 1px solid rgba(220,38,38,0.20);
+        border-radius: 12px;
+        padding: 12px 16px;
+        color: var(--red);
+        font-size: 13px;
+        margin-bottom: 16px;
+    }
+    .validation-summary:empty { display: none; }
+</style>
 }
 
-<div class="card shadow-sm border-0">
-    <div class="card-body">
-        <form asp-action="Edit" method="post">
-            <input asp-for="RoleId" type="hidden" />
-            <input asp-for="IsSystem" type="hidden" />
+<div class="role-form-shell">
 
-            <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+    <a asp-action="Index" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;color:var(--t2);margin-bottom:16px;">
+        <i class="bi bi-arrow-left"></i> Back to Roles
+    </a>
 
-            <div class="row g-3">
-                <div class="col-md-6">
-                    <label asp-for="RoleName" class="form-label"></label>
-                    @if (Model.IsSystem)
-                    {
-                        <input asp-for="RoleName" class="form-control" readonly="readonly" />
-                    }
-                    else
-                    {
-                        <input asp-for="RoleName" class="form-control" />
-                    }
-                    <span asp-validation-for="RoleName" class="text-danger"></span>
+    <h1 style="font-family:var(--font-display);font-size:22px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--t1);margin-bottom:18px;">
+        Edit Role
+    </h1>
+
+    @if (Model.IsSystem)
+    {
+        <div class="system-notice">
+            <i class="bi bi-shield-fill"></i>
+            <div class="txt">
+                <strong>This is a built-in role.</strong>
+                Built-in roles have fixed permissions and cannot be modified to keep the system safe. You can still review the access it grants below.
+            </div>
+        </div>
+    }
+
+    <form asp-action="Edit" method="post">
+        @Html.AntiForgeryToken()
+        <input asp-for="RoleId" type="hidden" />
+        <input asp-for="IsSystem" type="hidden" />
+
+        <div asp-validation-summary="ModelOnly" class="validation-summary"></div>
+
+        <!-- Role details card -->
+        <div class="role-form-card @(Model.IsSystem ? "system" : "")">
+            <div class="role-form-head">
+                <div class="ico"><i class="bi @(Model.IsSystem ? "bi-shield-fill" : "bi-shield")"></i></div>
+                <div>
+                    <div class="ttl">Role Details</div>
+                    <div class="sub">@(Model.IsSystem ? "Locked — read-only" : "Update name and description")</div>
                 </div>
+            </div>
 
-                <div class="col-md-6 d-flex align-items-end">
-                    <div class="form-check form-switch">
+            <div class="role-form-body">
+                <div class="grid-2">
+                    <div class="field">
+                        <label class="field-label">Role Name *</label>
                         @if (Model.IsSystem)
                         {
-                            <input asp-for="IsActive" class="form-check-input" disabled="disabled" />
+                            <input asp-for="RoleName" class="form-control" readonly />
                         }
                         else
                         {
-                            <input asp-for="IsActive" class="form-check-input" />
+                            <input asp-for="RoleName" class="form-control" placeholder="e.g. Branch Manager" />
                         }
-                        <label asp-for="IsActive" class="form-check-label"></label>
+                        <span asp-validation-for="RoleName" class="field-error"></span>
+                    </div>
+
+                    <div class="field">
+                        <label class="field-label">Status</label>
+                        <div class="toggle-switch @(Model.IsSystem ? "disabled" : "")">
+                            @if (Model.IsSystem)
+                            {
+                                <input asp-for="IsActive" type="checkbox" id="IsActiveCheck" disabled />
+                            }
+                            else
+                            {
+                                <input asp-for="IsActive" type="checkbox" id="IsActiveCheck" />
+                            }
+                            <label for="IsActiveCheck">Active &amp; assignable</label>
+                        </div>
                     </div>
                 </div>
 
-                <div class="col-12">
-                    <label asp-for="RoleDescription" class="form-label"></label>
+                <div class="field">
+                    <label class="field-label">Description</label>
                     @if (Model.IsSystem)
                     {
-                        <textarea asp-for="RoleDescription" class="form-control" rows="3" readonly="readonly"></textarea>
+                        <textarea asp-for="RoleDescription" class="form-control" rows="2" readonly></textarea>
                     }
                     else
                     {
-                        <textarea asp-for="RoleDescription" class="form-control" rows="3"></textarea>
+                        <textarea asp-for="RoleDescription" class="form-control" rows="2"
+                                  placeholder="Briefly describe what this role can do"></textarea>
                     }
-                    <span asp-validation-for="RoleDescription" class="text-danger"></span>
+                    <span asp-validation-for="RoleDescription" class="field-error"></span>
                 </div>
             </div>
+        </div>
 
-            <hr class="my-4" />
+        <!-- Permissions picker -->
+        @await Html.PartialAsync("_PermissionsPicker", Model)
 
-            <h5 class="mb-3">Allowed View Folders</h5>
-            <p class="text-muted">
-                Selecting a folder gives this role access to all pages inside that folder.
-            </p>
-
-            @if (!Model.Permissions.Any())
+        <!-- Actions -->
+        <div class="form-actions">
+            <a asp-action="Index" class="btn btn-ghost" style="border:1px solid var(--border);">
+                @(Model.IsSystem ? "Back to Roles" : "Cancel")
+            </a>
+            @if (!Model.IsSystem)
             {
-                <div class="alert alert-warning">
-                    No eligible view folders were found.
-                </div>
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-lg"></i> Save Changes
+                </button>
             }
-            else
-            {
-                <div class="row">
-                    @for (int i = 0; i < Model.Permissions.Count; i++)
-                    {
-                        <div class="col-md-4 mb-3">
-                            <div class="form-check border rounded p-3">
-                                <input type="hidden" asp-for="Permissions[@i].ViewPermissionId" />
-                                <input type="hidden" asp-for="Permissions[@i].DisplayName" />
-                                <input type="hidden" asp-for="Permissions[@i].GroupName" />
-
-                                @if (Model.IsSystem)
-                                {
-                                    <input asp-for="Permissions[@i].IsSelected" class="form-check-input" disabled="disabled" />
-                                }
-                                else
-                                {
-                                    <input asp-for="Permissions[@i].IsSelected" class="form-check-input" />
-                                }
-
-                                <label asp-for="Permissions[@i].IsSelected" class="form-check-label fw-semibold">
-                                    @Model.Permissions[i].DisplayName
-                                </label>
-                            </div>
-                        </div>
-                    }
-                </div>
-            }
-
-            <div class="mt-4 d-flex gap-2">
-                @if (!Model.IsSystem)
-                {
-                    <button type="submit" class="btn btn-primary">Update Role</button>
-                }
-                <a asp-action="Index" class="btn btn-outline-secondary">Back</a>
-            </div>
-        </form>
-    </div>
+        </div>
+    </form>
 </div>
 
 @section Scripts {

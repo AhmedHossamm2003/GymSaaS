@@ -1182,104 +1182,175 @@
             </div>
 
             <nav class="sidebar-nav">
+                @{
+                    var currentController = ViewContext.RouteData.Values["controller"]?.ToString();
+                    string Active(string c) => currentController == c ? "active" : "";
+                }
 
-                <div class="nav-section">
-                    <span class="nav-section-label">Overview</span>
-                    <a asp-controller="Dashboard" asp-action="Index"
-                       class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Dashboard" ? "active" : "")">
-                        <i class="bi bi-grid-1x2"></i> Dashboard
-                    </a>
-                </div>
+                @if (User.CanSee("Dashboard"))
+                {
+                    <div class="nav-section">
+                        <span class="nav-section-label">Overview</span>
+                        <a asp-controller="Dashboard" asp-action="Index" class="nav-item @Active("Dashboard")">
+                            <i class="bi bi-grid-1x2"></i> Dashboard
+                        </a>
+                    </div>
+                }
 
-                <div class="nav-section">
-                    <span class="nav-section-label">Operations</span>
-                    <a asp-controller="Reception" asp-action="Index"
-                       class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Reception" ? "active" : "")">
-                        <i class="bi bi-display"></i> Live Reception
-                        <span class="nav-badge" id="liveCount">0</span>
-                    </a>
-                    <a asp-controller="Attendance" asp-action="Index"
-                       class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Attendance" ? "active" : "")">
-                        <i class="bi bi-qr-code-scan"></i> Attendance Logs
-                    </a>
-                </div>
+                @if (User.CanSeeAny("Reception", "Attendance"))
+                {
+                    <div class="nav-section">
+                        <span class="nav-section-label">Operations</span>
+                        @if (User.CanSee("Reception"))
+                        {
+                            <a asp-controller="Reception" asp-action="Index" class="nav-item @Active("Reception")">
+                                <i class="bi bi-display"></i> Live Reception
+                                <span class="nav-badge" id="liveCount">0</span>
+                            </a>
+                        }
+                        @if (User.CanSee("Attendance"))
+                        {
+                            <a asp-controller="Attendance" asp-action="Index" class="nav-item @Active("Attendance")">
+                                <i class="bi bi-qr-code-scan"></i> Attendance Logs
+                            </a>
+                        }
+                    </div>
+                }
 
-                <div class="nav-section">
-                    <span class="nav-section-label">Members</span>
-                    <a asp-controller="Members" asp-action="Index"
-                       class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Members" ? "active" : "")">
-                        <i class="bi bi-people"></i> All Members
-                    </a>
-                    <a asp-controller="Invitations" asp-action="Index"
-                       class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Invitations" ? "active" : "")">
-                        <i class="bi bi-ticket-detailed"></i> Invitations
-                    </a>
-                </div>
+                @if (User.CanSeeAny("Members", "Invitations"))
+                {
+                    <div class="nav-section">
+                        <span class="nav-section-label">Members</span>
+                        @if (User.CanSee("Members"))
+                        {
+                            <a asp-controller="Members" asp-action="Index" class="nav-item @Active("Members")">
+                                <i class="bi bi-people"></i> All Members
+                            </a>
+                        }
+                        @if (User.CanSee("Invitations"))
+                        {
+                            <a asp-controller="Invitations" asp-action="Index" class="nav-item @Active("Invitations")">
+                                <i class="bi bi-ticket-detailed"></i> Invitations
+                            </a>
+                        }
+                    </div>
+                }
 
-                <div class="nav-section">
-                    <span class="nav-section-label">Management</span>
-                    <a asp-controller="Branches" asp-action="Index"
-                       class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Branches" ? "active" : "")">
-                        <i class="bi bi-building"></i> Branches
-                    </a>
-                    <a asp-controller="PackageCatalog" asp-action="Index"
-                       class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "PackageCatalog" ? "active" : "")">
-                        <i class="bi bi-box-seam"></i> Package Catalog
-                    </a>
-                    <a asp-controller="Users" asp-action="Index"
-                       class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Users" ? "active" : "")">
-                        <i class="bi bi-people-fill"></i> Users
-                    </a>
+                @if (User.CanSeeAny("Branches", "PackageCatalog", "Users", "Roles"))
+                {
+                    <div class="nav-section">
+                        <span class="nav-section-label">Management</span>
+                        @if (User.CanSee("Branches"))
+                        {
+                            <a asp-controller="Branches" asp-action="Index" class="nav-item @Active("Branches")">
+                                <i class="bi bi-building"></i> Branches
+                            </a>
+                        }
+                        @if (User.CanSee("PackageCatalog"))
+                        {
+                            <a asp-controller="PackageCatalog" asp-action="Index" class="nav-item @Active("PackageCatalog")">
+                                <i class="bi bi-box-seam"></i> Package Catalog
+                            </a>
+                        }
+                        @if (User.CanSee("Users"))
+                        {
+                            <a asp-controller="Users" asp-action="Index" class="nav-item @Active("Users")">
+                                <i class="bi bi-people-fill"></i> Users
+                            </a>
+                        }
+                        @if (User.CanSee("Roles"))
+                        {
+                            <a asp-controller="Roles" asp-action="Index" class="nav-item @Active("Roles")">
+                                <i class="bi bi-shield-lock"></i> Roles
+                            </a>
+                        }
+                    </div>
+                }
 
-                    <a asp-controller="Roles" asp-action="Index"
-                       class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Roles" ? "active" : "")">
-                        <i class="bi bi-shield-lock"></i> Roles
-                    </a>
-                </div>
+                @if (User.CanSeeAny("Reports", "Expenses", "Income"))
+                {
+                    <div class="nav-section">
+                        <span class="nav-section-label">Finance</span>
+                        @if (User.CanSee("Reports"))
+                        {
+                            <a asp-controller="Reports" asp-action="Index" class="nav-item @Active("Reports")">
+                                <i class="bi bi-bar-chart-line"></i> Reports
+                            </a>
+                        }
+                        @if (User.CanSee("Expenses"))
+                        {
+                            <a asp-controller="Expenses" asp-action="Index" class="nav-item @Active("Expenses")">
+                                <i class="bi bi-receipt"></i> Expenses
+                            </a>
+                        }
+                        @if (User.CanSee("Income"))
+                        {
+                            <a asp-controller="Income" asp-action="Index" class="nav-item @Active("Income")">
+                                <i class="bi bi-cash-stack"></i> Income
+                            </a>
+                        }
+                    </div>
+                }
 
-                <div class="nav-section">
-                    <span class="nav-section-label">Reports</span>
-                    <a asp-controller="Reports" asp-action="Index"
-                       class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Reports" ? "active" : "")">
-                        <i class="bi bi-bar-chart-line"></i> Reports
-                    </a>
-                    <a asp-controller="Notifications" asp-action="Index"
-                       class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Notifications" ? "active" : "")">
-                        <i class="bi bi-bell"></i> Notifications
-                    </a>
-                </div>
+                @if (User.CanSee("Notifications"))
+                {
+                    <div class="nav-section">
+                        <span class="nav-section-label">Communication</span>
+                        <a asp-controller="Notifications" asp-action="Index" class="nav-item @Active("Notifications")">
+                            <i class="bi bi-bell"></i> Notifications
+                        </a>
+                    </div>
+                }
 
-                <div class="nav-section">
-                    <span class="nav-section-label">Content</span>
-                    <a asp-controller="Coaches" asp-action="Index"
-                       class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Coaches" ? "active" : "")">
-                        <i class="bi bi-person-badge"></i> Coaches
-                    </a>
-                    <a asp-controller="Classes" asp-action="Index"
-                       class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Classes" ? "active" : "")">
-                        <i class="bi bi-calendar2-week"></i> Classes
-                    </a>
-                    <a asp-controller="Exercises" asp-action="Index"
-                       class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Exercises" ? "active" : "")">
-                        <i class="bi bi-activity"></i> Exercise Library
-                    </a>
-                    <a asp-controller="WorkoutTemplates" asp-action="Index"
-                       class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "WorkoutTemplates" ? "active" : "")">
-                        <i class="bi bi-journal-text"></i> Workout Templates
-                    </a>
-                </div>
+                @if (User.CanSeeAny("Coaches", "Classes", "Exercises", "WorkoutTemplates"))
+                {
+                    <div class="nav-section">
+                        <span class="nav-section-label">Content</span>
+                        @if (User.CanSee("Coaches"))
+                        {
+                            <a asp-controller="Coaches" asp-action="Index" class="nav-item @Active("Coaches")">
+                                <i class="bi bi-person-badge"></i> Coaches
+                            </a>
+                        }
+                        @if (User.CanSee("Classes"))
+                        {
+                            <a asp-controller="Classes" asp-action="Index" class="nav-item @Active("Classes")">
+                                <i class="bi bi-calendar2-week"></i> Classes
+                            </a>
+                        }
+                        @if (User.CanSee("Exercises"))
+                        {
+                            <a asp-controller="Exercises" asp-action="Index" class="nav-item @Active("Exercises")">
+                                <i class="bi bi-activity"></i> Exercise Library
+                            </a>
+                        }
+                        @if (User.CanSee("WorkoutTemplates"))
+                        {
+                            <a asp-controller="WorkoutTemplates" asp-action="Index" class="nav-item @Active("WorkoutTemplates")">
+                                <i class="bi bi-journal-text"></i> Workout Templates
+                            </a>
+                        }
+                    </div>
+                }
 
-                <div class="nav-section">
-                    <span class="nav-section-label">System</span>
-                    <a asp-controller="AuditLogs" asp-action="Index"
-                       class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "AuditLogs" ? "active" : "")">
-                        <i class="bi bi-journal-text"></i> Audit Logs
-                    </a>
-                    <a asp-controller="Settings" asp-action="Index"
-                       class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Settings" ? "active" : "")">
-                        <i class="bi bi-gear"></i> Settings
-                    </a>
-                </div>
+                @if (User.CanSeeAny("AuditLogs", "Settings"))
+                {
+                    <div class="nav-section">
+                        <span class="nav-section-label">System</span>
+                        @if (User.CanSee("AuditLogs"))
+                        {
+                            <a asp-controller="AuditLogs" asp-action="Index" class="nav-item @Active("AuditLogs")">
+                                <i class="bi bi-journal-text"></i> Audit Logs
+                            </a>
+                        }
+                        @if (User.CanSee("Settings"))
+                        {
+                            <a asp-controller="Settings" asp-action="Index" class="nav-item @Active("Settings")">
+                                <i class="bi bi-gear"></i> Settings
+                            </a>
+                        }
+                    </div>
+                }
 
             </nav>
 

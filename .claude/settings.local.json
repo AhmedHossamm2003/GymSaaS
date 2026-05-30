@@ -14,7 +14,11 @@
       "Bash(Sort-Object FullName)",
       "Bash(Format-Table -AutoSize)",
       "WebSearch",
-      "WebFetch(domain:www.youtube.com)"
+      "WebFetch(domain:www.youtube.com)",
+      "PowerShell(Get-Process -Name \"GymSaaS\" -ErrorAction SilentlyContinue)",
+      "PowerShell(Stop-Process -Force)",
+      "PowerShell(\"Process stopped\")",
+      "PowerShell(try { $r = Invoke-WebRequest -Uri \"http://localhost:5044/Reports\" -ErrorAction Stop; \"Reports: $\\($r.StatusCode\\) - URL: $\\($r.BaseResponse.ResponseUri\\)\" } catch { \"Reports ERROR: $_\" })"
     ]
   }
 }

@@ -3,6 +3,10 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 using GymSaaS.Services;
 using GymSaaS.Services.Reception;
+using QuestPDF.Infrastructure;
+
+// QuestPDF community license (free for individuals & small businesses < $1M revenue)
+QuestPDF.Settings.License = LicenseType.Community;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,6 +19,9 @@ builder.Services.AddDbContext<GymDbContext>(options =>
 builder.Services.AddScoped<IReceptionService, ReceptionService>();
 builder.Services.AddScoped<IRoleService, RoleService>();
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IReportsService, ReportsService>();
+builder.Services.AddScoped<GymSaaS.Services.Exports.IPdfExportService, GymSaaS.Services.Exports.PdfExportService>();
+builder.Services.AddScoped<GymSaaS.Services.Exports.IExcelExportService, GymSaaS.Services.Exports.ExcelExportService>();
 // ── Authentication ────────────────────────────────
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>

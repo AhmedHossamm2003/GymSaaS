@@ -74,6 +74,10 @@ public partial class GymDbContext : DbContext
 
     public virtual DbSet<VwCurrentBranchPresence> VwCurrentBranchPresences { get; set; }
 
+    public virtual DbSet<Expense> Expenses { get; set; }
+
+    public virtual DbSet<ManualIncomeEntry> ManualIncomeEntries { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<AttendanceOverrideRequest>(entity =>
