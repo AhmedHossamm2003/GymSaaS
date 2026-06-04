@@ -1,0 +1,302 @@
+@model GymSaaS.Models.PartnershipFormViewModel
+@{
+    bool isEdit = Model.PartnershipId.HasValue;
+    ViewData["Title"]    = "Partnerships";
+    ViewData["Subtitle"] = isEdit ? "Edit Partnership" : "New Partnership";
+}
+
+<style>
+    .pe-shell {
+        max-width: 560px;
+        padding: 26px 28px;
+        width: 100%;
+    }
+
+    .pe-card {
+        background: #fff;
+        border: 1px solid rgba(15,23,42,0.06);
+        border-radius: 20px;
+        box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 6px 18px rgba(15,23,42,0.05);
+        overflow: hidden;
+    }
+
+    .pe-card-header {
+        padding: 22px 24px 18px;
+        border-bottom: 1px solid #f3f4f6;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .pe-card-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #fff4ed, #fde8d4);
+        border: 1.5px solid #fed7aa;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        color: #ff5b14;
+        flex-shrink: 0;
+    }
+
+    .pe-card-body {
+        padding: 22px 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+    }
+
+    .pe-label {
+        display: block;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+        color: #6b7280;
+        margin-bottom: 7px;
+    }
+
+    .pe-input {
+        width: 100%;
+        height: 44px;
+        border: 1.5px solid #e5e7eb;
+        border-radius: 10px;
+        padding: 0 14px;
+        font-size: 13.5px;
+        outline: none;
+        transition: border-color 0.15s, box-shadow 0.15s;
+        box-sizing: border-box;
+    }
+
+    .pe-input:focus {
+        border-color: #fb6a16;
+        box-shadow: 0 0 0 3px rgba(251,106,22,.12);
+    }
+
+    textarea.pe-input {
+        height: 90px;
+        padding: 10px 14px;
+        resize: vertical;
+    }
+
+    .pe-logo-preview {
+        width: 100%;
+        height: 120px;
+        border: 2px dashed #e5e7eb;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        background: #f9fafb;
+        margin-bottom: 8px;
+    }
+
+    .pe-logo-preview img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+        padding: 10px;
+    }
+
+    .pe-logo-placeholder {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        color: #9ca3af;
+        font-size: 12.5px;
+    }
+
+    .pe-actions {
+        display: flex;
+        gap: 10px;
+        padding: 16px 24px;
+        border-top: 1px solid #f3f4f6;
+    }
+
+    .val-error {
+        color: #dc2626;
+        font-size: 11.5px;
+        margin-top: 4px;
+    }
+
+    .toggle-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 0;
+    }
+
+    .toggle-label {
+        font-size: 13.5px;
+        font-weight: 600;
+        color: #111827;
+    }
+
+    .toggle-desc {
+        font-size: 12px;
+        color: #6b7280;
+    }
+
+    .toggle-switch {
+        position: relative;
+        width: 40px;
+        height: 22px;
+    }
+
+    .toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .toggle-track {
+        position: absolute;
+        inset: 0;
+        border-radius: 999px;
+        background: #d1d5db;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+
+    .toggle-switch input:checked + .toggle-track {
+        background: #ff5b14;
+    }
+
+    .toggle-track::before {
+        content: '';
+        position: absolute;
+        width: 16px;
+        height: 16px;
+        left: 3px;
+        top: 3px;
+        border-radius: 50%;
+        background: #fff;
+        transition: transform 0.2s;
+        box-shadow: 0 1px 3px rgba(0,0,0,.2);
+    }
+
+    .toggle-switch input:checked + .toggle-track::before {
+        transform: translateX(18px);
+    }
+</style>
+
+<div class="pe-shell">
+
+    <div style="margin-bottom:18px;">
+        <a asp-action="Index" style="font-size:12.5px;color:#ff5b14;font-weight:700;text-decoration:none;">
+            ← Back to Partnerships
+        </a>
+    </div>
+
+    <div class="pe-card">
+        <div class="pe-card-header">
+            <div class="pe-card-icon"><i class="bi bi-building-gear"></i></div>
+            <div>
+                <div style="font-weight:800;font-size:15px;color:#111827;">@ViewData["Subtitle"]</div>
+                <div style="font-size:12px;color:#6b7280;">@(isEdit ? "Update partnership details below." : "Fill in the details to create a new partnership.")</div>
+            </div>
+        </div>
+
+        <form asp-action="@(isEdit ? "Edit" : "Create")"
+              asp-route-id="@Model.PartnershipId"
+              method="post"
+              enctype="multipart/form-data">
+            @Html.AntiForgeryToken()
+
+            <div class="pe-card-body">
+
+                <!-- Name -->
+                <div>
+                    <label class="pe-label">Partnership Name *</label>
+                    <input asp-for="Name" class="pe-input" placeholder="e.g. Nike, Corporate Health Plan…" />
+                    <div class="val-error"><span asp-validation-for="Name"></span></div>
+                </div>
+
+                <!-- Description -->
+                <div>
+                    <label class="pe-label">Description</label>
+                    <textarea asp-for="Description" class="pe-input" placeholder="Brief description of the partnership…"></textarea>
+                    <div class="val-error"><span asp-validation-for="Description"></span></div>
+                </div>
+
+                <!-- Discount -->
+                <div>
+                    <label class="pe-label">Discount Percentage</label>
+                    <input asp-for="DiscountPercentage" type="number" min="0" max="100" step="0.01"
+                           class="pe-input" placeholder="e.g. 10 for 10% discount" />
+                    <div style="font-size:11.5px;color:#9ca3af;margin-top:4px;">Leave blank if no discount applies.</div>
+                    <div class="val-error"><span asp-validation-for="DiscountPercentage"></span></div>
+                </div>
+
+                <!-- Logo -->
+                <div>
+                    <label class="pe-label">Logo / Image</label>
+                    <div class="pe-logo-preview" id="logoPreview">
+                        @if (!string.IsNullOrEmpty(Model.ExistingLogoUrl))
+                        {
+                            <img src="@Model.ExistingLogoUrl" alt="Logo" id="logoImg" />
+                        }
+                        else
+                        {
+                            <div class="pe-logo-placeholder" id="logoPlaceholder">
+                                <i class="bi bi-image" style="font-size:28px;"></i>
+                                <span>No logo uploaded</span>
+                            </div>
+                            <img src="" alt="Logo" id="logoImg" style="display:none;" />
+                        }
+                    </div>
+                    <input type="file" asp-for="Logo" accept=".jpg,.jpeg,.png,.webp,.svg"
+                           style="font-size:12.5px;" onchange="previewLogo(this)" />
+                    <div style="font-size:11.5px;color:#9ca3af;margin-top:4px;">
+                        JPG, PNG, WebP or SVG. Displayed on the member profile page.
+                    </div>
+                </div>
+
+                <!-- Active toggle -->
+                <div class="toggle-row">
+                    <div>
+                        <div class="toggle-label">Active</div>
+                        <div class="toggle-desc">Inactive partnerships can still be viewed but cannot be assigned.</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input asp-for="IsActive" type="checkbox" />
+                        <span class="toggle-track"></span>
+                    </label>
+                </div>
+
+            </div>
+
+            <div class="pe-actions">
+                <button type="submit" class="btn btn-primary" style="flex:1;">
+                    <i class="bi bi-check-lg"></i> @(isEdit ? "Save Changes" : "Create Partnership")
+                </button>
+                <a asp-action="Index" class="btn btn-secondary" style="flex:1;text-align:center;">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function previewLogo(input) {
+            const file = input.files[0];
+            const img = document.getElementById('logoImg');
+            const placeholder = document.getElementById('logoPlaceholder');
+
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    img.src = e.target.result;
+                    img.style.display = '';
+                    if (placeholder) placeholder.style.display = 'none';
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+    </script>
+}

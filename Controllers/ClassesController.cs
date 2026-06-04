@@ -26,8 +26,19 @@ namespace GymSaaS.Controllers
         private Guid UserId =>
             Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
-        // GET /Classes
-        public async Task<IActionResult> Index(string? search, Guid? branchId, Guid? coachId, int? day)
+        // GET /Classes — redirects to Schedule by default
+        public IActionResult Index(string? search, Guid? branchId, Guid? coachId, int? day)
+        {
+            // If no filters applied, go straight to the schedule view.
+            if (string.IsNullOrWhiteSpace(search) && branchId == null && coachId == null && day == null)
+                return RedirectToAction(nameof(Schedule));
+
+            // If someone navigated with filters (e.g. from a link), serve the list.
+            return RedirectToAction(nameof(Schedule), new { branchId, coachId });
+        }
+
+        // GET /Classes/List — old full list view (kept for direct access)
+        public async Task<IActionResult> List(string? search, Guid? branchId, Guid? coachId, int? day)
         {
             var classes = await BuildQueryAsync(search, branchId, coachId, day);
 
@@ -41,7 +52,7 @@ namespace GymSaaS.Controllers
             ViewData["TotalCount"] = classes.Count;
             ViewData["ActiveCount"] = classes.Count(c => c.IsActive);
 
-            return View(classes);
+            return View("Index", classes);
         }
 
         // GET /Classes/Schedule

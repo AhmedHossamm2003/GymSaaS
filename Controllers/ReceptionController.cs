@@ -120,7 +120,37 @@ namespace GymSaaS.Controllers
             return Ok(new
             {
                 currentlyPresentCount = dashboard.CurrentlyPresentCount,
-                todayEntryCount       = dashboard.TodayEntryCount
+                todayEntryCount       = dashboard.TodayEntryCount,
+                maxCapacity           = dashboard.MaxCapacity
+            });
+        }
+
+        // ── GET /Reception/LatestCheckIn  (AJAX polling) ─────────
+        /// <summary>
+        /// Returns the most recent check-in after sinceUtc. Called every 3 s by the
+        /// reception page to detect mobile-app check-ins and show the auto popup.
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> LatestCheckIn(Guid branchId, DateTime sinceUtc)
+        {
+            if (branchId == Guid.Empty) return BadRequest();
+
+            var tenantId = CurrentTenantId;
+            var result = await _receptionService.GetLatestCheckInAsync(branchId, tenantId, sinceUtc);
+
+            if (result == null) return Ok(new { found = false });
+
+            return Ok(new
+            {
+                found             = true,
+                attendanceRecordId = result.AttendanceRecordId,
+                memberId          = result.MemberId,
+                memberName        = result.MemberName,
+                membershipNumber  = result.MembershipNumber,
+                photoUrl          = result.PhotoUrl,
+                phoneNumber       = result.PhoneNumber,
+                packageName       = result.PackageName,
+                checkInAtUtc      = result.CheckInAtUtc,
             });
         }
 

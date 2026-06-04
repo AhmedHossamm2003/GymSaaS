@@ -1,0 +1,359 @@
+@model List<GymSaaS.Models.PartnershipListItem>
+@{
+    ViewData["Title"] = "Partnerships";
+    var search     = ViewData["Search"] as string;
+    var activeOnly = ViewData["ActiveOnly"] as bool?;
+    var totalCount = (int)(ViewData["TotalCount"] ?? 0);
+}
+
+<style>
+    .ps-page {
+        max-width: 1100px;
+        padding: 26px 28px;
+        width: 100%;
+    }
+
+    .ps-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 22px;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+
+    .ps-title {
+        font-size: 24px;
+        font-weight: 800;
+        margin: 0;
+        color: #111827;
+    }
+
+    .ps-subtitle {
+        font-size: 13.5px;
+        color: #6b7280;
+        margin: 3px 0 0;
+    }
+
+    .ps-filters {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 18px;
+        align-items: center;
+    }
+
+    .ps-search {
+        flex: 1;
+        min-width: 200px;
+        max-width: 340px;
+        height: 40px;
+        border-radius: 10px;
+        border: 1.5px solid #e5e7eb;
+        padding: 0 14px;
+        font-size: 13.5px;
+    }
+
+    .ps-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 16px;
+    }
+
+    .ps-card {
+        background: #fff;
+        border: 1px solid rgba(15,23,42,0.07);
+        border-radius: 18px;
+        box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 4px 14px rgba(15,23,42,0.04);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        transition: box-shadow 0.22s, transform 0.22s;
+    }
+
+    .ps-card:hover {
+        box-shadow: 0 4px 8px rgba(15,23,42,0.06), 0 14px 32px rgba(15,23,42,0.09);
+        transform: translateY(-2px);
+    }
+
+    .ps-card-logo {
+        height: 120px;
+        background: #f9fafb;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        border-bottom: 1px solid #f3f4f6;
+    }
+
+    .ps-card-logo img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+        padding: 16px;
+    }
+
+    .ps-card-logo-placeholder {
+        width: 64px;
+        height: 64px;
+        border-radius: 16px;
+        background: linear-gradient(135deg, #fff4ed, #fde8d4);
+        border: 1.5px solid #fed7aa;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 28px;
+    }
+
+    .ps-card-body {
+        padding: 16px 18px;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .ps-card-name {
+        font-size: 15px;
+        font-weight: 800;
+        color: #111827;
+        margin-bottom: 4px;
+    }
+
+    .ps-card-desc {
+        font-size: 12.5px;
+        color: #6b7280;
+        margin-bottom: 12px;
+        flex: 1;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .ps-card-meta {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: center;
+        margin-bottom: 14px;
+    }
+
+    .ps-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 3px 9px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+    }
+
+    .ps-badge-active {
+        background: #dcfce7;
+        color: #16a34a;
+    }
+
+    .ps-badge-inactive {
+        background: #f3f4f6;
+        color: #9ca3af;
+    }
+
+    .ps-badge-discount {
+        background: #fff4ed;
+        color: #ff5b14;
+        border: 1px solid #fed7aa;
+    }
+
+    .ps-badge-members {
+        background: #eff6ff;
+        color: #3b82f6;
+        border: 1px solid #bfdbfe;
+    }
+
+    .ps-card-actions {
+        display: flex;
+        gap: 8px;
+        border-top: 1px solid #f3f4f6;
+        padding: 12px 18px;
+    }
+
+    .ps-btn {
+        flex: 1;
+        height: 34px;
+        border-radius: 8px;
+        border: 1px solid #e5e7eb;
+        background: #fff;
+        color: #374151;
+        font-size: 12.5px;
+        font-weight: 700;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        text-decoration: none;
+        transition: background 0.15s, border-color 0.15s;
+    }
+
+    .ps-btn:hover {
+        background: #f9fafb;
+        border-color: #d1d5db;
+        color: #111827;
+        text-decoration: none;
+    }
+
+    .ps-btn-danger:hover {
+        background: #fef2f2;
+        border-color: #fca5a5;
+        color: #dc2626;
+    }
+
+    .ps-empty {
+        grid-column: 1 / -1;
+        text-align: center;
+        padding: 60px 20px;
+        color: #6b7280;
+    }
+
+    .ps-empty-icon {
+        width: 64px;
+        height: 64px;
+        border-radius: 18px;
+        background: #fff4ed;
+        color: #ff5b14;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 28px;
+        margin-bottom: 14px;
+    }
+</style>
+
+<div class="ps-page">
+
+    <div class="ps-header">
+        <div>
+            <h1 class="ps-title">Partnerships</h1>
+            <p class="ps-subtitle">@totalCount partnership@(totalCount != 1 ? "s" : "") configured</p>
+        </div>
+        <a asp-action="Create" class="btn btn-primary" style="gap:6px;">
+            <i class="bi bi-plus-lg"></i> New Partnership
+        </a>
+    </div>
+
+    @Html.AntiForgeryToken()
+
+    <form method="get" class="ps-filters">
+        <input type="text" name="search" value="@search" placeholder="Search by name…"
+               class="ps-search" />
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#374151;cursor:pointer;">
+            <input type="checkbox" name="activeOnly" value="true"
+                   @(activeOnly == true ? "checked" : "") /> Active only
+        </label>
+        <button type="submit" class="btn btn-secondary" style="height:40px;padding:0 16px;font-size:13px;">
+            Filter
+        </button>
+    </form>
+
+    <div class="ps-grid">
+        @if (!Model.Any())
+        {
+            <div class="ps-empty">
+                <div class="ps-empty-icon"><i class="bi bi-building-gear"></i></div>
+                <div style="font-weight:700;font-size:15px;margin-bottom:6px;">No partnerships yet</div>
+                <div style="font-size:13px;">Create your first partnership to start assigning members.</div>
+            </div>
+        }
+        else
+        {
+            @foreach (var p in Model)
+            {
+                <div class="ps-card">
+                    <div class="ps-card-logo">
+                        @if (!string.IsNullOrEmpty(p.LogoImageUrl))
+                        {
+                            <img src="@p.LogoImageUrl" alt="@p.Name" />
+                        }
+                        else
+                        {
+                            <div class="ps-card-logo-placeholder">
+                                <i class="bi bi-building-gear"></i>
+                            </div>
+                        }
+                    </div>
+
+                    <div class="ps-card-body">
+                        <div class="ps-card-name">@p.Name</div>
+                        <div class="ps-card-desc">@(string.IsNullOrWhiteSpace(p.Description) ? "No description." : p.Description)</div>
+
+                        <div class="ps-card-meta">
+                            <span class="ps-badge @(p.IsActive ? "ps-badge-active" : "ps-badge-inactive")">
+                                <span style="width:5px;height:5px;border-radius:50%;background:currentColor;display:inline-block;"></span>
+                                @(p.IsActive ? "Active" : "Inactive")
+                            </span>
+
+                            @if (p.DiscountPercentage.HasValue)
+                            {
+                                <span class="ps-badge ps-badge-discount">
+                                    <i class="bi bi-tag"></i> @p.DiscountPercentage.Value.ToString("0.##")% off
+                                </span>
+                            }
+
+                            <span class="ps-badge ps-badge-members">
+                                <i class="bi bi-people"></i> @p.MemberCount
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="ps-card-actions">
+                        <a asp-action="Edit" asp-route-id="@p.PartnershipId" class="ps-btn">
+                            <i class="bi bi-pencil"></i> Edit
+                        </a>
+                        <button type="button" class="ps-btn ps-btn-danger"
+                                onclick="confirmDelete('@p.PartnershipId', '@Html.Raw(System.Text.Json.JsonSerializer.Serialize(p.Name))')">
+                            <i class="bi bi-trash"></i> Delete
+                        </button>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+</div>
+
+<!-- Delete confirm modal -->
+<div id="deleteOverlay" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:9998;"></div>
+<div id="deleteModal" style="display:none;position:fixed;z-index:9999;left:50%;top:50%;transform:translate(-50%,-50%);
+     width:min(400px,calc(100% - 32px));background:#fff;border-radius:20px;
+     box-shadow:0 24px 70px rgba(15,23,42,.28);overflow:hidden;">
+    <div style="padding:24px;">
+        <h5 style="font-size:18px;font-weight:800;margin:0 0 8px;">Delete Partnership?</h5>
+        <p id="deleteModalMsg" style="font-size:13.5px;color:#374151;margin:0 0 20px;"></p>
+        <div style="display:flex;gap:10px;">
+            <form id="deleteForm" method="post" style="flex:1;">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-danger" style="width:100%;">Delete</button>
+            </form>
+            <button type="button" onclick="closeDeleteModal()"
+                    style="flex:1;height:40px;border-radius:10px;border:1px solid #e5e7eb;background:#fff;font-size:13.5px;font-weight:700;cursor:pointer;">
+                Cancel
+            </button>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function confirmDelete(id, name) {
+            document.getElementById('deleteModalMsg').textContent =
+                'This will permanently delete "' + name + '" and remove it from all assigned members.';
+            document.getElementById('deleteForm').action = '/Partnerships/Delete/' + id;
+            document.getElementById('deleteOverlay').style.display = 'block';
+            document.getElementById('deleteModal').style.display = 'block';
+        }
+        function closeDeleteModal() {
+            document.getElementById('deleteOverlay').style.display = 'none';
+            document.getElementById('deleteModal').style.display = 'none';
+        }
+        document.getElementById('deleteOverlay').addEventListener('click', closeDeleteModal);
+    </script>
+}

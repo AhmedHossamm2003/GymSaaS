@@ -242,5 +242,19 @@ namespace GymSaaS.Models
 
         // All branches for SELECTED_BRANCHES policy
         public List<BranchDropdownItem> AllBranches { get; set; } = new();
+
+        // Optional override — link this CLASS/SESSION package to a specific gym class.
+        public Guid? GymClassId { get; set; }
+
+        // For the class picker (loaded for the home branch)
+        public List<ClassDropdownItem> AvailableClasses { get; set; } = new();
+    }
+
+    public class ClassDropdownItem
+    {
+        public Guid GymClassId { get; set; }
+        public string ClassName { get; set; } = string.Empty;
+        public string TimeDisplay { get; set; } = string.Empty;
+        public string? CoachName { get; set; }
     }
 }

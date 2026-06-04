@@ -50,6 +50,7 @@ namespace GymSaaS.Controllers
                 AvailablePackages = await GetAvailablePackagesAsync(member.HomeBranchId),
                 CurrentPackages = await GetCurrentPackagesAsync(memberId),
                 AllBranches = await GetBranchesAsync(),
+                AvailableClasses = await GetClassesAsync(member.HomeBranchId),
             };
 
             ViewData["Title"] = vm.MemberName;
@@ -77,6 +78,7 @@ namespace GymSaaS.Controllers
                 model.AvailablePackages = await GetAvailablePackagesAsync(member.HomeBranchId);
                 model.CurrentPackages = await GetCurrentPackagesAsync(model.MemberId);
                 model.AllBranches = await GetBranchesAsync();
+                model.AvailableClasses = await GetClassesAsync(member.HomeBranchId);
                 ViewData["Title"] = model.MemberName;
                 ViewData["Subtitle"] = "Assign Package";
                 return View(model);
@@ -154,6 +156,7 @@ namespace GymSaaS.Controllers
                     PtSessionsRemaining  = ptSessionsTotal,
                     FreezeAllowanceDays  = freezeAllowance,
                     FreezeRemainingDays  = freezeAllowance,
+                    GymClassId           = model.GymClassId ?? pkgDef.GymClassId,
                     CreatedAtUtc = DateTime.UtcNow,
                     CreatedByUserId = UserId,
                 };
@@ -245,6 +248,9 @@ namespace GymSaaS.Controllers
                     PtSessionsRemaining  = ptSessionsTotal,
                     FreezeAllowanceDays  = freezeAllowance,
                     FreezeRemainingDays  = freezeAllowance,
+                    GymClassId           = (typeCode == "SESSION" || typeCode == "CLASS")
+                        ? (model.GymClassId ?? pkgDef.GymClassId)
+                        : null,
                     CreatedAtUtc = DateTime.UtcNow,
                     CreatedByUserId = UserId,
                 };
@@ -308,6 +314,47 @@ namespace GymSaaS.Controllers
                     SessionCountRemaining = x.p.SessionCountRemaining,
                 })
                 .ToListAsync();
+
+        private async Task<List<ClassDropdownItem>> GetClassesAsync(Guid branchId)
+        {
+            var raw = await _db.GymClasses
+                .Where(g => g.TenantId == TenantId && g.BranchId == branchId && g.IsActive && !g.IsDeleted)
+                .OrderBy(g => g.DayOfWeek)
+                .ThenBy(g => g.StartTime)
+                .ThenBy(g => g.ClassName)
+                .Select(g => new
+                {
+                    g.GymClassId,
+                    g.ClassName,
+                    g.DayOfWeek,
+                    g.StartTime,
+                    g.EndTime,
+                    g.CoachId,
+                })
+                .ToListAsync();
+
+            var coachIds = raw.Where(c => c.CoachId.HasValue).Select(c => c.CoachId!.Value).Distinct().ToList();
+            var coachMap = coachIds.Count > 0
+                ? await _db.Coaches
+                    .Where(c => coachIds.Contains(c.CoachId))
+                    .Select(c => new { c.CoachId, Name = c.FirstName + " " + c.LastName })
+                    .ToDictionaryAsync(c => c.CoachId, c => c.Name.Trim())
+                : new Dictionary<Guid, string>();
+
+            string DayName(int d) => d switch
+            {
+                0 => "Sun", 1 => "Mon", 2 => "Tue", 3 => "Wed",
+                4 => "Thu", 5 => "Fri", 6 => "Sat", _ => "?"
+            };
+
+            return raw.Select(g => new ClassDropdownItem
+            {
+                GymClassId  = g.GymClassId,
+                ClassName   = g.ClassName,
+                TimeDisplay = $"{DayName(g.DayOfWeek)} {g.StartTime:HH:mm}–{g.EndTime:HH:mm}",
+                CoachName   = g.CoachId.HasValue && coachMap.TryGetValue(g.CoachId.Value, out var cn) ? cn : null,
+            }).ToList();
+        }
 
         private async Task<List<BranchDropdownItem>> GetBranchesAsync() =>
             await _db.Branches

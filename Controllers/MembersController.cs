@@ -284,6 +284,23 @@ namespace GymSaaS.Controllers
                 .OrderBy(x => x.p.ValidToDate)
                 .FirstOrDefault();
 
+            var memberPartnerships = await _db.MemberPartnerships
+                .Where(mp => mp.MemberId == id)
+                .Join(_db.Partnerships,
+                      mp => mp.PartnershipId,
+                      p => p.PartnershipId,
+                      (mp, p) => new MemberPartnershipItem
+                      {
+                          MemberPartnershipId = mp.MemberPartnershipId,
+                          PartnershipId       = p.PartnershipId,
+                          PartnershipName     = p.Name,
+                          LogoImageUrl        = p.LogoImageUrl,
+                          DiscountPercentage  = p.DiscountPercentage,
+                          AssignedAtUtc       = mp.CreatedAtUtc,
+                      })
+                .OrderBy(x => x.PartnershipName)
+                .ToListAsync();
+
             var vm = new MemberDetailsViewModel
             {
                 MemberId = m.MemberId,
@@ -311,6 +328,7 @@ namespace GymSaaS.Controllers
                 Invitations = invitations,
                 InvitationsRemaining = activeInvPkg?.p.InvitationsRemaining ?? 0,
                 ActivePackageWithInvitationsId = activeInvPkg?.p.MemberPackageId,
+                Partnerships = memberPartnerships,
             };
 
             ViewData["Title"] = vm.FullName;
@@ -536,6 +554,67 @@ namespace GymSaaS.Controllers
             TempData["Toast"] = $"Member {m.FirstName} {m.LastName} has been removed.";
             TempData["ToastType"] = "warning";
             return RedirectToAction(nameof(Index));
+        }
+
+        // ─────────────────────────────────────────────
+        // POST /Members/AddPartnership  (AJAX)
+        // ─────────────────────────────────────────────
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [Authorize(Policy = "AnyStaff")]
+        public async Task<IActionResult> AddPartnership(Guid memberId, Guid partnershipId)
+        {
+            var member = await _db.Members
+                .FirstOrDefaultAsync(m => m.MemberId == memberId && m.TenantId == TenantId && !m.IsDeleted);
+            if (member == null) return Json(new { success = false, message = "Member not found." });
+
+            var partnership = await _db.Partnerships
+                .FirstOrDefaultAsync(p => p.PartnershipId == partnershipId && p.TenantId == TenantId && p.IsActive);
+            if (partnership == null) return Json(new { success = false, message = "Partnership not found." });
+
+            var exists = await _db.MemberPartnerships
+                .AnyAsync(mp => mp.MemberId == memberId && mp.PartnershipId == partnershipId);
+            if (exists) return Json(new { success = false, message = "Already assigned." });
+
+            var newMp = new GymSaaS.Persistence.Entities.MemberPartnership
+            {
+                MemberPartnershipId = Guid.NewGuid(),
+                TenantId            = TenantId,
+                MemberId            = memberId,
+                PartnershipId       = partnershipId,
+                CreatedAtUtc        = DateTime.UtcNow,
+                CreatedByUserId     = UserId,
+            };
+            _db.MemberPartnerships.Add(newMp);
+            await _db.SaveChangesAsync();
+
+            return Json(new
+            {
+                memberPartnershipId = newMp.MemberPartnershipId,
+                success          = true,
+                partnershipId    = partnershipId,
+                partnershipName  = partnership.Name,
+                logoImageUrl     = partnership.LogoImageUrl,
+                discountPct      = partnership.DiscountPercentage,
+            });
+        }
+
+        // ─────────────────────────────────────────────
+        // POST /Members/RemovePartnership  (AJAX)
+        // ─────────────────────────────────────────────
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [Authorize(Policy = "AnyStaff")]
+        public async Task<IActionResult> RemovePartnership(Guid memberPartnershipId)
+        {
+            var mp = await _db.MemberPartnerships
+                .FirstOrDefaultAsync(x => x.MemberPartnershipId == memberPartnershipId && x.TenantId == TenantId);
+            if (mp == null) return Json(new { success = false, message = "Not found." });
+
+            _db.MemberPartnerships.Remove(mp);
+            await _db.SaveChangesAsync();
+
+            return Json(new { success = true });
         }
 
         // ─────────────────────────────────────────────

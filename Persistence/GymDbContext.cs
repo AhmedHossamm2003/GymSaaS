@@ -78,6 +78,10 @@ public partial class GymDbContext : DbContext
 
     public virtual DbSet<ManualIncomeEntry> ManualIncomeEntries { get; set; }
 
+    public virtual DbSet<Partnership> Partnerships { get; set; }
+
+    public virtual DbSet<MemberPartnership> MemberPartnerships { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<AttendanceOverrideRequest>(entity =>
@@ -151,7 +155,7 @@ public partial class GymDbContext : DbContext
             entity.Property(e => e.CreatedAtUtc).HasDefaultValueSql("(sysutcdatetime())");
             entity.Property(e => e.CurrentQrVersion).HasDefaultValue(1);
             entity.Property(e => e.IsActive).HasDefaultValue(true);
-            entity.Property(e => e.MemberPresenceWindowMinutes).HasDefaultValue(120);
+            entity.Property(e => e.MemberPresenceWindowMinutes).HasDefaultValue(90);
 
             entity.HasOne(d => d.Tenant).WithMany(p => p.Branches)
                 .OnDelete(DeleteBehavior.ClientSetNull)
@@ -243,6 +247,11 @@ public partial class GymDbContext : DbContext
                 .HasConstraintName("FK_MemberPackages_Tenants");
 
             entity.HasOne(d => d.UpdatedByUser).WithMany(p => p.MemberPackageUpdatedByUsers).HasConstraintName("FK_MemberPackages_UpdatedBy");
+
+            entity.HasOne(d => d.GymClass).WithMany()
+                .HasForeignKey(d => d.GymClassId)
+                .OnDelete(DeleteBehavior.NoAction)
+                .HasConstraintName("FK_MemberPackages_GymClasses");
         });
 
         modelBuilder.Entity<MemberPackageAllowedBranch>(entity =>
@@ -518,6 +527,27 @@ public partial class GymDbContext : DbContext
 
             entity.HasOne(d => d.CreatedByUser).WithMany()
                 .HasConstraintName("FK_MemberInvitations_CreatedBy");
+        });
+
+        modelBuilder.Entity<Partnership>(entity =>
+        {
+            entity.Property(e => e.PartnershipId).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.CreatedAtUtc).HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+        });
+
+        modelBuilder.Entity<MemberPartnership>(entity =>
+        {
+            entity.Property(e => e.MemberPartnershipId).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.CreatedAtUtc).HasDefaultValueSql("(sysutcdatetime())");
+
+            entity.HasOne(d => d.Member).WithMany(p => p.MemberPartnerships)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_MemberPartnerships_Members");
+
+            entity.HasOne(d => d.Partnership).WithMany(p => p.MemberPartnerships)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_MemberPartnerships_Partnerships");
         });
 
         modelBuilder.Entity<VwActiveMemberPackage>(entity =>

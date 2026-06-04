@@ -45,9 +45,14 @@
         <div class="page-title">Classes</div>
         <div class="page-subtitle">Weekly Schedule</div>
     </div>
-    <a asp-controller="Classes" asp-action="Index" class="btn btn-secondary">
-        <i class="bi bi-list-ul"></i> List View
-    </a>
+    <div style="display:flex;gap:8px;align-items:center;">
+        <a asp-controller="Classes" asp-action="List" class="btn btn-secondary">
+            <i class="bi bi-list-ul"></i> List View
+        </a>
+        <a asp-controller="Classes" asp-action="Create" class="btn btn-primary">
+            <i class="bi bi-plus-lg"></i> Add Class
+        </a>
+    </div>
 </div>
 
 <!-- Filters -->

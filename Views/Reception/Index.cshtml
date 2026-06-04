@@ -420,18 +420,43 @@
     {
         <div class="reception-grid">
             <div class="reception-card">
-                <div class="reception-card-body">
-                    <div class="stat-label">Gym Capacity</div>
-                    @if (dashboard.MaxCapacity > 0)
-                    {
-                        <div class="stat-value">@dashboard.CurrentlyPresentCount <span style="font-size:18px;font-weight:500;color:#9ca3af;">/ @dashboard.MaxCapacity</span></div>
-                        <div class="stat-note">@dashboard.CapacityPercent% full</div>
+                <div class="reception-card-body" style="display:flex;align-items:center;gap:16px;">
+                    @{
+                        int capPct      = dashboard.MaxCapacity > 0 ? dashboard.CapacityPercent : 0;
+                        int radius      = 28;
+                        double circ     = 2 * Math.PI * radius;
+                        double dashVal  = dashboard.MaxCapacity > 0 ? circ * capPct / 100.0 : 0;
+                        string ringColor = capPct >= 90 ? "#dc2626"
+                                         : capPct >= 70 ? "#f59e0b"
+                                         : "#16a34a";
                     }
-                    else
-                    {
-                        <div class="stat-value">@dashboard.CurrentlyPresentCount</div>
-                        <div class="stat-note">No capacity limit set</div>
-                    }
+                    <svg id="capacityRing" width="72" height="72" viewBox="0 0 72 72" style="flex-shrink:0;">
+                        <circle cx="36" cy="36" r="@radius" fill="none" stroke="#f3f4f6" stroke-width="7"/>
+                        <circle id="capacityArc" cx="36" cy="36" r="@radius" fill="none"
+                                stroke="@ringColor" stroke-width="7"
+                                stroke-linecap="round"
+                                stroke-dasharray="@dashVal.ToString("F1") @circ.ToString("F1")"
+                                stroke-dashoffset="@(circ / 4.0).ToString("F1")"
+                                transform="rotate(-90 36 36)"
+                                style="transition:stroke-dasharray 0.5s ease;" />
+                        <text x="36" y="40" text-anchor="middle"
+                              font-size="13" font-weight="800" fill="#111827">
+                            @(dashboard.MaxCapacity > 0 ? $"{capPct}%" : "—")
+                        </text>
+                    </svg>
+                    <div>
+                        <div class="stat-label">Gym Capacity</div>
+                        @if (dashboard.MaxCapacity > 0)
+                        {
+                            <div id="capCount" class="stat-value" style="font-size:22px;">@dashboard.CurrentlyPresentCount<span style="font-size:14px;font-weight:500;color:#9ca3af;"> / @dashboard.MaxCapacity</span></div>
+                            <div class="stat-note" id="capNote">@capPct% full</div>
+                        }
+                        else
+                        {
+                            <div id="capCount" class="stat-value" style="font-size:22px;">@dashboard.CurrentlyPresentCount</div>
+                            <div class="stat-note" id="capNote">No capacity limit</div>
+                        }
+                    </div>
                 </div>
             </div>
 
@@ -733,9 +758,55 @@
                      class="member-photo"
                      alt="Member Photo" />
 
-                <div>
+                <div style="flex:1;min-width:0;">
                     <div class="member-name" id="memberName">—</div>
                     <span class="member-badge" id="membershipBadge">—</span>
+                    <div id="memberPhone" class="d-none" style="margin-top:6px;font-size:12.5px;color:#6b7280;">
+                        <i class="bi bi-telephone" style="font-size:11px;margin-right:3px;"></i>
+                        <span id="memberPhoneVal"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div id="memberPackageInfo" class="d-none"
+                 style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:10px 14px;margin-bottom:12px;font-size:13px;display:flex;align-items:center;gap:8px;">
+                <i class="bi bi-ticket-perforated" style="color:#ff5b14;font-size:15px;flex-shrink:0;"></i>
+                <div>
+                    <span id="memberPackageName" style="font-weight:700;color:#111827;"></span>
+                    <span id="memberPackageExpiry" style="color:#9ca3af;font-size:11.5px;margin-left:6px;"></span>
+                </div>
+            </div>
+
+            <div id="classInfo" class="d-none"
+                 style="background:#fff8f3;border:1px solid #fed7aa;border-radius:12px;padding:10px 14px;margin-bottom:12px;font-size:13px;display:flex;align-items:center;gap:10px;">
+                <i class="bi bi-calendar2-event" style="color:#ff5b14;font-size:16px;flex-shrink:0;"></i>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:800;color:#111827;" id="classInfoName">—</div>
+                    <div style="font-size:11.5px;color:#6b7280;margin-top:2px;">
+                        <span id="classInfoTime"></span>
+                        <span id="classInfoCoach"></span>
+                    </div>
+                </div>
+                <div id="classCapacityBadge"
+                     style="background:#fff;border:1px solid #e5e7eb;border-radius:999px;padding:3px 10px;font-size:11px;font-weight:800;color:#374151;flex-shrink:0;">
+                    —
+                </div>
+            </div>
+
+            <div id="classFullAlert" class="alert-clean alert-danger-clean d-none">
+                <strong>Class is full.</strong>
+                <div style="margin-top:4px;font-size:12.5px;">
+                    Override and let the member in anyway?
+                </div>
+                <div style="margin-top:10px;display:flex;gap:8px;">
+                    <button type="button" id="btnOverrideClassFull" class="orange-btn"
+                            style="min-height:36px;padding:0 14px;font-size:12.5px;">
+                        Allow Entry
+                    </button>
+                    <button type="button" class="orange-btn" data-close-modal
+                            style="min-height:36px;padding:0 14px;font-size:12.5px;background:#f3f4f6;color:#374151;">
+                        Cancel
+                    </button>
                 </div>
             </div>
 
@@ -804,8 +875,17 @@
             async function doScan() {
                 const membershipNumber = input.value.trim();
 
+                // Empty input — silently refocus rather than popping a scary modal.
+                // This avoids the "Missing Membership Number" pop-up after a
+                // successful check-in when a stray Enter / double-click fires.
                 if (!membershipNumber) {
-                    showModalError('Missing Membership Number', 'Please enter or scan a membership number.');
+                    input.focus();
+                    return;
+                }
+
+                // Modal is already open — ignore (prevents double-trigger from
+                // a stray Enter while the success popup is still showing).
+                if (modal.classList.contains('is-open')) {
                     return;
                 }
 
@@ -855,6 +935,61 @@
                 const photo = document.getElementById('memberPhoto');
                 photo.src = data.photoUrl ? data.photoUrl : '/images/avatar-placeholder.png';
 
+                // Phone
+                if (data.phoneNumber) {
+                    document.getElementById('memberPhoneVal').textContent = data.phoneNumber;
+                    document.getElementById('memberPhone').classList.remove('d-none');
+                }
+
+                // Package info
+                if (data.activePackageName) {
+                    document.getElementById('memberPackageName').textContent = data.activePackageName;
+                    const expEl = document.getElementById('memberPackageExpiry');
+                    expEl.textContent = data.activePackageExpiry ? ('Exp ' + data.activePackageExpiry) : '';
+                    document.getElementById('memberPackageInfo').classList.remove('d-none');
+                }
+
+                // Class info (for CLASS package check-ins)
+                if (data.targetClassName) {
+                    document.getElementById('classInfoName').textContent = data.targetClassName;
+                    document.getElementById('classInfoTime').textContent = data.targetClassTime ?? '';
+                    document.getElementById('classInfoCoach').textContent =
+                        data.targetCoachName ? (' · ' + data.targetCoachName) : '';
+
+                    const capBadge = document.getElementById('classCapacityBadge');
+                    if (data.targetClassCapacity != null) {
+                        capBadge.textContent = (data.targetClassAttendees ?? 0) + ' / ' + data.targetClassCapacity;
+                        if (data.classIsFull) {
+                            capBadge.style.background    = '#fef2f2';
+                            capBadge.style.borderColor   = '#fca5a5';
+                            capBadge.style.color         = '#b42318';
+                        } else {
+                            capBadge.style.background  = '#dcfce7';
+                            capBadge.style.borderColor = '#bbf7d0';
+                            capBadge.style.color       = '#15803d';
+                        }
+                    } else {
+                        capBadge.textContent = 'No limit';
+                    }
+                    document.getElementById('classInfo').classList.remove('d-none');
+                }
+
+                if (data.classIsFull) {
+                    document.getElementById('classFullAlert').classList.remove('d-none');
+
+                    // Wire override button — pass the class package id
+                    const overrideBtn = document.getElementById('btnOverrideClassFull');
+                    overrideBtn.onclick = function () {
+                        // Find the class package option (CLASS type)
+                        const classOpt = (data.packageOptions || []).find(o => o.packageTypeCode === 'CLASS');
+                        if (!classOpt) {
+                            showModalError('No CLASS Package', 'No class package available to override with.');
+                            return;
+                        }
+                        markAttendance(data.memberId, classOpt.memberPackageId, classOpt.label, true);
+                    };
+                }
+
                 if (data.alreadyInsideGym) {
                     alreadyAlert.classList.remove('d-none');
                 }
@@ -864,6 +999,10 @@
                     document.getElementById('autoPackageName').textContent =
                         data.autoCheckedInPackageName ?? '';
                     refreshStats();
+                    // Advance poller cursor so it doesn't re-show this check-in
+                    if (window.advancePollerCursor) {
+                        window.advancePollerCursor(new Date().toISOString());
+                    }
                 }
 
                 if (data.hasConflict && !data.alreadyInsideGym && data.packageOptions) {
@@ -899,10 +1038,12 @@
                 openModal();
             }
 
-            async function markAttendance(memberId, memberPackageId, label) {
+            async function markAttendance(memberId, memberPackageId, label, overrideClassCapacity) {
                 packageButtons.querySelectorAll('button').forEach(function (b) {
                     b.disabled = true;
                 });
+                const overrideBtn = document.getElementById('btnOverrideClassFull');
+                if (overrideBtn) overrideBtn.disabled = true;
 
                 try {
                     const res = await fetch('/Reception/MarkAttendance', {
@@ -914,18 +1055,24 @@
                         body: JSON.stringify({
                             memberId: memberId,
                             branchId: branchId,
-                            selectedMemberPackageId: memberPackageId
+                            selectedMemberPackageId: memberPackageId,
+                            overrideClassCapacity: overrideClassCapacity === true
                         })
                     });
 
                     const data = await res.json();
 
                     conflictSection.classList.add('d-none');
+                    document.getElementById('classFullAlert').classList.add('d-none');
 
                     if (data.success) {
                         autoAlert.classList.remove('d-none');
                         document.getElementById('autoPackageName').textContent = label;
                         refreshStats();
+                        // Advance poller cursor so it doesn't re-show this check-in
+                        if (window.advancePollerCursor) {
+                            window.advancePollerCursor(new Date().toISOString());
+                        }
                     }
                     else {
                         showModalError('Check-In Failed', data.errorMessage ?? 'Unknown error.');
@@ -933,6 +1080,9 @@
                 }
                 catch {
                     showModalError('Network Error', 'Could not reach server.');
+                }
+                finally {
+                    if (overrideBtn) overrideBtn.disabled = false;
                 }
             }
 
@@ -978,8 +1128,36 @@
 
                     if (currently) currently.textContent = data.currentlyPresentCount;
                     if (today) today.textContent = data.todayEntryCount;
+
+                    // Update capacity ring
+                    updateCapacityRing(data.currentlyPresentCount, data.maxCapacity ?? 0);
                 }
                 catch {
+                }
+            }
+
+            function updateCapacityRing(current, maxCap) {
+                const arc    = document.getElementById('capacityArc');
+                const note   = document.getElementById('capNote');
+                const count  = document.getElementById('capCount');
+                if (!arc) return;
+
+                const r    = 28;
+                const circ = 2 * Math.PI * r;
+
+                if (maxCap > 0) {
+                    const pct  = Math.min(100, Math.round(current / maxCap * 100));
+                    const dash = circ * pct / 100;
+                    arc.setAttribute('stroke-dasharray', `${dash.toFixed(1)} ${circ.toFixed(1)}`);
+                    arc.setAttribute('stroke',
+                        pct >= 90 ? '#dc2626' : pct >= 70 ? '#f59e0b' : '#16a34a');
+                    // Update the text inside SVG
+                    const txt = arc.parentElement.querySelector('text');
+                    if (txt) txt.textContent = pct + '%';
+                    if (note) note.textContent = pct + '% full';
+                    if (count) count.firstChild.textContent = current;
+                } else {
+                    if (count) count.firstChild.textContent = current;
                 }
             }
 
@@ -990,16 +1168,28 @@
                 autoAlert.classList.add('d-none');
                 conflictSection.classList.add('d-none');
                 packageButtons.innerHTML = '';
+                document.getElementById('memberPhone').classList.add('d-none');
+                document.getElementById('memberPhoneVal').textContent = '';
+                document.getElementById('memberPackageInfo').classList.add('d-none');
+                document.getElementById('classInfo').classList.add('d-none');
+                document.getElementById('classFullAlert').classList.add('d-none');
             }
 
             function openModal() {
                 overlay.classList.add('is-open');
                 modal.classList.add('is-open');
+                // Disable Check In button so a stray Enter can't double-fire
+                if (btnScan) btnScan.disabled = true;
             }
 
             function closeModal() {
                 overlay.classList.remove('is-open');
                 modal.classList.remove('is-open');
+                // Clear the input and re-enable Check In
+                if (input)   input.value = '';
+                if (btnScan) btnScan.disabled = false;
+                // Refocus input so the next member can be scanned immediately
+                setTimeout(() => input?.focus(), 50);
             }
 
             function setLoading(on) {
@@ -1015,6 +1205,76 @@
                     BRANCH_ACCESS_DENIED: 'Access Denied',
                     BRANCH_NOT_FOUND: 'Branch Not Found'
                 })[code] ?? 'Entry Denied';
+            }
+
+            // ── Auto-popup polling ─────────────────────────────────
+            // Polls every 3 s for check-ins from ANY source (mobile app,
+            // QR, web). Inside the main IIFE so it can see branchId,
+            // refreshStats, resetModal, modal, openModal, etc.
+            let pollerLastSeenUtc = new Date().toISOString();
+            let pollerActive = true;
+
+            // Lets the manual scan flow advance the cursor after a
+            // successful web check-in to avoid re-showing the same record.
+            window.advancePollerCursor = function (isoTimestamp) {
+                if (isoTimestamp && isoTimestamp > pollerLastSeenUtc) {
+                    pollerLastSeenUtc = isoTimestamp;
+                }
+            };
+
+            function isModalOpen() {
+                return modal.classList.contains('is-open');
+            }
+
+            async function poll() {
+                if (!pollerActive || !branchId) return;
+                try {
+                    const url = `/Reception/LatestCheckIn?branchId=${branchId}&sinceUtc=${encodeURIComponent(pollerLastSeenUtc)}`;
+                    const res  = await fetch(url);
+                    const data = await res.json();
+                    if (data.found) {
+                        pollerLastSeenUtc = data.checkInAtUtc;
+                        refreshStats();
+                        if (!isModalOpen()) {
+                            showAutoCheckInPopup(data);
+                        }
+                    }
+                } catch { /* keep polling on network hiccup */ }
+                if (pollerActive) setTimeout(poll, 3000);
+            }
+
+            document.addEventListener('visibilitychange', () => {
+                pollerActive = !document.hidden;
+                if (pollerActive) poll();
+            });
+
+            // Start polling — first poll after 3 s
+            setTimeout(poll, 3000);
+
+            function showAutoCheckInPopup(data) {
+                resetModal();
+
+                document.getElementById('memberName').textContent      = data.memberName        ?? '—';
+                document.getElementById('membershipBadge').textContent = data.membershipNumber  ?? '—';
+
+                const photo = document.getElementById('memberPhoto');
+                photo.src = data.photoUrl ? data.photoUrl : '/images/avatar-placeholder.png';
+
+                if (data.phoneNumber) {
+                    document.getElementById('memberPhoneVal').textContent = data.phoneNumber;
+                    document.getElementById('memberPhone').classList.remove('d-none');
+                }
+
+                if (data.packageName) {
+                    document.getElementById('memberPackageName').textContent  = data.packageName;
+                    document.getElementById('memberPackageExpiry').textContent = '';
+                    document.getElementById('memberPackageInfo').classList.remove('d-none');
+                }
+
+                autoAlert.classList.remove('d-none');
+                document.getElementById('autoPackageName').textContent = data.packageName ?? 'Mobile check-in';
+
+                openModal();
             }
         })();
 

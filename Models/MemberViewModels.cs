@@ -200,6 +200,9 @@ namespace GymSaaS.Models
         public int InvitationsRemaining { get; set; }
         public Guid? ActivePackageWithInvitationsId { get; set; }
 
+        // Partnerships
+        public List<MemberPartnershipItem> Partnerships { get; set; } = new();
+
         public string Initials => string.Concat(
             FullName.Split(' ', StringSplitOptions.RemoveEmptyEntries)
                     .Take(2)

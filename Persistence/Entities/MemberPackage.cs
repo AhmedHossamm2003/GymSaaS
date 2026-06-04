@@ -114,6 +114,11 @@ public partial class MemberPackage
     [StringLength(20)]
     public string? PackageComponentRole { get; set; }
 
+    public Guid? GymClassId { get; set; }
+
+    [ForeignKey("GymClassId")]
+    public virtual GymClass? GymClass { get; set; }
+
     [InverseProperty("MemberPackage")]
     public virtual ICollection<AttendanceRecord> AttendanceRecords { get; set; } = new List<AttendanceRecord>();
 

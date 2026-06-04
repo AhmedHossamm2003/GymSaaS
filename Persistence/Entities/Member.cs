@@ -133,4 +133,7 @@ public partial class Member
 
     [InverseProperty("InvitedMember")]
     public virtual ICollection<MemberInvitation> ReceivedInvitations { get; set; } = new List<MemberInvitation>();
+
+    [InverseProperty("Member")]
+    public virtual ICollection<MemberPartnership> MemberPartnerships { get; set; } = new List<MemberPartnership>();
 }

@@ -59,6 +59,18 @@ namespace GymSaaS.Services.Reception
         public string MemberName { get; set; } = null!;
         public string MembershipNumber { get; set; } = null!;
         public string? PhotoUrl { get; set; }
+        public string? PhoneNumber { get; set; }
+        public string? ActivePackageName { get; set; }
+        public string? ActivePackageExpiry { get; set; }
+
+        // Class info (for CLASS-package check-ins)
+        public Guid? TargetGymClassId { get; set; }
+        public string? TargetClassName { get; set; }
+        public string? TargetClassTime { get; set; }
+        public string? TargetCoachName { get; set; }
+        public int? TargetClassCapacity { get; set; }
+        public int? TargetClassAttendees { get; set; }
+        public bool ClassIsFull { get; set; }
 
         // Subscription state
         public bool HasConflict { get; set; }       // true = show choice buttons
@@ -93,6 +105,7 @@ namespace GymSaaS.Services.Reception
         public Guid BranchId { get; set; }
         public Guid SelectedMemberPackageId { get; set; }
         public Guid ReceptionistUserId { get; set; }
+        public bool OverrideClassCapacity { get; set; }
     }
 
     /// <summary>
@@ -103,6 +116,21 @@ namespace GymSaaS.Services.Reception
         public bool Success { get; set; }
         public string? ErrorMessage { get; set; }
         public Guid? AttendanceRecordId { get; set; }
+    }
+
+    /// <summary>
+    /// Returned by the polling endpoint — carries member info for the auto-popup.
+    /// </summary>
+    public class LatestCheckInDto
+    {
+        public Guid AttendanceRecordId { get; set; }
+        public Guid MemberId { get; set; }
+        public string MemberName { get; set; } = null!;
+        public string MembershipNumber { get; set; } = null!;
+        public string? PhotoUrl { get; set; }
+        public string? PhoneNumber { get; set; }
+        public string? PackageName { get; set; }
+        public string CheckInAtUtc { get; set; } = null!;
     }
 
     // ── Interface ─────────────────────────────────────────────────
@@ -127,6 +155,12 @@ namespace GymSaaS.Services.Reception
         /// Records the AttendanceRecord with PresenceUntilUtc = now + MemberPresenceWindowMinutes.
         /// </summary>
         Task<MarkAttendanceResult> MarkAttendanceAsync(MarkAttendanceRequest request, Guid tenantId);
+
+        /// <summary>
+        /// Returns the most recent check-in at the branch that occurred AFTER sinceUtc.
+        /// Used by the reception page to poll for mobile check-ins and show auto-popup.
+        /// </summary>
+        Task<LatestCheckInDto?> GetLatestCheckInAsync(Guid branchId, Guid tenantId, DateTime sinceUtc);
 
         /// <summary>
         /// Returns all branches for the tenant (used by Admin/SuperAdmin branch selector).

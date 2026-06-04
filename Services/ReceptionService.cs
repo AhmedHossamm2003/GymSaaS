@@ -22,6 +22,10 @@ namespace GymSaaS.Services.Reception
             "OPEN_GYM", "SESSION", "SUBSCRIPTION", "BUNDLE"
         };
 
+        // Re-entry cooldown: a member cannot check in again within this many hours
+        // of their previous successful check-in at the same branch.
+        private const int ReentryCooldownHours = 8;
+
         public ReceptionService(GymDbContext db)
         {
             _db = db;
@@ -150,6 +154,7 @@ namespace GymSaaS.Services.Reception
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
             var activePackages = await _db.MemberPackages
       .Include(p => p.PackageType)
+      .Include(p => p.GymClass)
       .Where(p => p.MemberId == member.MemberId
                && p.TenantId == tenantId
                && p.Status == "ACTIVE"
@@ -199,8 +204,10 @@ namespace GymSaaS.Services.Reception
                 return Fail("BRANCH_ACCESS_DENIED",
                     "Member's package does not allow access to this branch.");
 
-            // 5. Check if already inside gym right now
+            // 5. Re-entry cooldown: block re-entry within 8 h of previous check-in
+            //    at the same branch (separate from the 90-min "still inside" window).
             var now = DateTime.UtcNow;
+            var cooldownStart = now.AddHours(-ReentryCooldownHours);
             var validStatusIds = await _db.AttendanceStatuses
                 .Where(s => new[] { "SUCCESS", "OVERRIDE_APPROVED", "MANUAL" }.Contains(s.StatusCode))
                 .Select(s => s.AttendanceStatusId)
@@ -210,48 +217,105 @@ namespace GymSaaS.Services.Reception
                 .AnyAsync(a => a.MemberId == member.MemberId
                             && a.BranchId == branchId
                             && validStatusIds.Contains(a.AttendanceStatusId)
-                            && a.PresenceUntilUtc > now);
+                            && a.CheckInAtUtc > cooldownStart);
 
-            // 6. Classify packages into CLASS vs non-CLASS
-            var classPackages    = accessiblePackages.Where(p => p.PackageType.PackageTypeCode == "CLASS").ToList();
-            var nonClassPackages = accessiblePackages.Where(p => p.PackageType.PackageTypeCode != "CLASS").ToList();
+            // 6. Class-linked vs open access.
+            //    A package counts as class-linked if it has a specific GymClassId
+            //    OR the type code itself is CLASS. This catches:
+            //      - CLASS-only packages (type CLASS, with GymClassId)
+            //      - COMBINED package's SESSION row (type SESSION, with GymClassId)
+            //    Everything else (OPEN_GYM, SUBSCRIPTION, BUNDLE, COMBINED's open-gym row) is open access.
+            var classPackages    = accessiblePackages
+                .Where(p => p.GymClassId.HasValue || p.PackageType.PackageTypeCode == "CLASS")
+                .ToList();
+            var nonClassPackages = accessiblePackages
+                .Where(p => !p.GymClassId.HasValue && p.PackageType.PackageTypeCode != "CLASS")
+                .ToList();
 
+            // Conflict = the receptionist must choose. True whenever there's both a
+            // class-linked option and an open-gym option (e.g. COMBINED package).
             bool hasConflict = classPackages.Any() && nonClassPackages.Any();
 
             // 7. Build package options for popup
-            var options = accessiblePackages.Select(p => new PackageOptionDto
+            var options = accessiblePackages.Select(p =>
             {
-                MemberPackageId  = p.MemberPackageId,
-                PackageName      = p.PackageNameSnapshot,
-                PackageTypeCode  = p.PackageType.PackageTypeCode,
-                SessionsRemaining = p.SessionCountRemaining.HasValue
-                    ? $"{p.SessionCountRemaining} sessions left"
-                    : null,
-                Label = p.PackageType.PackageTypeCode switch
+                bool isClassLinked = p.GymClassId.HasValue || p.PackageType.PackageTypeCode == "CLASS";
+                string label = isClassLinked
+                    ? (p.GymClass != null ? $"Class · {p.GymClass.ClassName}" : "Class")
+                    : p.PackageType.PackageTypeCode switch
+                    {
+                        "OPEN_GYM"     => "Open Gym",
+                        "SESSION"      => "Session",
+                        "SUBSCRIPTION" => "Subscription",
+                        "BUNDLE"       => "Open Gym (Bundle)",
+                        _              => p.PackageNameSnapshot
+                    };
+
+                return new PackageOptionDto
                 {
-                    "CLASS"        => "Mark as Class",
-                    "OPEN_GYM"     => "Open Gym",
-                    "SESSION"      => "Session",
-                    "SUBSCRIPTION" => "Subscription",
-                    "BUNDLE"       => "Open Gym (Bundle)",
-                    _              => p.PackageNameSnapshot
-                }
+                    MemberPackageId  = p.MemberPackageId,
+                    PackageName      = p.PackageNameSnapshot,
+                    PackageTypeCode  = isClassLinked ? "CLASS" : p.PackageType.PackageTypeCode,
+                    SessionsRemaining = p.SessionCountRemaining.HasValue
+                        ? $"{p.SessionCountRemaining} sessions left"
+                        : null,
+                    Label = label
+                };
             }).ToList();
+
+            var primaryPackage = accessiblePackages.OrderBy(p => p.ValidToDate).FirstOrDefault();
+            string? expiryDisplay = primaryPackage?.ValidToDate.HasValue == true
+                ? primaryPackage.ValidToDate!.Value.ToString("MMM d, yyyy")
+                : null;
 
             var result = new ScanResultDto
             {
-                Success           = true,
-                MemberId          = member.MemberId,
-                MemberName        = member.FullName ?? $"{member.FirstName} {member.LastName}",
-                MembershipNumber  = member.MembershipNumber,
-                PhotoUrl          = member.ProfileImageUrl,
-                HasConflict       = hasConflict,
-                AlreadyInsideGym  = alreadyInside,
-                PackageOptions    = options
+                Success               = true,
+                MemberId              = member.MemberId,
+                MemberName            = member.FullName ?? $"{member.FirstName} {member.LastName}",
+                MembershipNumber      = member.MembershipNumber,
+                PhotoUrl              = member.ProfileImageUrl,
+                PhoneNumber           = member.PhoneNumber,
+                ActivePackageName     = primaryPackage?.PackageNameSnapshot,
+                ActivePackageExpiry   = expiryDisplay,
+                HasConflict           = hasConflict,
+                AlreadyInsideGym      = alreadyInside,
+                PackageOptions        = options
             };
 
-            // 8. If no conflict — auto check-in immediately
-            if (!hasConflict && !alreadyInside)
+            // 7b. For CLASS packages: locate the relevant class (linked or currently live)
+            //     and verify capacity before any auto check-in.
+            GymClass? targetClass = null;
+            var classCheckPackage = classPackages.FirstOrDefault();
+            if (classCheckPackage != null)
+            {
+                targetClass = await ResolveTargetClassAsync(classCheckPackage, branchId, tenantId);
+            }
+
+            if (targetClass != null)
+            {
+                var classCounts = await CountClassAttendeesAsync(targetClass, tenantId, validStatusIds);
+
+                string? coachName = null;
+                if (targetClass.CoachId.HasValue)
+                {
+                    coachName = await _db.Coaches
+                        .Where(c => c.CoachId == targetClass.CoachId.Value)
+                        .Select(c => (c.FirstName + " " + c.LastName).Trim())
+                        .FirstOrDefaultAsync();
+                }
+
+                result.TargetGymClassId     = targetClass.GymClassId;
+                result.TargetClassName      = targetClass.ClassName;
+                result.TargetClassTime      = $"{targetClass.StartTime:HH:mm}–{targetClass.EndTime:HH:mm}";
+                result.TargetCoachName      = coachName;
+                result.TargetClassCapacity  = targetClass.Capacity;
+                result.TargetClassAttendees = classCounts;
+                result.ClassIsFull          = targetClass.Capacity.HasValue && classCounts >= targetClass.Capacity.Value;
+            }
+
+            // 8. If no conflict — auto check-in immediately (skip if class is full — needs override)
+            if (!hasConflict && !alreadyInside && !result.ClassIsFull)
             {
                 var autoPackage = nonClassPackages.FirstOrDefault() ?? classPackages.First();
                 var markResult  = await MarkAttendanceAsync(new MarkAttendanceRequest
@@ -269,6 +333,58 @@ namespace GymSaaS.Services.Reception
             return result;
         }
 
+        // ── Resolve the GymClass a CLASS-type member package check-in refers to.
+        //    Priority: 1) the package's directly-linked GymClass (if it's today + at this branch),
+        //              2) the live class right now at this branch.
+        private async Task<GymClass?> ResolveTargetClassAsync(MemberPackage classPkg, Guid branchId, Guid tenantId)
+        {
+            var localNow = DateTime.Now;
+            var todayDow = (int)localNow.DayOfWeek;
+            var nowTime  = TimeOnly.FromDateTime(localNow);
+
+            // Linked class — only accept if it's at this branch and runs today.
+            if (classPkg.GymClass != null
+                && classPkg.GymClass.BranchId == branchId
+                && classPkg.GymClass.DayOfWeek == todayDow
+                && !classPkg.GymClass.IsDeleted && classPkg.GymClass.IsActive)
+            {
+                return classPkg.GymClass;
+            }
+
+            // Otherwise find any class live RIGHT NOW at this branch.
+            return await _db.GymClasses
+                .Where(g => g.TenantId == tenantId
+                         && g.BranchId == branchId
+                         && g.IsActive && !g.IsDeleted
+                         && g.DayOfWeek == todayDow
+                         && g.StartTime <= nowTime
+                         && g.EndTime >= nowTime)
+                .OrderBy(g => g.StartTime)
+                .FirstOrDefaultAsync();
+        }
+
+        // ── Count today's attendees that fall inside the class's time window.
+        private async Task<int> CountClassAttendeesAsync(GymClass cls, Guid tenantId, List<Guid> validStatusIds)
+        {
+            var localDateNow = DateTime.Now;
+            var classStart = new DateTime(localDateNow.Year, localDateNow.Month, localDateNow.Day,
+                                          cls.StartTime.Hour, cls.StartTime.Minute, 0).ToUniversalTime();
+            var classEnd   = new DateTime(localDateNow.Year, localDateNow.Month, localDateNow.Day,
+                                          cls.EndTime.Hour, cls.EndTime.Minute, 0).ToUniversalTime();
+
+            return await _db.AttendanceRecords
+                .Where(a => a.TenantId == tenantId
+                         && a.BranchId == cls.BranchId
+                         && validStatusIds.Contains(a.AttendanceStatusId)
+                         && a.CheckInAtUtc >= classStart
+                         && a.CheckInAtUtc <= classEnd
+                         && a.MemberPackage != null
+                         && a.MemberPackage.GymClassId == cls.GymClassId)
+                .Select(a => a.MemberId)
+                .Distinct()
+                .CountAsync();
+        }
+
         // ── MarkAttendanceAsync ───────────────────────────────────
         public async Task<MarkAttendanceResult> MarkAttendanceAsync(
             MarkAttendanceRequest request, Guid tenantId)
@@ -276,6 +392,7 @@ namespace GymSaaS.Services.Reception
             // Load package to get HomeBranchId for cross-branch detection
             var package = await _db.MemberPackages
                 .Include(p => p.PackageType)
+                .Include(p => p.GymClass)
                 .FirstOrDefaultAsync(p => p.MemberPackageId == request.SelectedMemberPackageId
                                        && p.TenantId == tenantId);
 
@@ -285,6 +402,33 @@ namespace GymSaaS.Services.Reception
                     Success = false,
                     ErrorMessage = "Package not found."
                 };
+
+            // CLASS check: enforce class capacity unless receptionist overrides.
+            // Triggered for any class-linked package — including COMBINED's SESSION row.
+            bool isClassLinked = package.GymClassId.HasValue
+                              || package.PackageType.PackageTypeCode == "CLASS";
+
+            if (isClassLinked && !request.OverrideClassCapacity)
+            {
+                var targetClass = await ResolveTargetClassAsync(package, request.BranchId, tenantId);
+                if (targetClass != null && targetClass.Capacity.HasValue)
+                {
+                    var validStatusIds = await _db.AttendanceStatuses
+                        .Where(s => new[] { "SUCCESS", "OVERRIDE_APPROVED", "MANUAL" }.Contains(s.StatusCode))
+                        .Select(s => s.AttendanceStatusId)
+                        .ToListAsync();
+
+                    var attendeeCount = await CountClassAttendeesAsync(targetClass, tenantId, validStatusIds);
+                    if (attendeeCount >= targetClass.Capacity.Value)
+                    {
+                        return new MarkAttendanceResult
+                        {
+                            Success = false,
+                            ErrorMessage = $"Class \"{targetClass.ClassName}\" is full ({attendeeCount}/{targetClass.Capacity.Value})."
+                        };
+                    }
+                }
+            }
 
             // Load branch for presence window
             var branch = await _db.Branches
@@ -338,9 +482,11 @@ namespace GymSaaS.Services.Reception
                     ? null
                     : request.ReceptionistUserId,
                 CreatedAtUtc             = now,
-                Notes                    = request.ReceptionistUserId != Guid.Empty
-                    ? "Marked by receptionist"
-                    : null
+                Notes                    = request.OverrideClassCapacity
+                    ? "Class-capacity override by receptionist"
+                    : request.ReceptionistUserId != Guid.Empty
+                        ? "Marked by receptionist"
+                        : null
             };
 
             _db.AttendanceRecords.Add(record);
@@ -365,6 +511,61 @@ namespace GymSaaS.Services.Reception
             {
                 Success = true,
                 AttendanceRecordId = record.AttendanceRecordId
+            };
+        }
+
+        // ── GetLatestCheckInAsync ─────────────────────────────────
+        public async Task<LatestCheckInDto?> GetLatestCheckInAsync(
+            Guid branchId, Guid tenantId, DateTime sinceUtc)
+        {
+            var validStatusIds = await _db.AttendanceStatuses
+                .Where(s => new[] { "SUCCESS", "OVERRIDE_APPROVED", "MANUAL" }.Contains(s.StatusCode))
+                .Select(s => s.AttendanceStatusId)
+                .ToListAsync();
+
+            var record = await _db.AttendanceRecords
+                .Where(a => a.BranchId == branchId
+                         && a.TenantId == tenantId
+                         && validStatusIds.Contains(a.AttendanceStatusId)
+                         && a.CheckInAtUtc > sinceUtc)
+                .OrderByDescending(a => a.CheckInAtUtc)
+                .Select(a => new
+                {
+                    a.AttendanceRecordId,
+                    a.MemberId,
+                    a.CheckInAtUtc,
+                    a.MemberPackageId,
+                    PackageName = a.MemberPackage != null ? a.MemberPackage.PackageNameSnapshot : null,
+                })
+                .FirstOrDefaultAsync();
+
+            if (record == null) return null;
+
+            var member = await _db.Members
+                .Where(m => m.MemberId == record.MemberId)
+                .Select(m => new
+                {
+                    m.FullName,
+                    m.FirstName,
+                    m.LastName,
+                    m.MembershipNumber,
+                    m.ProfileImageUrl,
+                    m.PhoneNumber,
+                })
+                .FirstOrDefaultAsync();
+
+            if (member == null) return null;
+
+            return new LatestCheckInDto
+            {
+                AttendanceRecordId = record.AttendanceRecordId,
+                MemberId           = record.MemberId,
+                MemberName         = member.FullName ?? $"{member.FirstName} {member.LastName}",
+                MembershipNumber   = member.MembershipNumber,
+                PhotoUrl           = member.ProfileImageUrl,
+                PhoneNumber        = member.PhoneNumber,
+                PackageName        = record.PackageName,
+                CheckInAtUtc       = record.CheckInAtUtc.ToString("O"),
             };
         }
 

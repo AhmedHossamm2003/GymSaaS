@@ -754,6 +754,90 @@
         </div>
     </div>
 
+    <!-- Partnerships -->
+    <div class="info-card" id="partnershipCard">
+        <div class="ic-head">
+            <div class="ic-head-left">
+                <div class="ic-head-icon"><i class="bi bi-building-gear"></i></div>
+                <span class="ic-head-title">Partnerships</span>
+            </div>
+        </div>
+        <div class="ic-body">
+            <div id="partnershipList">
+                @if (!Model.Partnerships.Any())
+                {
+                    <div id="partnershipEmpty" style="text-align:center;padding:20px 0;color:var(--t3);font-size:13px;">
+                        <i class="bi bi-building-gear" style="font-size:22px;display:block;margin-bottom:8px;color:var(--t4);"></i>
+                        No partnerships assigned.
+                    </div>
+                }
+                else
+                {
+                    <div id="partnershipEmpty" style="display:none;text-align:center;padding:20px 0;color:var(--t3);font-size:13px;">
+                        <i class="bi bi-building-gear" style="font-size:22px;display:block;margin-bottom:8px;color:var(--t4);"></i>
+                        No partnerships assigned.
+                    </div>
+                    @foreach (var mp in Model.Partnerships)
+                    {
+                        <div class="partnership-row" id="pr-@mp.MemberPartnershipId"
+                             style="display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--border);">
+                            <div style="width:40px;height:40px;border-radius:10px;overflow:hidden;background:#f9fafb;border:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;">
+                                @if (!string.IsNullOrEmpty(mp.LogoImageUrl))
+                                {
+                                    <img src="@mp.LogoImageUrl" alt="@mp.PartnershipName"
+                                         style="width:100%;height:100%;object-fit:contain;padding:4px;" />
+                                }
+                                else
+                                {
+                                    <i class="bi bi-building-gear" style="font-size:16px;color:var(--t3);"></i>
+                                }
+                            </div>
+                            <div style="flex:1;min-width:0;">
+                                <div style="font-weight:700;font-size:13.5px;color:var(--t1);">@mp.PartnershipName</div>
+                                <div style="font-size:11.5px;color:var(--t3);">
+                                    Assigned @mp.AssignedAtUtc.ToString("MMM d, yyyy")
+                                    @if (mp.DiscountPercentage.HasValue)
+                                    {
+                                        <span style="margin-left:8px;background:#fff4ed;color:#ff5b14;padding:2px 7px;border-radius:999px;font-weight:700;border:1px solid #fed7aa;">
+                                            @mp.DiscountPercentage.Value.ToString("0.##")% off
+                                        </span>
+                                    }
+                                </div>
+                            </div>
+                            <button type="button"
+                                    onclick="removePartnership('@mp.MemberPartnershipId', '@Html.Raw(System.Text.Json.JsonSerializer.Serialize(mp.PartnershipName))')"
+                                    style="width:28px;height:28px;border-radius:7px;border:1px solid var(--border);background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--t3);flex-shrink:0;"
+                                    title="Remove partnership">
+                                <i class="bi bi-x-lg" style="font-size:11px;"></i>
+                            </button>
+                        </div>
+                    }
+                }
+            </div>
+
+            <!-- Add partnership -->
+            <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:14px;">
+                <label style="display:block;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--t3);margin-bottom:7px;">
+                    Add Partnership
+                </label>
+                <div style="display:flex;gap:8px;">
+                    <input type="text" id="psSearchInput"
+                           placeholder="Search by name…"
+                           autocomplete="off"
+                           style="flex:1;height:38px;border:1.5px solid #e5e7eb;border-radius:9px;padding:0 12px;font-size:13px;outline:none;" />
+                    <button type="button" id="psAddBtn"
+                            onclick="addPartnership()"
+                            style="height:38px;padding:0 14px;border-radius:9px;background:linear-gradient(135deg,#ff5b14,#ea4f0f);color:#fff;border:none;font-weight:700;font-size:12.5px;cursor:pointer;white-space:nowrap;">
+                        <i class="bi bi-plus-lg"></i> Add
+                    </button>
+                </div>
+                <div id="psDropdown" style="display:none;border:1px solid #e5e7eb;border-radius:10px;background:#fff;box-shadow:0 8px 24px rgba(15,23,42,.10);margin-top:4px;overflow:hidden;max-height:240px;overflow-y:auto;"></div>
+                <div id="psSelectedInfo" style="display:none;margin-top:8px;padding:8px 12px;background:#f9fafb;border-radius:9px;border:1px solid #e5e7eb;font-size:12.5px;display:flex;align-items:center;gap:8px;"></div>
+                <div id="psFeedback" style="margin-top:6px;font-size:12px;"></div>
+            </div>
+        </div>
+    </div>
+
     <!-- Personal Info -->
     <div class="info-card">
         <div class="ic-head">
@@ -876,5 +960,192 @@
                 resultEl.innerHTML = '<span style="color:var(--red);">Search failed. Try again.</span>';
             }
         }
+
+        // ── Partnership Widget ────────────────────────
+        (function () {
+            const memberId   = '@Model.MemberId';
+            const antiforgery = document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '';
+            const searchInput = document.getElementById('psSearchInput');
+            const dropdown    = document.getElementById('psDropdown');
+            const feedback    = document.getElementById('psFeedback');
+            const selectedInfo = document.getElementById('psSelectedInfo');
+
+            let selectedPartnership = null;
+            let searchTimer = null;
+
+            if (!searchInput) return;
+
+            searchInput.addEventListener('input', function () {
+                clearTimeout(searchTimer);
+                const q = this.value.trim();
+                if (q.length < 1) {
+                    closeDropdown();
+                    return;
+                }
+                searchTimer = setTimeout(() => doSearch(q), 250);
+            });
+
+            searchInput.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape') closeDropdown();
+            });
+
+            document.addEventListener('click', function (e) {
+                if (!e.target.closest('#partnershipCard')) closeDropdown();
+            });
+
+            async function doSearch(q) {
+                try {
+                    const res  = await fetch(`/Partnerships/Search?q=${encodeURIComponent(q)}`);
+                    const data = await res.json();
+                    renderDropdown(data);
+                } catch {
+                    closeDropdown();
+                }
+            }
+
+            function renderDropdown(items) {
+                if (!items.length) {
+                    dropdown.innerHTML = '<div style="padding:10px 14px;font-size:12.5px;color:#9ca3af;">No partnerships found.</div>';
+                } else {
+                    dropdown.innerHTML = items.map(p => `
+                        <div class="ps-item" data-id="${p.partnershipId}" data-name="${escHtml(p.name)}"
+                             data-logo="${p.logoImageUrl ?? ''}" data-discount="${p.discountPercentage ?? ''}"
+                             style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;transition:background 0.12s;">
+                            <div style="width:28px;height:28px;border-radius:7px;background:#f9fafb;border:1px solid #e5e7eb;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;">
+                                ${p.logoImageUrl
+                                    ? `<img src="${p.logoImageUrl}" style="width:100%;height:100%;object-fit:contain;padding:2px;">`
+                                    : '<i class="bi bi-building-gear" style="font-size:13px;color:#9ca3af;"></i>'}
+                            </div>
+                            <div>
+                                <div style="font-weight:700;font-size:13px;color:#111827;">${escHtml(p.name)}</div>
+                                ${p.discountPercentage ? `<div style="font-size:11px;color:#ff5b14;">${p.discountPercentage}% off</div>` : ''}
+                            </div>
+                        </div>`).join('');
+
+                    dropdown.querySelectorAll('.ps-item').forEach(el => {
+                        el.addEventListener('mouseenter', () => el.style.background = '#f9fafb');
+                        el.addEventListener('mouseleave', () => el.style.background = '');
+                        el.addEventListener('click', () => selectPartnership(el));
+                    });
+                }
+                dropdown.style.display = 'block';
+            }
+
+            function selectPartnership(el) {
+                selectedPartnership = {
+                    id:       el.dataset.id,
+                    name:     el.dataset.name,
+                    logo:     el.dataset.logo,
+                    discount: el.dataset.discount,
+                };
+                searchInput.value = el.dataset.name;
+                closeDropdown();
+                selectedInfo.innerHTML = `
+                    <span style="color:#16a34a;font-weight:700;"><i class="bi bi-check-circle-fill"></i> ${escHtml(el.dataset.name)} selected</span>`;
+                selectedInfo.style.display = 'flex';
+            }
+
+            function closeDropdown() {
+                dropdown.style.display = 'none';
+            }
+
+            window.addPartnership = async function () {
+                if (!selectedPartnership) {
+                    feedback.innerHTML = '<span style="color:#b42318;">Please search and select a partnership first.</span>';
+                    searchInput.focus();
+                    return;
+                }
+
+                const btn = document.getElementById('psAddBtn');
+                btn.disabled = true;
+                feedback.innerHTML = '<span style="color:#9ca3af;">Adding…</span>';
+
+                try {
+                    const fd = new FormData();
+                    fd.append('memberId', memberId);
+                    fd.append('partnershipId', selectedPartnership.id);
+                    fd.append('__RequestVerificationToken', antiforgery);
+
+                    const res  = await fetch('/Members/AddPartnership', { method: 'POST', body: fd });
+                    const data = await res.json();
+
+                    if (data.success) {
+                        appendPartnershipRow(data);
+                        selectedPartnership = null;
+                        searchInput.value = '';
+                        selectedInfo.style.display = 'none';
+                        selectedInfo.innerHTML = '';
+                        feedback.innerHTML = `<span style="color:#16a34a;font-weight:700;"><i class="bi bi-check-circle-fill"></i> Added!</span>`;
+                        setTimeout(() => feedback.innerHTML = '', 2000);
+                    } else {
+                        feedback.innerHTML = `<span style="color:#b42318;">${escHtml(data.message)}</span>`;
+                    }
+                } catch {
+                    feedback.innerHTML = '<span style="color:#b42318;">Network error. Try again.</span>';
+                } finally {
+                    btn.disabled = false;
+                }
+            };
+
+            function appendPartnershipRow(data) {
+                const empty = document.getElementById('partnershipEmpty');
+                if (empty) empty.style.display = 'none';
+
+                const list = document.getElementById('partnershipList');
+                const div  = document.createElement('div');
+                div.className = 'partnership-row';
+                div.id = 'pr-' + data.partnershipId;
+                div.style.cssText = 'display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--border);';
+                div.innerHTML = `
+                    <div style="width:40px;height:40px;border-radius:10px;overflow:hidden;background:#f9fafb;border:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;">
+                        ${data.logoImageUrl
+                            ? `<img src="${data.logoImageUrl}" alt="${escHtml(data.partnershipName)}" style="width:100%;height:100%;object-fit:contain;padding:4px;">`
+                            : '<i class="bi bi-building-gear" style="font-size:16px;color:var(--t3);"></i>'}
+                    </div>
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-weight:700;font-size:13.5px;color:var(--t1);">${escHtml(data.partnershipName)}</div>
+                        <div style="font-size:11.5px;color:var(--t3);">
+                            Assigned just now
+                            ${data.discountPct ? `<span style="margin-left:8px;background:#fff4ed;color:#ff5b14;padding:2px 7px;border-radius:999px;font-weight:700;border:1px solid #fed7aa;">${data.discountPct}% off</span>` : ''}
+                        </div>
+                    </div>
+                    <button type="button"
+                            onclick="removePartnership('${data.memberPartnershipId ?? ''}', '${escHtml(data.partnershipName)}')"
+                            style="width:28px;height:28px;border-radius:7px;border:1px solid var(--border);background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--t3);flex-shrink:0;">
+                        <i class="bi bi-x-lg" style="font-size:11px;"></i>
+                    </button>`;
+                list.insertBefore(div, list.querySelector('div:last-child'));
+            }
+
+            window.removePartnership = async function (id, name) {
+                if (!confirm(`Remove ${name} from this member?`)) return;
+
+                const fd = new FormData();
+                fd.append('memberPartnershipId', id);
+                fd.append('__RequestVerificationToken', antiforgery);
+
+                try {
+                    const res  = await fetch('/Members/RemovePartnership', { method: 'POST', body: fd });
+                    const data = await res.json();
+
+                    if (data.success) {
+                        const row = document.getElementById('pr-' + id);
+                        if (row) row.remove();
+                        const rows = document.querySelectorAll('.partnership-row');
+                        if (!rows.length) {
+                            document.getElementById('partnershipEmpty').style.display = '';
+                        }
+                    }
+                } catch { }
+            };
+
+            function escHtml(s) {
+                return String(s ?? '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;');
+            }
+        })();
     </script>
 }

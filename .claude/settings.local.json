@@ -18,7 +18,17 @@
       "PowerShell(Get-Process -Name \"GymSaaS\" -ErrorAction SilentlyContinue)",
       "PowerShell(Stop-Process -Force)",
       "PowerShell(\"Process stopped\")",
-      "PowerShell(try { $r = Invoke-WebRequest -Uri \"http://localhost:5044/Reports\" -ErrorAction Stop; \"Reports: $\\($r.StatusCode\\) - URL: $\\($r.BaseResponse.ResponseUri\\)\" } catch { \"Reports ERROR: $_\" })"
+      "PowerShell(try { $r = Invoke-WebRequest -Uri \"http://localhost:5044/Reports\" -ErrorAction Stop; \"Reports: $\\($r.StatusCode\\) - URL: $\\($r.BaseResponse.ResponseUri\\)\" } catch { \"Reports ERROR: $_\" })",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\LAPTOP\\\\source\\\\repos\\\\GymSaaS\" -Force)",
+      "Bash(Select-Object Name, PSIsContainer)",
+      "Bash(grep -r \"\\\\\\\\[ApiController\\\\\\\\]\\\\|\\\\\\\\[Route.*api\" \"C:\\\\Users\\\\LAPTOP\\\\source\\\\repos\\\\GymSaaS/Controllers\" --include=\"*.cs\")",
+      "Bash(echo \"EXIT:$?\")",
+      "PowerShell(Get-NetTCPConnection -LocalPort 5044 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }; \"Stopped processes on 5044\")",
+      "Bash(Get-ChildItem -Directory)",
+      "Bash(Select-Object Name)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\LAPTOP\\\\source\\\\repos\\\\KarimNassef-1\\\\IdeaWEllnessApp\" -Directory)",
+      "Bash(flutter pub *)",
+      "Bash(flutter clean *)"
     ]
   }
 }

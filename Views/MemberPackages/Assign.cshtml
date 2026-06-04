@@ -539,6 +539,29 @@
         </div>
     </div>
 
+    <!-- 2b. Class link (shown for SESSION / COMBINED) -->
+    <div class="form-card" id="classLinkCard" style="display:none;">
+        <div class="form-section-head">
+            <div class="form-section-icon"><i class="bi bi-calendar2-week"></i></div>
+            <span class="form-section-title">Link to Class</span>
+        </div>
+        <div class="form-body">
+            <div class="field" style="max-width:420px;">
+                <label class="field-label" asp-for="GymClassId">Specific Class (optional)</label>
+                <select asp-for="GymClassId" class="form-select">
+                    <option value="">— Any class —</option>
+                    @foreach (var c in Model.AvailableClasses)
+                    {
+                        <option value="@c.GymClassId">@c.ClassName · @c.TimeDisplay@(string.IsNullOrEmpty(c.CoachName) ? "" : $" · {c.CoachName}")</option>
+                    }
+                </select>
+                <div class="field-hint">
+                    If the member can only attend one specific class with this package, pick it here. Otherwise leave blank.
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- 3. Dates & Overrides -->
     <div class="form-card">
         <div class="form-section-head">
@@ -694,6 +717,14 @@
             // Show session override card for session-based packages
             const showSessions = type === 'SESSION' || type === 'COMBINED';
             document.getElementById('sessionOverrideCard').style.display = showSessions ? 'block' : 'none';
+
+            // Show "Link to Class" picker for class-eligible package types
+            const showClassLink = type === 'SESSION' || type === 'COMBINED' || type === 'CLASS';
+            document.getElementById('classLinkCard').style.display = showClassLink ? 'block' : 'none';
+            if (!showClassLink) {
+                const sel = document.querySelector('#classLinkCard select');
+                if (sel) sel.value = '';
+            }
 
             // Show branch section ONLY for SELECTED_BRANCHES
             const branchSection = document.getElementById('branchSection');
