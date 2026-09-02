@@ -1,5 +1,6 @@
 using GymSaaS.Models;
 using GymSaaS.Persistence;
+using GymSaaS.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -43,7 +44,12 @@ namespace GymSaaS.Controllers
                          && a.CheckInAtUtc >= fromDt
                          && a.CheckInAtUtc <= toDt);
 
-            if (branchId.HasValue)
+            // Branch scope: restricted staff see only their branches' attendance.
+            var scopedBranchIds = User.AssignedBranchIds();
+            if (scopedBranchIds.Count > 0)
+                q = q.Where(a => scopedBranchIds.Contains(a.BranchId));
+
+            if (branchId.HasValue && User.CanAccessBranch(branchId.Value))
                 q = q.Where(a => a.BranchId == branchId.Value);
 
             if (!string.IsNullOrWhiteSpace(statusCode))
@@ -98,9 +104,10 @@ namespace GymSaaS.Controllers
                 })
                 .ToListAsync();
 
-            // Populate dropdowns
+            // Populate dropdowns (scoped to the staff member's branches)
             var branches = await _db.Branches
-                .Where(b => b.TenantId == tenantId && b.IsActive)
+                .Where(b => b.TenantId == tenantId && b.IsActive
+                         && (scopedBranchIds.Count == 0 || scopedBranchIds.Contains(b.BranchId)))
                 .OrderBy(b => b.BranchName)
                 .Select(b => new { b.BranchId, b.BranchName })
                 .ToListAsync();

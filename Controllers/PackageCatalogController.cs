@@ -59,6 +59,9 @@ namespace GymSaaS.Controllers
                     PtSessionCount = x.p.PtSessionCount,
                     FreezeAllowanceDays = x.p.FreezeAllowanceDays,
                     Price = x.p.Price,
+                    MaxDiscountedPrice = x.p.MaxDiscountedPrice,
+                    IsPrivateTraining = x.p.IsPrivateTraining,
+                    CoachCommissionPercent = x.p.CoachCommissionPercent,
                     IsActive = x.p.IsActive,
                     SortOrder = x.p.SortOrder,
                     AssignedCount = _db.MemberPackages
@@ -159,10 +162,13 @@ namespace GymSaaS.Controllers
                 PtSessionCount = model.PtSessionCount,
                 FreezeAllowanceDays = model.FreezeAllowanceDays,
                 Price = model.Price,
+                MaxDiscountedPrice = model.MaxDiscountedPrice,
                 AllowCarryOverSessions = model.AllowCarryOverSessions,
                 AllowQueuedRenewal = model.AllowQueuedRenewal,
                 AllowCustomOverrideDuringAssignment = true,
                 IsCustomTemplate = false,
+                IsPrivateTraining = model.IsPrivateTraining,
+                CoachCommissionPercent = model.IsPrivateTraining ? model.CoachCommissionPercent : null,
                 IsActive = model.IsActive,
                 SortOrder = model.SortOrder,
                 CreatedAtUtc = DateTime.UtcNow,
@@ -205,8 +211,11 @@ namespace GymSaaS.Controllers
                 OpenGymDurationDaysSeparate = pkg.OpenGymDurationDays,
                 OpenGymDailyLimit = pkg.OpenGymDailyLimit,
                 Price = pkg.Price,
+                MaxDiscountedPrice = pkg.MaxDiscountedPrice,
                 AllowCarryOverSessions = pkg.AllowCarryOverSessions,
                 AllowQueuedRenewal = pkg.AllowQueuedRenewal,
+                IsPrivateTraining = pkg.IsPrivateTraining,
+                CoachCommissionPercent = pkg.CoachCommissionPercent,
                 IsActive = pkg.IsActive,
                 SortOrder = pkg.SortOrder,
                 RestrictedToBranchId = pkg.RestrictedToBranchId,
@@ -261,8 +270,11 @@ namespace GymSaaS.Controllers
             pkg.OpenGymDurationDays = model.IsCombined ? model.OpenGymDurationDaysSeparate : null;
             pkg.OpenGymDailyLimit = model.OpenGymDailyLimit;
             pkg.Price = model.Price;
+            pkg.MaxDiscountedPrice = model.MaxDiscountedPrice;
             pkg.AllowCarryOverSessions = model.AllowCarryOverSessions;
             pkg.AllowQueuedRenewal = model.AllowQueuedRenewal;
+            pkg.IsPrivateTraining = model.IsPrivateTraining;
+            pkg.CoachCommissionPercent = model.IsPrivateTraining ? model.CoachCommissionPercent : null;
             pkg.IsActive = model.IsActive;
             pkg.SortOrder = model.SortOrder;
             pkg.UpdatedAtUtc = DateTime.UtcNow;
@@ -385,6 +397,19 @@ namespace GymSaaS.Controllers
 
             if (string.IsNullOrWhiteSpace(model.PackageName))
                 ModelState.AddModelError(nameof(model.PackageName), "Package name is required.");
+
+            if (model.MaxDiscountedPrice.HasValue)
+            {
+                if (model.MaxDiscountedPrice.Value < 0)
+                    ModelState.AddModelError(nameof(model.MaxDiscountedPrice),
+                        "Max discounted price cannot be negative.");
+                else if (!model.Price.HasValue)
+                    ModelState.AddModelError(nameof(model.MaxDiscountedPrice),
+                        "Set a Price before setting a Max Discounted Price.");
+                else if (model.MaxDiscountedPrice.Value > model.Price.Value)
+                    ModelState.AddModelError(nameof(model.MaxDiscountedPrice),
+                        "Max discounted price cannot be greater than Price.");
+            }
 
             if (model.BranchAccessPolicyTypeId == Guid.Empty)
                 ModelState.AddModelError(nameof(model.BranchAccessPolicyTypeId), "Please select a branch access policy.");

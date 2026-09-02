@@ -426,14 +426,26 @@
                 <div class="field">
                     <label class="field-label">Price (EGP)</label>
                     <input name="Price" type="number" step="0.01" min="0"
-                           value="@Model.Price" placeholder="e.g. 1500" />
+                           value="@Model.Price" placeholder="e.g. 6000" />
                     <div class="field-hint">Leave blank if price varies per assignment.</div>
                 </div>
                 <div class="field">
-                    <label class="field-label">Sort Order</label>
-                    <input name="SortOrder" type="number" min="0" value="@Model.SortOrder" placeholder="0" />
-                    <div class="field-hint">Lower numbers appear first.</div>
+                    <label class="field-label">Max Discounted Price (EGP)</label>
+                    <input name="MaxDiscountedPrice" type="number" step="0.01" min="0"
+                           value="@Model.MaxDiscountedPrice" placeholder="e.g. 5500" />
+                    <div class="field-hint">Lowest price staff may charge after discount. Leave blank for no floor.</div>
+                    @if (ViewData.ModelState["MaxDiscountedPrice"]?.Errors.Count > 0)
+                    {
+                        <div class="field-error" style="display:block;">
+                            @ViewData.ModelState["MaxDiscountedPrice"]!.Errors[0].ErrorMessage
+                        </div>
+                    }
                 </div>
+            </div>
+            <div class="field" style="max-width:220px;">
+                <label class="field-label">Sort Order</label>
+                <input name="SortOrder" type="number" min="0" value="@Model.SortOrder" placeholder="0" />
+                <div class="field-hint">Lower numbers appear first.</div>
             </div>
         </div>
     </div>
@@ -712,6 +724,38 @@
 
             <div class="toggle-row">
                 <div class="toggle-label">
+                    <div class="tl-title"><i class="bi bi-person-arms-up" style="color:var(--fire);margin-right:5px;"></i> Private Training Package</div>
+                    <div class="tl-sub">Marks this as a Personal Training package. Staff must select a coach when assigning.</div>
+                </div>
+                <label class="toggle-switch">
+                    <input name="IsPrivateTraining" type="checkbox" value="true" id="privateToggle" @(Model.IsPrivateTraining ? "checked" : "") />
+                    <span class="toggle-track"></span>
+                </label>
+            </div>
+
+            <!-- Commission % — visible only when Private is on -->
+            <div id="commissionRow" style="display:@(Model.IsPrivateTraining ? "block" : "none"); margin-top:14px; padding:14px 16px; background:linear-gradient(135deg, rgba(249,115,22,.05), rgba(249,115,22,.02)); border:1px solid rgba(249,115,22,.25); border-radius:10px;">
+                <label class="field-label" for="CoachCommissionPercent">
+                    <i class="bi bi-percent" style="color:var(--fire);margin-right:5px;"></i>
+                    Coach Commission %
+                </label>
+                <div style="display:flex; align-items:center; gap:8px; max-width:260px; margin-top:6px;">
+                    <input name="CoachCommissionPercent" id="CoachCommissionPercent" type="number" min="0" max="100" step="0.01"
+                           value="@(Model.CoachCommissionPercent?.ToString("0.##") ?? "")" placeholder="e.g. 30" style="flex:1;" />
+                    <span style="font-size:14px;font-weight:700;color:var(--t2);">%</span>
+                </div>
+                <div class="field-hint" style="margin-top:6px;">
+                    Percentage of the package price the coach earns when a member is assigned this package.
+                    The gym keeps the remainder. Locked in at the moment of assignment.
+                </div>
+                @if (!ViewData.ModelState.IsValid && ViewData.ModelState["CoachCommissionPercent"]?.Errors.Count > 0)
+                {
+                    <div class="field-error visible">@ViewData.ModelState["CoachCommissionPercent"]!.Errors[0].ErrorMessage</div>
+                }
+            </div>
+
+            <div class="toggle-row">
+                <div class="toggle-label">
                     <div class="tl-title">Active</div>
                     <div class="tl-sub">Inactive packages cannot be assigned to members.</div>
                 </div>
@@ -802,6 +846,19 @@
                 set('real_OpenGymDurationDaysSeparate', get('fGymDurationSeparate'));
                 set('real_OpenGymDailyLimit',           get('fGymDailyLimitCombined'));
             }
+        }
+
+        // Toggle commission % row visibility based on Private toggle
+        const privateToggle = document.getElementById('privateToggle');
+        const commissionRow = document.getElementById('commissionRow');
+        if (privateToggle && commissionRow) {
+            privateToggle.addEventListener('change', () => {
+                commissionRow.style.display = privateToggle.checked ? 'block' : 'none';
+                if (!privateToggle.checked) {
+                    const inp = document.getElementById('CoachCommissionPercent');
+                    if (inp) inp.value = '';
+                }
+            });
         }
 
         // Init on load

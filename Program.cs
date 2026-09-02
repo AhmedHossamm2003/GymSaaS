@@ -50,7 +50,15 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("ManagerAndAbove", policy =>
         policy.RequireRole("SuperAdmin", "Admin", "BranchManager"));
 
+    options.AddPolicy("CoachAndAbove", policy =>
+        policy.RequireRole("SuperAdmin", "Admin", "BranchManager", "Coach"));
+
     options.AddPolicy("AnyStaff", policy =>
+        policy.RequireRole("SuperAdmin", "Admin", "BranchManager", "Receptionist", "Coach"));
+
+    // Staff who can access the all-members directory. Coaches are excluded —
+    // they have a separate "My Trainees" view scoped to members they coach.
+    options.AddPolicy("StaffExceptCoach", policy =>
         policy.RequireRole("SuperAdmin", "Admin", "BranchManager", "Receptionist"));
 });
 

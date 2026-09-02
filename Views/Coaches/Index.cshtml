@@ -120,6 +120,23 @@ else
                         <i class="bi bi-calendar2-week" style="width:14px;color:var(--text-faint)"></i>
                         <span>@c.ClassCount @(c.ClassCount == 1 ? "class" : "classes")</span>
                     </div>
+                    <div style="display:flex;align-items:center;gap:8px">
+                        <i class="bi bi-person-arms-up" style="width:14px;color:var(--text-faint)"></i>
+                        <span>
+                            <strong style="color:var(--orange)">@c.ActiveTraineeCount</strong>
+                            @if (c.CoachTarget > 0)
+                            {
+                                <text> / @c.CoachTarget</text>
+                            }
+                            <text> trainees</text>
+                            @if (c.CoachTarget > 0)
+                            {
+                                var pct = (int)((double)c.ActiveTraineeCount / c.CoachTarget * 100);
+                                var clr = pct >= 100 ? "#16a34a" : (pct >= 50 ? "#f59e0b" : "#dc2626");
+                                <span style="font-size:11px;color:@clr;font-weight:700;margin-left:6px;">(@pct%)</span>
+                            }
+                        </span>
+                    </div>
                     @if (!string.IsNullOrEmpty(c.Phone))
                     {
                         <div style="display:flex;align-items:center;gap:8px">

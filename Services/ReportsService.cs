@@ -67,11 +67,15 @@ namespace GymSaaS.Services
 
             // Avoid double-counting COMBINED rows (they have two MemberPackage rows but one sale)
             // → group by LinkedPackageGroupId when present; otherwise count individually
+            // Use the SNAPSHOT price/commission on MemberPackage so historical accounting is stable.
+            // For private packages, subtract the coach's commission so income reflects only the gym's share.
             var pkgRows = await packageIncomeQuery
                 .Select(x => new
                 {
                     GroupKey         = x.mp.LinkedPackageGroupId ?? x.mp.MemberPackageId,
-                    Price            = x.pd.Price ?? 0,
+                    // Prefer snapshot price; fall back to live PackageDefinition.Price for legacy rows.
+                    Price            = x.mp.PriceSnapshot ?? x.pd.Price ?? 0,
+                    CoachCut         = x.mp.CoachCommissionAmount ?? 0,
                     PackageName      = x.pd.PackageName,
                     HomeBranchId     = x.mp.HomeBranchId,
                     ComponentRole    = x.mp.PackageComponentRole,
@@ -84,12 +88,15 @@ namespace GymSaaS.Services
                 .Select(g => new
                 {
                     Price        = g.First().Price,
+                    CoachCut     = g.First().CoachCut,
+                    GymShare     = g.First().Price - g.First().CoachCut,
                     PackageName  = g.First().PackageName,
                     HomeBranchId = g.First().HomeBranchId,
                 })
                 .ToList();
 
-            vm.IncomeFromPackages = pkgGroupedForIncome.Sum(g => g.Price);
+            // Income = gym's share only (full price for non-private packages, price - coach cut for private)
+            vm.IncomeFromPackages = pkgGroupedForIncome.Sum(g => g.GymShare);
 
             // Manual income
             var manualIncQuery = _db.ManualIncomeEntries
@@ -126,10 +133,13 @@ namespace GymSaaS.Services
                 .Select(x => new
                 {
                     GroupKey = x.mp.LinkedPackageGroupId ?? x.mp.MemberPackageId,
-                    Price    = x.pd.Price ?? 0,
+                    Price    = x.mp.PriceSnapshot ?? x.pd.Price ?? 0,
+                    CoachCut = x.mp.CoachCommissionAmount ?? 0,
                 }).ToListAsync();
 
-            var prevPkgIncome = prevPkgRows.GroupBy(r => r.GroupKey).Sum(g => g.First().Price);
+            var prevPkgIncome = prevPkgRows
+                .GroupBy(r => r.GroupKey)
+                .Sum(g => g.First().Price - g.First().CoachCut);
 
             var prevManualQuery = _db.ManualIncomeEntries
                 .Where(i => i.TenantId == tenantId && !i.IsDeleted
@@ -272,7 +282,7 @@ namespace GymSaaS.Services
                 var bPkgIncome = pkgRows
                     .Where(r => r.HomeBranchId == b.BranchId)
                     .GroupBy(r => r.GroupKey)
-                    .Sum(g => g.First().Price);
+                    .Sum(g => g.First().Price - g.First().CoachCut);
 
                 var bManualIncome = await _db.ManualIncomeEntries
                     .Where(i => i.TenantId == tenantId && !i.IsDeleted
@@ -312,13 +322,14 @@ namespace GymSaaS.Services
             vm.BranchPerformance = branchPerf.OrderByDescending(b => b.Income).ToList();
 
             // ─── TOP SELLING PACKAGES ──────────────────────────────────
+            // Revenue = gym's share (after coach commission)
             vm.TopSellingPackages = pkgGroupedForIncome
                 .GroupBy(g => g.PackageName)
                 .Select(g => new TopPackageItem
                 {
                     PackageName     = g.Key,
                     AssignmentCount = g.Count(),
-                    TotalRevenue    = g.Sum(x => x.Price),
+                    TotalRevenue    = g.Sum(x => x.GymShare),
                 })
                 .OrderByDescending(p => p.TotalRevenue)
                 .Take(5)
@@ -349,10 +360,13 @@ namespace GymSaaS.Services
                     .Select(x => new
                     {
                         GroupKey = x.mp.LinkedPackageGroupId ?? x.mp.MemberPackageId,
-                        Price    = x.pd.Price ?? 0,
+                        Price    = x.mp.PriceSnapshot ?? x.pd.Price ?? 0,
+                        CoachCut = x.mp.CoachCommissionAmount ?? 0,
                     })
                     .ToListAsync();
-                var mPkgIncome = mPkgRows.GroupBy(r => r.GroupKey).Sum(g => g.First().Price);
+                var mPkgIncome = mPkgRows
+                    .GroupBy(r => r.GroupKey)
+                    .Sum(g => g.First().Price - g.First().CoachCut);
 
                 var mManualQ = _db.ManualIncomeEntries
                     .Where(x => x.TenantId == tenantId && !x.IsDeleted

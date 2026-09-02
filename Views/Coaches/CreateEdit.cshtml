@@ -71,12 +71,53 @@
                     <span asp-validation-for="Phone" style="color:#dc2626;font-size:11px"></span>
                 </div>
                 <div class="form-group" style="margin-bottom:0">
-                    <label asp-for="Email">Email</label>
-                    <input asp-for="Email" type="email" placeholder="coach@example.com" />
+                    <label asp-for="Email">Email <span style="color:var(--orange)">*</span></label>
+                    <input asp-for="Email" type="email" placeholder="coach@example.com" readonly="@(Model.IsEdit ? "readonly" : null)" />
                     <span asp-validation-for="Email" style="color:#dc2626;font-size:11px"></span>
+                    @if (!Model.IsEdit)
+                    {
+                        <div style="font-size:11.5px;color:var(--text-faint);margin-top:5px">
+                            <i class="bi bi-info-circle"></i> Used as the coach's login username.
+                        </div>
+                    }
                 </div>
             </div>
         </div>
+
+        <!-- Login account (Create only) -->
+        @if (!Model.IsEdit)
+        {
+            <div class="card" style="margin-bottom:20px;border:1px solid var(--orange);background:rgba(249,115,22,.04)">
+                <div class="card-header">
+                    <span class="card-title"><i class="bi bi-shield-lock" style="color:var(--orange)"></i> Login Account</span>
+                </div>
+                <div style="font-size:12.5px;color:var(--text-secondary);margin-bottom:14px">
+                    A user account with the <strong>Coach</strong> role will be automatically created. The coach will use the email above and the password below to log in.
+                </div>
+                <div class="form-group" style="margin-bottom:0;max-width:360px">
+                    <label asp-for="LoginPassword">Initial Password <span style="color:var(--orange)">*</span></label>
+                    <input asp-for="LoginPassword" type="password" placeholder="Minimum 6 characters" autocomplete="new-password" />
+                    <span asp-validation-for="LoginPassword" style="color:#dc2626;font-size:11px"></span>
+                    <div style="font-size:11.5px;color:var(--text-faint);margin-top:5px">
+                        Share this password with the coach so they can log in. They can change it later.
+                    </div>
+                </div>
+            </div>
+        }
+        else if (Model.HasLinkedUser)
+        {
+            <div class="card" style="margin-bottom:20px;border:1px solid var(--border);background:var(--bg-raised)">
+                <div style="display:flex;align-items:center;gap:10px">
+                    <i class="bi bi-check-circle-fill" style="color:#16a34a;font-size:18px"></i>
+                    <div>
+                        <div style="font-size:13px;font-weight:600;color:var(--black)">Login account linked</div>
+                        <div style="font-size:12px;color:var(--text-secondary);margin-top:2px">
+                            Email: <strong>@Model.LinkedUserEmail</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
 
         <!-- Photo -->
         <div class="card" style="margin-bottom:20px">
@@ -106,6 +147,24 @@
                            onchange="previewPhoto(this)"
                            style="font-size:13px;border:none;padding:0"/>
                 </div>
+            </div>
+        </div>
+
+        <!-- Performance Target -->
+        <div class="card" style="margin-bottom:20px">
+            <div class="card-header">
+                <span class="card-title">Performance Target</span>
+            </div>
+            <div class="form-group" style="margin-bottom:0;max-width:300px">
+                <label asp-for="CoachTarget">
+                    <i class="bi bi-bullseye" style="color:var(--orange);margin-right:5px"></i>
+                    Target Number of Trainees
+                </label>
+                <input asp-for="CoachTarget" type="number" min="0" max="999" placeholder="e.g. 15" />
+                <div style="font-size:11.5px;color:var(--text-faint);margin-top:5px">
+                    Goal number of active private-training members assigned to this coach. Used on the coach dashboard.
+                </div>
+                <span asp-validation-for="CoachTarget" style="color:#dc2626;font-size:11px"></span>
             </div>
         </div>
 

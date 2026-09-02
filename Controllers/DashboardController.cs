@@ -1,5 +1,6 @@
 using GymSaaS.Persistence;
 using GymSaaS.Models;
+using GymSaaS.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -19,25 +20,42 @@ namespace GymSaaS.Controllers
 
         public async Task<IActionResult> Index()
         {
+            // Pure Coach users get redirected to their own dashboard
+            if (User.IsInRole("Coach")
+                && !User.IsInRole("SuperAdmin")
+                && !User.IsInRole("Admin")
+                && !User.IsInRole("BranchManager")
+                && !User.IsInRole("Receptionist"))
+            {
+                return RedirectToAction("Dashboard", "Coaches");
+            }
+
             var tenantId = Guid.Parse(User.FindFirstValue("TenantId")!);
             var now      = DateTime.UtcNow;
             var today    = DateOnly.FromDateTime(now);
+
+            // Branch scope — restricted staff see only their branches' figures.
+            var scoped = User.AssignedBranchIds();
+            bool unscoped = scoped.Count == 0;
 
             // ── 1. Active Members ────────────────────────────────
             var activeMembers = await _db.Members
                 .CountAsync(m => m.TenantId == tenantId
                               && m.IsActive
-                              && !m.IsDeleted);
+                              && !m.IsDeleted
+                              && (unscoped || scoped.Contains(m.HomeBranchId)));
 
-            // ── 2. Attendance Today (across all branches) ────────
+            // ── 2. Attendance Today (scoped branches) ────────────
             var attendanceToday = await _db.AttendanceRecords
                 .CountAsync(a => a.TenantId == tenantId
-                              && a.CheckInAtUtc.Date == now.Date);
+                              && a.CheckInAtUtc.Date == now.Date
+                              && (unscoped || scoped.Contains(a.BranchId)));
 
             // ── 3. Members Currently Inside (within presence window)
             var currentlyInside = await _db.AttendanceRecords
                 .Where(a => a.TenantId == tenantId
-                         && a.PresenceUntilUtc > now)
+                         && a.PresenceUntilUtc > now
+                         && (unscoped || scoped.Contains(a.BranchId)))
                 .Select(a => a.MemberId)
                 .Distinct()
                 .CountAsync();
@@ -48,11 +66,13 @@ namespace GymSaaS.Controllers
                                && mp.Status == "ACTIVE"
                                && mp.ValidToDate != null
                                && mp.ValidToDate >= today
-                               && mp.ValidToDate <= today.AddDays(7));
+                               && mp.ValidToDate <= today.AddDays(7)
+                               && (unscoped || scoped.Contains(mp.HomeBranchId)));
 
             // ── 5. Branch Summary ────────────────────────────────
             var branches = await _db.Branches
-                .Where(b => b.TenantId == tenantId && b.IsActive)
+                .Where(b => b.TenantId == tenantId && b.IsActive
+                         && (unscoped || scoped.Contains(b.BranchId)))
                 .Select(b => new BranchSummaryItem
                 {
                     BranchId   = b.BranchId,
@@ -78,7 +98,8 @@ namespace GymSaaS.Controllers
 
             // ── 6. Recent Attendance (last 10 check-ins) ─────────
             var recentAttendance = await _db.AttendanceRecords
-                .Where(a => a.TenantId == tenantId)
+                .Where(a => a.TenantId == tenantId
+                         && (unscoped || scoped.Contains(a.BranchId)))
                 .OrderByDescending(a => a.CheckInAtUtc)
                 .Take(10)
                 .Join(_db.Members,
@@ -109,7 +130,8 @@ namespace GymSaaS.Controllers
                 .CountAsync(mp => mp.TenantId == tenantId
                                && mp.Status == "ACTIVE"
                                && mp.SessionCountRemaining != null
-                               && mp.SessionCountRemaining <= 2);
+                               && mp.SessionCountRemaining <= 2
+                               && (unscoped || scoped.Contains(mp.HomeBranchId)));
 
             // ── Build ViewModel ───────────────────────────────────
             var vm = new DashboardViewModel

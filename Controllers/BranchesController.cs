@@ -34,6 +34,11 @@ namespace GymSaaS.Controllers
         {
             var query = _db.Branches.Where(b => b.TenantId == TenantId);
 
+            // Branch scope — restricted staff see only their assigned branches.
+            var scoped = User.AssignedBranchIds();
+            if (scoped.Count > 0)
+                query = query.Where(b => scoped.Contains(b.BranchId));
+
             if (!string.IsNullOrWhiteSpace(search))
                 query = query.Where(b =>
                     b.BranchName.Contains(search) ||
@@ -73,6 +78,8 @@ namespace GymSaaS.Controllers
         // ─────────────────────────────────────────────
         public async Task<IActionResult> Details(Guid id)
         {
+            if (!User.CanAccessBranch(id)) return Forbid();
+
             var b = await _db.Branches
                 .FirstOrDefaultAsync(x => x.BranchId == id && x.TenantId == TenantId);
 

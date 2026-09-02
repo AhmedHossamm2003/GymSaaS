@@ -1,0 +1,248 @@
+@model GymSaaS.Models.CoachMyScheduleViewModel
+@{
+    ViewData["Title"] = "My Schedule";
+
+    // Compute hour range based on actual class times (pad ±1h, default 06:00–22:00)
+    int minHour = 6, maxHour = 22;
+    if (Model.Classes.Any())
+    {
+        var minStart = Model.Classes.Min(c => c.StartTime.Hour);
+        var maxEnd = Model.Classes.Max(c => c.EndTime.Hour + (c.EndTime.Minute > 0 ? 1 : 0));
+        minHour = Math.Min(Math.Max(minStart - 1, 0), 6);
+        maxHour = Math.Max(Math.Min(maxEnd + 1, 24), 22);
+    }
+    var hourCount = maxHour - minHour;
+    int slotHeight = 60; // px per hour
+
+    var dayNames = new[] { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
+    var dayFullNames = new[] { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
+    var today = DateTime.Today;
+    var weekStart = today.AddDays(-(int)today.DayOfWeek);
+}
+
+@section Styles {
+    <style>
+        .sched-head {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 18px;
+        }
+        .sched-summary {
+            display: flex; gap: 14px; align-items: center;
+            font-size: 13px; color: #6b7280;
+        }
+        .sched-pill {
+            background: rgba(249,115,22,.1); color: #ea580c;
+            padding: 4px 12px; border-radius: 14px;
+            font-weight: 700; font-size: 12px;
+        }
+
+        .week-cal {
+            background: #fff; border: 1px solid #e8e8e8;
+            border-radius: 14px; overflow: hidden;
+        }
+
+        /* Header row: time gutter + 7 day columns */
+        .week-cal-head {
+            display: grid;
+            grid-template-columns: 70px repeat(7, 1fr);
+            background: #fafafa;
+            border-bottom: 1px solid #e8e8e8;
+        }
+        .week-cal-head-cell {
+            padding: 12px 8px;
+            text-align: center;
+            border-right: 1px solid #f0f0f0;
+        }
+        .week-cal-head-cell:last-child { border-right: none; }
+        .week-cal-head-day {
+            font-size: 11px; font-weight: 700;
+            letter-spacing: .08em; text-transform: uppercase;
+            color: #9ca3af;
+        }
+        .week-cal-head-date {
+            font-size: 18px; font-weight: 800;
+            color: #111; margin-top: 2px;
+        }
+        .week-cal-head-cell.today .week-cal-head-day { color: #f97316; }
+        .week-cal-head-cell.today .week-cal-head-date {
+            background: #f97316; color: #fff;
+            width: 30px; height: 30px; border-radius: 50%;
+            display: inline-flex; align-items: center; justify-content: center;
+            font-size: 14px;
+        }
+
+        /* Grid: time gutter + 7 day columns, hour rows */
+        .week-cal-body {
+            display: grid;
+            grid-template-columns: 70px repeat(7, 1fr);
+            position: relative;
+        }
+        .time-gutter {
+            border-right: 1px solid #e8e8e8;
+        }
+        .time-row {
+            height: 60px;
+            border-bottom: 1px dashed #f0f0f0;
+            text-align: right;
+            padding-right: 8px;
+            font-size: 11px; font-weight: 600;
+            color: #9ca3af;
+            position: relative;
+            top: -7px;
+        }
+        .time-row:first-child { top: 0; }
+
+        .day-col {
+            border-right: 1px solid #f0f0f0;
+            position: relative;
+        }
+        .day-col:last-child { border-right: none; }
+        .day-col.today { background: rgba(249,115,22,.03); }
+        .hour-slot {
+            height: 60px;
+            border-bottom: 1px dashed #f0f0f0;
+        }
+
+        /* Event blocks */
+        .class-event {
+            position: absolute;
+            left: 4px; right: 4px;
+            background: linear-gradient(135deg, #fff7ed, #fed7aa);
+            border-left: 3px solid #f97316;
+            border-radius: 6px;
+            padding: 6px 8px;
+            box-shadow: 0 2px 6px rgba(249,115,22,.15);
+            overflow: hidden;
+            font-size: 11px;
+            color: #9a3412;
+            transition: transform .12s, box-shadow .12s;
+            cursor: pointer;
+        }
+        .class-event:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 12px rgba(249,115,22,.25);
+            z-index: 10;
+        }
+        .class-event-time {
+            font-size: 10px; font-weight: 700;
+            color: #c2410c; margin-bottom: 1px;
+        }
+        .class-event-name {
+            font-size: 12px; font-weight: 700;
+            color: #7c2d12; line-height: 1.2;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .class-event-cap {
+            font-size: 10px; color: #9a3412; margin-top: 2px;
+        }
+
+        /* Now line */
+        .now-line {
+            position: absolute;
+            left: 0; right: 0; height: 2px;
+            background: #dc2626; z-index: 5;
+            pointer-events: none;
+        }
+        .now-line::before {
+            content: '';
+            position: absolute; left: -5px; top: -4px;
+            width: 10px; height: 10px;
+            border-radius: 50%; background: #dc2626;
+        }
+
+        .empty-state {
+            background: #fff; border: 1px solid #e8e8e8; border-radius: 14px;
+            padding: 60px 24px; text-align: center;
+        }
+    </style>
+}
+
+<div class="sched-head">
+    <div>
+        <div style="font-size:22px;font-weight:800;color:#111">My Weekly Schedule</div>
+        <div style="font-size:13px;color:#6b7280;margin-top:2px">@weekStart.ToString("MMM dd") – @weekStart.AddDays(6).ToString("MMM dd, yyyy")</div>
+    </div>
+    <div class="sched-summary">
+        <span class="sched-pill"><i class="bi bi-calendar2-week"></i> @Model.Classes.Count weekly classes</span>
+        <a asp-controller="Coaches" asp-action="Dashboard" class="btn btn-secondary"><i class="bi bi-arrow-left"></i> Dashboard</a>
+    </div>
+</div>
+
+@if (!Model.Classes.Any())
+{
+    <div class="empty-state">
+        <i class="bi bi-calendar2-week" style="font-size:48px;color:#d1d5db"></i>
+        <div style="margin-top:14px;font-size:16px;font-weight:600;color:#374151">No classes assigned yet</div>
+        <div style="margin-top:6px;font-size:13px;color:#9ca3af">Your manager can assign classes to you from the Classes page.</div>
+    </div>
+}
+else
+{
+    <div class="week-cal">
+        <!-- Header -->
+        <div class="week-cal-head">
+            <div class="week-cal-head-cell"></div>
+            @for (int d = 0; d < 7; d++)
+            {
+                var dayDate = weekStart.AddDays(d);
+                var isToday = dayDate.Date == today.Date;
+                <div class="week-cal-head-cell @(isToday ? "today" : "")">
+                    <div class="week-cal-head-day">@dayNames[d]</div>
+                    <div class="week-cal-head-date">@dayDate.Day</div>
+                </div>
+            }
+        </div>
+
+        <!-- Body with hour rows -->
+        <div class="week-cal-body" style="height:@(hourCount * slotHeight)px;">
+            <!-- Time gutter -->
+            <div class="time-gutter">
+                @for (int h = 0; h < hourCount; h++)
+                {
+                    var hour = minHour + h;
+                    var label = hour == 0 ? "12 AM" : hour == 12 ? "12 PM" : hour < 12 ? $"{hour} AM" : $"{hour - 12} PM";
+                    <div class="time-row">@label</div>
+                }
+            </div>
+
+            <!-- Day columns -->
+            @for (int d = 0; d < 7; d++)
+            {
+                var isToday = (int)today.DayOfWeek == d;
+                <div class="day-col @(isToday ? "today" : "")" data-day="@d">
+                    @for (int h = 0; h < hourCount; h++)
+                    {
+                        <div class="hour-slot"></div>
+                    }
+                    @{
+                        var dayClasses = Model.Classes.Where(c => c.DayOfWeek == d).OrderBy(c => c.StartTime).ToList();
+                    }
+                    @foreach (var cls in dayClasses)
+                    {
+                        var startMins = (cls.StartTime.Hour - minHour) * 60 + cls.StartTime.Minute;
+                        var endMins   = (cls.EndTime.Hour - minHour) * 60 + cls.EndTime.Minute;
+                        var topPx = startMins;
+                        var heightPx = Math.Max(endMins - startMins, 30);
+                        <div class="class-event" style="top:@(topPx)px;height:@(heightPx)px;"
+                             title="@cls.ClassName · @cls.StartTime.ToString("HH:mm") – @cls.EndTime.ToString("HH:mm")">
+                            <div class="class-event-time">@cls.StartTime.ToString("HH:mm") – @cls.EndTime.ToString("HH:mm")</div>
+                            <div class="class-event-name">@cls.ClassName</div>
+                            @if (cls.Capacity.HasValue)
+                            {
+                                <div class="class-event-cap"><i class="bi bi-people"></i> cap @cls.Capacity</div>
+                            }
+                        </div>
+                    }
+                    @if (isToday)
+                    {
+                        var nowMins = (DateTime.Now.Hour - minHour) * 60 + DateTime.Now.Minute;
+                        if (nowMins > 0 && nowMins < hourCount * 60)
+                        {
+                            <div class="now-line" style="top:@(nowMins)px;"></div>
+                        }
+                    }
+                </div>
+            }
+        </div>
+    </div>
+}

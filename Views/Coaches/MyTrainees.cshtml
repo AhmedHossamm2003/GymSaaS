@@ -1,0 +1,90 @@
+@model List<GymSaaS.Models.CoachMyTraineeItem>
+@{
+    ViewData["Title"] = "My Trainees";
+}
+
+<div class="page-header">
+    <div>
+        <div class="page-title">My Trainees</div>
+        <div class="page-subtitle">Active private training assignments</div>
+    </div>
+    <a asp-controller="Coaches" asp-action="Dashboard" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Dashboard
+    </a>
+</div>
+
+@if (!Model.Any())
+{
+    <div class="card" style="text-align:center;padding:60px 24px">
+        <i class="bi bi-person-arms-up" style="font-size:40px;color:var(--text-faint)"></i>
+        <div style="margin-top:12px;color:var(--text-muted);font-size:14px">No active trainees yet.</div>
+        <div style="margin-top:6px;font-size:12.5px;color:var(--text-faint)">When members are assigned to you on a private-training package, they'll appear here.</div>
+    </div>
+}
+else
+{
+    <div class="card" style="padding:0;overflow:hidden">
+        <table style="width:100%;border-collapse:collapse">
+            <thead>
+                <tr style="background:var(--bg-raised);border-bottom:1px solid var(--border)">
+                    <th style="padding:12px 16px;text-align:left;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint)">Member</th>
+                    <th style="padding:12px 16px;text-align:left;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint)">Package</th>
+                    <th style="padding:12px 16px;text-align:left;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint)">Type</th>
+                    <th style="padding:12px 16px;text-align:left;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint)">Sessions / Days Left</th>
+                    <th style="padding:12px 16px;text-align:left;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint)">Expires</th>
+                    <th style="padding:12px 16px;text-align:left;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint)">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var t in Model)
+                {
+                    var daysLeft = (t.ValidToDate.DayNumber - DateOnly.FromDateTime(DateTime.UtcNow).DayNumber);
+                    var rowColor = daysLeft < 7 ? "#fef2f2" : (daysLeft < 30 ? "#fffbeb" : "transparent");
+                    <tr style="border-bottom:1px solid var(--border);background:@rowColor">
+                        <td style="padding:14px 16px">
+                            <a asp-controller="Members" asp-action="Details" asp-route-id="@t.MemberId" style="font-weight:600;color:var(--black);text-decoration:none">@t.MemberName</a>
+                        </td>
+                        <td style="padding:14px 16px;font-size:13px;color:var(--text-secondary)">@t.PackageName</td>
+                        <td style="padding:14px 16px">
+                            <span style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:10px;background:@(t.TrainingType == "Classes" ? "rgba(249,115,22,.12)" : "rgba(59,130,246,.12)");color:@(t.TrainingType == "Classes" ? "#ea580c" : "#3b82f6")">
+                                @t.TrainingType
+                            </span>
+                        </td>
+                        <td style="padding:14px 16px;font-size:13px">
+                            @if (t.SessionsRemaining.HasValue)
+                            {
+                                <strong>@t.SessionsRemaining</strong> <text>sessions</text>
+                            }
+                            else if (t.DaysRemaining.HasValue)
+                            {
+                                <strong>@t.DaysRemaining</strong> <text>days</text>
+                            }
+                            else
+                            {
+                                <span style="color:var(--text-faint)">—</span>
+                            }
+                        </td>
+                        <td style="padding:14px 16px;font-size:13px">
+                            @t.ValidToDate.ToString("dd MMM yyyy")
+                            @if (daysLeft <= 30 && daysLeft > 0)
+                            {
+                                <div style="font-size:11px;color:@(daysLeft < 7 ? "#dc2626" : "#f59e0b");font-weight:600">@daysLeft days left</div>
+                            }
+                            else if (daysLeft <= 0)
+                            {
+                                <div style="font-size:11px;color:#dc2626;font-weight:600">Expired</div>
+                            }
+                        </td>
+                        <td style="padding:14px 16px">
+                            <span class="badge badge-active">@t.Status</span>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <div style="margin-top:14px;font-size:12px;color:var(--text-faint)">
+        Total: <strong>@Model.Count</strong> active trainee@(Model.Count == 1 ? "" : "s")
+    </div>
+}

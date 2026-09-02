@@ -32,6 +32,8 @@ public partial class GymDbContext : DbContext
 
     public virtual DbSet<MemberInvitation> MemberInvitations { get; set; }
 
+    public virtual DbSet<MemberPerkUsage> MemberPerkUsages { get; set; }
+
     public virtual DbSet<MemberStatus> MemberStatuses { get; set; }
 
     public virtual DbSet<OverrideRequestStatus> OverrideRequestStatuses { get; set; }

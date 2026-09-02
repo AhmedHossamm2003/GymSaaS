@@ -152,6 +152,16 @@
                 background: var(--fire-soft);
             }
 
+            .pkg-option.is-private {
+                background: linear-gradient(90deg, rgba(249,115,22,.05) 0%, #fff 50%);
+                border-color: rgba(249,115,22,.4);
+            }
+            .pkg-option.is-private.selected {
+                border-color: #ea580c;
+                background: linear-gradient(90deg, rgba(249,115,22,.12) 0%, var(--fire-soft) 100%);
+                box-shadow: 0 4px 14px rgba(249,115,22,.18);
+            }
+
             .pkg-option input[type=radio] {
                 display: none;
             }
@@ -408,9 +418,28 @@
     <input type="hidden" asp-for="MemberId" />
     <input type="hidden" asp-for="MemberName" />
     <input type="hidden" asp-for="MembershipNumber" />
+    <input type="hidden" asp-for="HomeBranchId" />
+    <input type="hidden" asp-for="HomeBranchName" />
     <!-- Store member's home branch id and name for display -->
     <input type="hidden" id="homeBranchId" value="@Model.HomeBranchId" />
     <input type="hidden" id="homeBranchName" value="@Model.HomeBranchName" />
+
+    @* Validation summary *@
+    @if (!ViewData.ModelState.IsValid && ViewData.ModelState.ErrorCount > 0)
+    {
+        <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:10px; padding:14px 18px; margin-bottom:16px; display:flex; align-items:flex-start; gap:10px;">
+            <i class="bi bi-exclamation-circle" style="color:#dc2626; font-size:16px; flex-shrink:0; margin-top:1px;"></i>
+            <div>
+                <div style="font-size:13px; font-weight:700; color:#991b1b; margin-bottom:4px;">Please fix the following:</div>
+                <ul style="list-style:none; padding:0; margin:0;">
+                    @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors).Where(e => !string.IsNullOrEmpty(e.ErrorMessage)))
+                    {
+                        <li style="font-size:12.5px; color:#991b1b;">· @error.ErrorMessage</li>
+                    }
+                </ul>
+            </div>
+        </div>
+    }
 
     <!-- 1. Select Package -->
     <div class="form-card">
@@ -447,19 +476,28 @@
                             _ => pkg.BranchAccessPolicy
                         };
 
-                        <label class="pkg-option" onclick="selectPackage(this)"
+                        <label class="pkg-option @(pkg.IsPrivateTraining ? "is-private" : "")" onclick="selectPackage(this)"
                                data-type="@pkg.PackageTypeCode"
                                data-policy="@pkg.BranchAccessPolicy"
+                               data-private="@(pkg.IsPrivateTraining ? "1" : "0")"
+                               data-gym-class-id="@(pkg.GymClassId?.ToString() ?? "")"
+                               data-coach-id="@(pkg.CoachId?.ToString() ?? "")"
                                data-sessions="@(pkg.SessionCount?.ToString() ?? "")"
                                data-duration="@(pkg.DurationDays?.ToString() ?? "")"
                                data-gym-duration="@(pkg.OpenGymDurationDays?.ToString() ?? "")"
                                data-invitations="@(pkg.InvitationCount?.ToString() ?? "")"
                                data-inbody="@(pkg.InBodyCount?.ToString() ?? "")"
                                data-pt="@(pkg.PtSessionCount?.ToString() ?? "")"
-                               data-freeze="@(pkg.FreezeAllowanceDays?.ToString() ?? "")">
+                               data-freeze="@(pkg.FreezeAllowanceDays?.ToString() ?? "")"
+                               data-price="@(pkg.Price?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "")"
+                               data-min-price="@(pkg.MaxDiscountedPrice?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "")">
                             <input type="radio" name="PackageDefinitionId" value="@pkg.PackageDefinitionId" />
                             <div class="pkg-opt-icon @pkg.PackageTypeCode">
-                                @if (pkg.PackageTypeCode == "SESSION")
+                                @if (pkg.IsPrivateTraining)
+                                {
+                                    <i class="bi bi-person-arms-up"></i>
+                                }
+                                else if (pkg.PackageTypeCode == "SESSION")
                                 {
                                     <i class="bi bi-ticket-perforated"></i>
                                 }
@@ -473,9 +511,15 @@
                                 }
                             </div>
                             <div class="pkg-opt-info">
-                                <div style="display:flex; align-items:center; gap:7px; margin-bottom:3px;">
+                                <div style="display:flex; align-items:center; gap:7px; margin-bottom:3px; flex-wrap:wrap;">
                                     <span class="pkg-opt-name">@pkg.PackageName</span>
                                     <span class="pkg-opt-badge @pkg.PackageTypeCode">@pkg.PackageTypeName</span>
+                                    @if (pkg.IsPrivateTraining)
+                                    {
+                                        <span style="font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;background:linear-gradient(135deg,#f97316,#ea580c);color:#fff;padding:3px 9px;border-radius:10px;box-shadow:0 2px 6px rgba(249,115,22,.35);">
+                                            <i class="bi bi-person-arms-up"></i> Private Training
+                                        </span>
+                                    }
                                 </div>
                                 <div class="pkg-opt-meta">
                                     <span>@meta</span>
@@ -484,7 +528,24 @@
                                     {
                                         <span style="color:var(--fire); font-weight:700;">@pkg.Price.Value.ToString("N0") EGP</span>
                                     }
+                                    @if (pkg.MaxDiscountedPrice.HasValue)
+                                    {
+                                        <span style="color:#6b7280;font-weight:600;">· min @pkg.MaxDiscountedPrice.Value.ToString("N0") after discount</span>
+                                    }
                                 </div>
+                                @if (!string.IsNullOrEmpty(pkg.CoachName) || !string.IsNullOrEmpty(pkg.GymClassName))
+                                {
+                                    <div style="margin-top:4px;display:flex;align-items:center;gap:10px;font-size:11.5px;color:var(--t3);">
+                                        @if (!string.IsNullOrEmpty(pkg.GymClassName))
+                                        {
+                                            <span><i class="bi bi-calendar2-week" style="color:var(--blue,#3b82f6);"></i> @pkg.GymClassName</span>
+                                        }
+                                        @if (!string.IsNullOrEmpty(pkg.CoachName))
+                                        {
+                                            <span><i class="bi bi-person-circle" style="color:var(--fire);"></i> Coach @pkg.CoachName</span>
+                                        }
+                                    </div>
+                                }
                             </div>
                             <div class="pkg-opt-check"><i class="bi bi-check"></i></div>
                         </label>
@@ -548,16 +609,53 @@
         <div class="form-body">
             <div class="field" style="max-width:420px;">
                 <label class="field-label" asp-for="GymClassId">Specific Class (optional)</label>
-                <select asp-for="GymClassId" class="form-select">
+                <select asp-for="GymClassId" class="form-select" id="gymClassSelect">
                     <option value="">— Any class —</option>
                     @foreach (var c in Model.AvailableClasses)
                     {
-                        <option value="@c.GymClassId">@c.ClassName · @c.TimeDisplay@(string.IsNullOrEmpty(c.CoachName) ? "" : $" · {c.CoachName}")</option>
+                        <option value="@c.GymClassId" data-coach-id="@(c.CoachId?.ToString() ?? "")">@c.ClassName · @c.TimeDisplay@(string.IsNullOrEmpty(c.CoachName) ? "" : $" · {c.CoachName}")</option>
                     }
                 </select>
                 <div class="field-hint">
                     If the member can only attend one specific class with this package, pick it here. Otherwise leave blank.
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2c. Coach assignment (shown only for Private Training packages) -->
+    <div class="form-card" id="coachLinkCard" style="display:none; border-color:var(--fire-border); background:linear-gradient(180deg, var(--fire-soft) 0%, var(--surface) 30%);">
+        <div class="form-section-head" style="background:var(--fire-soft);">
+            <div class="form-section-icon"><i class="bi bi-person-arms-up"></i></div>
+            <span class="form-section-title">Assign Personal Trainer <span style="color:var(--fire);">*</span></span>
+        </div>
+        <div class="form-body">
+            <div class="field" style="max-width:480px;">
+                <label class="field-label" asp-for="CoachId">Coach</label>
+                @if (!Model.AvailableCoaches.Any())
+                {
+                    <div style="font-size:13px; color:var(--t3); font-style:italic; padding:10px 0;">
+                        No active coaches in this branch.
+                        <a asp-controller="Coaches" asp-action="Create" style="color:var(--fire);">Add a coach first.</a>
+                    </div>
+                }
+                else
+                {
+                    <select asp-for="CoachId" class="form-select" id="coachSelect">
+                        <option value="">— Select a coach —</option>
+                        @foreach (var c in Model.AvailableCoaches)
+                        {
+                            <option value="@c.CoachId">@c.FullName@(string.IsNullOrEmpty(c.Specialty) ? "" : $" · {c.Specialty}")</option>
+                        }
+                    </select>
+                }
+                <div class="field-hint">
+                    <i class="bi bi-info-circle"></i> A coach is required for private training packages.
+                </div>
+                @if (!ViewData.ModelState.IsValid && ViewData.ModelState["CoachId"]?.Errors.Count > 0)
+                {
+                    <div class="field-error" style="display:block; color:var(--red); margin-top:6px;">@ViewData.ModelState["CoachId"]!.Errors[0].ErrorMessage</div>
+                }
             </div>
         </div>
     </div>
@@ -610,6 +708,36 @@
                 </div>
             </div>
 
+        </div>
+    </div>
+
+    <!-- 3b. Pricing / Discount -->
+    <div class="form-card" id="pricingCard">
+        <div class="form-section-head">
+            <div class="form-section-icon"><i class="bi bi-cash-coin"></i></div>
+            <span class="form-section-title">Pricing</span>
+        </div>
+        <div class="form-body">
+            <div class="form-grid-2">
+                <div class="field" style="max-width:260px;">
+                    <label class="field-label" asp-for="FinalPrice">Charged Price (EGP)</label>
+                    <input asp-for="FinalPrice" id="finalPriceInput" type="number" step="0.01" min="0"
+                           placeholder="Select a package first" />
+                    <div class="field-hint" id="priceHint">Pick a package to see the allowed price range.</div>
+                    @if (ViewData.ModelState["FinalPrice"]?.Errors.Count > 0)
+                    {
+                        <div class="field-error" style="display:block;">
+                            @ViewData.ModelState["FinalPrice"]!.Errors[0].ErrorMessage
+                        </div>
+                    }
+                </div>
+                <div class="field" id="discountSummary" style="display:none;">
+                    <label class="field-label">Discount Applied</label>
+                    <div id="discountAmount"
+                         style="font-weight:800;color:var(--fire);font-size:18px;">—</div>
+                    <div class="field-hint" id="discountPct"></div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -726,6 +854,37 @@
                 if (sel) sel.value = '';
             }
 
+            // Show coach card ONLY for private training packages
+            const isPrivate = el.dataset.private === '1';
+            const coachCard = document.getElementById('coachLinkCard');
+            const coachSel  = document.getElementById('coachSelect');
+            const classSel  = document.getElementById('gymClassSelect');
+            const presetClassId = el.dataset.gymClassId || '';
+            const presetCoachId = el.dataset.coachId || '';
+
+            if (coachCard) {
+                coachCard.style.display = isPrivate ? 'block' : 'none';
+                if (coachSel) coachSel.required = isPrivate;
+            }
+
+            // Auto-fill the linked CLASS if the package has one
+            if (classSel && presetClassId) {
+                classSel.value = presetClassId;
+            } else if (classSel && !isPrivate) {
+                // keep user's manual selection on non-private; don't override
+            }
+
+            // Auto-fill the COACH for private packages (from the linked class's coach)
+            if (coachSel) {
+                if (isPrivate && presetCoachId) {
+                    // Only set if the coach exists in the dropdown options
+                    const exists = Array.from(coachSel.options).some(o => o.value === presetCoachId);
+                    if (exists) coachSel.value = presetCoachId;
+                } else if (!isPrivate) {
+                    coachSel.value = '';
+                }
+            }
+
             // Show branch section ONLY for SELECTED_BRANCHES
             const branchSection = document.getElementById('branchSection');
             if (policy === 'SELECTED_BRANCHES') {
@@ -734,6 +893,9 @@
                 branchSection.style.display = 'none';
                 document.querySelectorAll('[name="selectedBranchIds"]').forEach(cb => cb.checked = false);
             }
+
+            // Pricing — sync the FinalPrice input with the package's price + discount floor
+            syncPricing(el);
 
             // Perks card — always show, populate placeholder text with package defaults
             const invitations = el.dataset.invitations;
@@ -766,5 +928,74 @@
                 note.style.display = parts.length ? 'block' : 'none';
             }
         }
+
+        // ── Pricing sync ──────────────────────────────────────────────────
+        // Reads the selected package's price + discount floor from data-attrs,
+        // sets the FinalPrice input's min/max, and recomputes the discount summary.
+        function syncPricing(el) {
+            const priceInput = document.getElementById('finalPriceInput');
+            const hint       = document.getElementById('priceHint');
+            const summary    = document.getElementById('discountSummary');
+            if (!priceInput) return;
+
+            const price    = parseFloat(el.dataset.price)     || null;
+            const minPrice = parseFloat(el.dataset.minPrice)  || null;
+
+            if (price == null) {
+                priceInput.value = '';
+                priceInput.removeAttribute('max');
+                priceInput.removeAttribute('min');
+                priceInput.placeholder = 'No fixed price — enter amount charged';
+                hint.textContent = 'This package has no catalog price; enter the amount the member paid.';
+                summary.style.display = 'none';
+                return;
+            }
+
+            priceInput.max = price.toFixed(2);
+            if (minPrice != null) {
+                priceInput.min = minPrice.toFixed(2);
+                hint.textContent = `Catalog ${price.toLocaleString()} EGP · minimum after discount ${minPrice.toLocaleString()} EGP.`;
+            } else {
+                priceInput.removeAttribute('min');
+                hint.textContent = `Catalog ${price.toLocaleString()} EGP · no discount floor set.`;
+            }
+
+            // Default to full catalog price unless the staffer already typed one
+            if (!priceInput.value) priceInput.value = price.toFixed(2);
+            priceInput.placeholder = price.toLocaleString();
+            updateDiscountSummary();
+        }
+
+        function updateDiscountSummary() {
+            const priceInput = document.getElementById('finalPriceInput');
+            const summary    = document.getElementById('discountSummary');
+            const amountEl   = document.getElementById('discountAmount');
+            const pctEl      = document.getElementById('discountPct');
+            if (!priceInput || !summary) return;
+
+            const catalog = parseFloat(priceInput.max);
+            const charged = parseFloat(priceInput.value);
+            if (!catalog || isNaN(charged)) {
+                summary.style.display = 'none';
+                return;
+            }
+            const diff = catalog - charged;
+            if (diff <= 0) {
+                summary.style.display = 'none';
+                return;
+            }
+            summary.style.display = '';
+            amountEl.textContent = `− ${diff.toLocaleString(undefined, {maximumFractionDigits:2})} EGP`;
+            pctEl.textContent = `${((diff / catalog) * 100).toFixed(1)}% off catalog price`;
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const priceInput = document.getElementById('finalPriceInput');
+            if (priceInput) priceInput.addEventListener('input', updateDiscountSummary);
+            // If the form was re-rendered after a validation error, re-sync from the
+            // currently selected package so min/max are restored.
+            const selected = document.querySelector('.pkg-option.selected');
+            if (selected) syncPricing(selected);
+        });
     </script>
 }

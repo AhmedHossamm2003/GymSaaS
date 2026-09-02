@@ -61,10 +61,11 @@
                 </div>
 
                 <div class="col-md-6" id="branchWrapper">
-                    <label asp-for="BranchId" class="form-label">Branch</label>
+                    <label asp-for="BranchId" class="form-label">Branch <span class="text-muted">(optional)</span></label>
                     <select asp-for="BranchId" asp-items="Model.Branches" class="form-select" id="branchSelect">
-                        <option value="">-- Select Branch --</option>
+                        <option value="">-- All branches --</option>
                     </select>
+                    <div class="form-text">Leave empty to let this user see all branches' data.</div>
                     <span asp-validation-for="BranchId" class="text-danger"></span>
                 </div>
             </div>

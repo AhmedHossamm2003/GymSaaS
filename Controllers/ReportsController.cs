@@ -41,6 +41,7 @@ namespace GymSaaS.Controllers
             Guid? branchId = null)
         {
             var (from, to, label) = ResolveRange(preset, fromDate, toDate);
+            branchId = ClampBranch(branchId);
 
             var vm = await _reports.BuildAsync(TenantId, from, to, branchId, preset);
             vm.RangeLabel = label;
@@ -61,6 +62,7 @@ namespace GymSaaS.Controllers
             Guid? branchId = null)
         {
             var (from, to, label) = ResolveRange(preset, fromDate, toDate);
+            branchId = ClampBranch(branchId);
             var vm = await _reports.BuildAsync(TenantId, from, to, branchId, preset);
             vm.RangeLabel = label;
 
@@ -83,6 +85,7 @@ namespace GymSaaS.Controllers
             Guid? branchId = null)
         {
             var (from, to, label) = ResolveRange(preset, fromDate, toDate);
+            branchId = ClampBranch(branchId);
             var vm = await _reports.BuildAsync(TenantId, from, to, branchId, preset);
             vm.RangeLabel = label;
 
@@ -158,9 +161,12 @@ namespace GymSaaS.Controllers
             return (from, to, label);
         }
 
-        private async Task<List<BranchDropdownItem>> GetBranchesAsync() =>
-            await _db.Branches
-                .Where(b => b.TenantId == TenantId && b.IsActive)
+        private async Task<List<BranchDropdownItem>> GetBranchesAsync()
+        {
+            var scoped = User.AssignedBranchIds();
+            return await _db.Branches
+                .Where(b => b.TenantId == TenantId && b.IsActive
+                         && (scoped.Count == 0 || scoped.Contains(b.BranchId)))
                 .OrderBy(b => b.BranchName)
                 .Select(b => new BranchDropdownItem
                 {
@@ -168,5 +174,16 @@ namespace GymSaaS.Controllers
                     BranchName = b.BranchName,
                 })
                 .ToListAsync();
+        }
+
+        // For a branch-restricted user, force the report to one of their branches.
+        // Unrestricted users keep whatever branch (or all) they requested.
+        private Guid? ClampBranch(Guid? branchId)
+        {
+            var scoped = User.AssignedBranchIds();
+            if (scoped.Count == 0) return branchId;
+            if (branchId.HasValue && scoped.Contains(branchId.Value)) return branchId;
+            return scoped[0];
+        }
     }
 }

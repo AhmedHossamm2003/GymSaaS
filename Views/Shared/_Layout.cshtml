@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] — Ideal Wellness</title>
+    <title>@ViewData["Title"] — Idea Wellness</title>
 
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet" />
@@ -1176,7 +1176,7 @@
                     </svg>
                 </div>
                 <div class="logo-text">
-                    <span class="name">Ideal Wellness</span>
+                    <span class="name">Idea Wellness</span>
                     <span class="tag">Management</span>
                 </div>
             </div>
@@ -1187,7 +1187,33 @@
                     string Active(string c) => currentController == c ? "active" : "";
                 }
 
-                @if (User.CanSee("Dashboard"))
+                @{
+                    var isCoach = User.IsInRole("Coach")
+                        && !User.IsInRole("SuperAdmin")
+                        && !User.IsInRole("Admin")
+                        && !User.IsInRole("BranchManager")
+                        && !User.IsInRole("Receptionist");
+                    var currentAction = ViewContext.RouteData.Values["action"]?.ToString();
+                    string ActiveAction(string c, string a) =>
+                        (currentController == c && currentAction == a) ? "active" : "";
+                }
+
+                @if (isCoach)
+                {
+                    <div class="nav-section">
+                        <span class="nav-section-label">My Coaching</span>
+                        <a asp-controller="Coaches" asp-action="Dashboard" class="nav-item @ActiveAction("Coaches", "Dashboard")">
+                            <i class="bi bi-speedometer2"></i> My Dashboard
+                        </a>
+                        <a asp-controller="Coaches" asp-action="MyTrainees" class="nav-item @ActiveAction("Coaches", "MyTrainees")">
+                            <i class="bi bi-person-arms-up"></i> My Trainees
+                        </a>
+                        <a asp-controller="Coaches" asp-action="MySchedule" class="nav-item @ActiveAction("Coaches", "MySchedule")">
+                            <i class="bi bi-calendar2-week"></i> My Schedule
+                        </a>
+                    </div>
+                }
+                else if (User.CanSee("Dashboard"))
                 {
                     <div class="nav-section">
                         <span class="nav-section-label">Overview</span>
@@ -1197,7 +1223,7 @@
                     </div>
                 }
 
-                @if (User.CanSeeAny("Reception", "Attendance"))
+                @if (!isCoach && User.CanSeeAny("Reception", "Attendance"))
                 {
                     <div class="nav-section">
                         <span class="nav-section-label">Operations</span>
@@ -1217,7 +1243,7 @@
                     </div>
                 }
 
-                @if (User.CanSeeAny("Members", "Invitations"))
+                @if (!isCoach && User.CanSeeAny("Members", "Invitations"))
                 {
                     <div class="nav-section">
                         <span class="nav-section-label">Members</span>
@@ -1239,7 +1265,7 @@
                     </div>
                 }
 
-                @if (User.CanSeeAny("Branches", "PackageCatalog", "Users", "Roles"))
+                @if (!isCoach && User.CanSeeAny("Branches", "PackageCatalog", "Users", "Roles"))
                 {
                     <div class="nav-section">
                         <span class="nav-section-label">Management</span>
@@ -1270,7 +1296,7 @@
                     </div>
                 }
 
-                @if (User.CanSeeAny("Reports", "Expenses", "Income"))
+                @if (!isCoach && User.CanSeeAny("Reports", "Expenses", "Income"))
                 {
                     <div class="nav-section">
                         <span class="nav-section-label">Finance</span>
@@ -1295,7 +1321,7 @@
                     </div>
                 }
 
-                @if (User.CanSee("Notifications"))
+                @if (!isCoach && User.CanSee("Notifications"))
                 {
                     <div class="nav-section">
                         <span class="nav-section-label">Communication</span>
@@ -1305,7 +1331,7 @@
                     </div>
                 }
 
-                @if (User.CanSeeAny("Coaches", "Classes", "Exercises", "WorkoutTemplates"))
+                @if (!isCoach && User.CanSeeAny("Coaches", "Classes", "Exercises", "WorkoutTemplates"))
                 {
                     <div class="nav-section">
                         <span class="nav-section-label">Content</span>
@@ -1336,22 +1362,13 @@
                     </div>
                 }
 
-                @if (User.CanSeeAny("AuditLogs", "Settings"))
+                @if (!isCoach && User.CanSee("AuditLogs"))
                 {
                     <div class="nav-section">
                         <span class="nav-section-label">System</span>
-                        @if (User.CanSee("AuditLogs"))
-                        {
-                            <a asp-controller="AuditLogs" asp-action="Index" class="nav-item @Active("AuditLogs")">
-                                <i class="bi bi-journal-text"></i> Audit Logs
-                            </a>
-                        }
-                        @if (User.CanSee("Settings"))
-                        {
-                            <a asp-controller="Settings" asp-action="Index" class="nav-item @Active("Settings")">
-                                <i class="bi bi-gear"></i> Settings
-                            </a>
-                        }
+                        <a asp-controller="AuditLogs" asp-action="Index" class="nav-item @Active("AuditLogs")">
+                            <i class="bi bi-journal-text"></i> Audit Logs
+                        </a>
                     </div>
                 }
 
@@ -1367,7 +1384,7 @@
                     </div>
                     <div class="user-info">
                         <div class="user-name">@(User.Identity?.Name ?? "Admin")</div>
-                        <div class="user-role">@(User.IsInRole("SuperAdmin") ? "Super Admin" : User.IsInRole("Admin") ? "Admin" : User.IsInRole("BranchManager") ? "Branch Manager" : "Receptionist")</div>
+                        <div class="user-role">@(User.IsInRole("SuperAdmin") ? "Super Admin" : User.IsInRole("Admin") ? "Admin" : User.IsInRole("BranchManager") ? "Branch Manager" : User.IsInRole("Coach") ? "Coach" : User.IsInRole("Receptionist") ? "Receptionist" : "User")</div>
                     </div>
                     <i class="bi bi-three-dots"></i>
                 </div>
@@ -1393,22 +1410,19 @@
             </div>
 
             <div class="topbar-actions">
-                <div class="search-bar" style="position:relative;">
-                    <i class="bi bi-search"></i>
-                    <input type="text" id="globalSearch" placeholder="Client ID or phone..." autocomplete="off" />
-                    <div id="globalSearchDropdown" style="display:none; position:absolute; top:calc(100% + 6px); left:0; right:0; background:#fff; border:1px solid #e0e0e0; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,.12); z-index:9999; overflow:hidden;"></div>
-                </div>
+                @if (!isCoach)
+                {
+                    <div class="search-bar" style="position:relative;">
+                        <i class="bi bi-search"></i>
+                        <input type="text" id="globalSearch" placeholder="Search name, ID or phone..." autocomplete="off" />
+                        <div id="globalSearchDropdown" style="display:none; position:absolute; top:calc(100% + 6px); left:0; right:0; background:#fff; border:1px solid #e0e0e0; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,.12); z-index:9999; overflow:hidden;"></div>
+                    </div>
 
-                <div class="topbar-branch">
-                    <i class="bi bi-building"></i>
-                    <span>@(ViewData["CurrentBranch"] ?? "All Branches")</span>
-                    <i class="bi bi-chevron-down chevron"></i>
-                </div>
-
-                <div class="topbar-btn" title="Notifications">
-                    <i class="bi bi-bell"></i>
-                    <span class="notif-dot"></span>
-                </div>
+                    <a asp-controller="Notifications" asp-action="Index" class="topbar-btn" id="notifBtn" title="Notifications" style="position:relative;">
+                        <i class="bi bi-bell"></i>
+                        <span class="notif-dot" id="notifDot" style="display:none;"></span>
+                    </a>
+                }
 
                 <div class="topbar-btn" id="fullscreenBtn" title="Toggle fullscreen">
                     <i class="bi bi-fullscreen"></i>
@@ -1535,6 +1549,23 @@
             }).join('');
             dropdown.style.display = 'block';
         }
+    })();
+    </script>
+
+    <script>
+    (function () {
+        const dot = document.getElementById('notifDot');
+        if (!dot) return;
+        async function refreshNotifCount() {
+            try {
+                const res = await fetch('/Notifications/Count');
+                if (!res.ok) return;
+                const data = await res.json();
+                dot.style.display = (data.count && data.count > 0) ? 'block' : 'none';
+            } catch { /* ignore */ }
+        }
+        refreshNotifCount();
+        setInterval(refreshNotifCount, 60000);
     })();
     </script>
 

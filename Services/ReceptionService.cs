@@ -330,6 +330,44 @@ namespace GymSaaS.Services.Reception
                 result.AutoCheckedInPackageName = autoPackage.PackageNameSnapshot;
             }
 
+            // 9. Non-attendance perks — surface PT sessions / InBody scans the member
+            //    still has, so reception can record them (independent of gym entry).
+            var ptPackage = activePackages
+                .Where(p => p.PtSessionsRemaining.HasValue && p.PtSessionsRemaining.Value > 0)
+                .OrderByDescending(p => p.PtSessionsRemaining)
+                .FirstOrDefault();
+            if (ptPackage != null)
+            {
+                result.PtSessionsRemaining = ptPackage.PtSessionsRemaining;
+                result.PtPackageId         = ptPackage.MemberPackageId;
+                result.PtAssignedCoachId   = ptPackage.CoachId?.ToString();
+            }
+
+            var inBodyPackage = activePackages
+                .Where(p => p.InBodyRemaining.HasValue && p.InBodyRemaining.Value > 0)
+                .OrderByDescending(p => p.InBodyRemaining)
+                .FirstOrDefault();
+            if (inBodyPackage != null)
+            {
+                result.InBodyRemaining = inBodyPackage.InBodyRemaining;
+                result.InBodyPackageId = inBodyPackage.MemberPackageId;
+            }
+
+            // Coach picker (only needed when PT sessions are available).
+            if (result.PtSessionsRemaining.HasValue)
+            {
+                result.CoachOptions = await _db.Coaches
+                    .Where(c => c.TenantId == tenantId && c.BranchId == branchId
+                             && c.IsActive && !c.IsDeleted)
+                    .OrderBy(c => c.FirstName).ThenBy(c => c.LastName)
+                    .Select(c => new CoachOptionDto
+                    {
+                        CoachId = c.CoachId,
+                        Name    = (c.FirstName + " " + c.LastName).Trim()
+                    })
+                    .ToListAsync();
+            }
+
             return result;
         }
 
@@ -518,15 +556,20 @@ namespace GymSaaS.Services.Reception
         public async Task<LatestCheckInDto?> GetLatestCheckInAsync(
             Guid branchId, Guid tenantId, DateTime sinceUtc)
         {
-            var validStatusIds = await _db.AttendanceStatuses
-                .Where(s => new[] { "SUCCESS", "OVERRIDE_APPROVED", "MANUAL" }.Contains(s.StatusCode))
-                .Select(s => s.AttendanceStatusId)
+            // Include PENDING so mobile scans awaiting a reception choice surface
+            // in the same poll. We capture the status code to branch on it below.
+            var statuses = await _db.AttendanceStatuses
+                .Where(s => new[] { "SUCCESS", "OVERRIDE_APPROVED", "MANUAL", "PENDING" }.Contains(s.StatusCode))
+                .Select(s => new { s.AttendanceStatusId, s.StatusCode })
                 .ToListAsync();
+
+            var statusIds   = statuses.Select(s => s.AttendanceStatusId).ToList();
+            var pendingId   = statuses.FirstOrDefault(s => s.StatusCode == "PENDING")?.AttendanceStatusId;
 
             var record = await _db.AttendanceRecords
                 .Where(a => a.BranchId == branchId
                          && a.TenantId == tenantId
-                         && validStatusIds.Contains(a.AttendanceStatusId)
+                         && statusIds.Contains(a.AttendanceStatusId)
                          && a.CheckInAtUtc > sinceUtc)
                 .OrderByDescending(a => a.CheckInAtUtc)
                 .Select(a => new
@@ -535,7 +578,9 @@ namespace GymSaaS.Services.Reception
                     a.MemberId,
                     a.CheckInAtUtc,
                     a.MemberPackageId,
+                    a.AttendanceStatusId,
                     PackageName = a.MemberPackage != null ? a.MemberPackage.PackageNameSnapshot : null,
+                    SessionsRemaining = a.MemberPackage != null ? a.MemberPackage.SessionCountRemaining : null,
                 })
                 .FirstOrDefaultAsync();
 
@@ -556,7 +601,9 @@ namespace GymSaaS.Services.Reception
 
             if (member == null) return null;
 
-            return new LatestCheckInDto
+            bool isPending = pendingId.HasValue && record.AttendanceStatusId == pendingId.Value;
+
+            var dto = new LatestCheckInDto
             {
                 AttendanceRecordId = record.AttendanceRecordId,
                 MemberId           = record.MemberId,
@@ -565,8 +612,235 @@ namespace GymSaaS.Services.Reception
                 PhotoUrl           = member.ProfileImageUrl,
                 PhoneNumber        = member.PhoneNumber,
                 PackageName        = record.PackageName,
+                SessionsRemaining  = record.SessionsRemaining,
                 CheckInAtUtc       = record.CheckInAtUtc.ToString("O"),
+                RequiresChoice     = isPending,
             };
+
+            if (isPending)
+                dto.PackageOptions = await BuildPackageOptionsForMemberAsync(record.MemberId, branchId, tenantId);
+
+            return dto;
+        }
+
+        // ── BuildPackageOptionsForMemberAsync ─────────────────────
+        // Returns the class/session + open-gym options a member is eligible for
+        // at a branch — used to populate the receptionist's pending-choice popup.
+        private async Task<List<PackageOptionDto>> BuildPackageOptionsForMemberAsync(
+            Guid memberId, Guid branchId, Guid tenantId)
+        {
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var activePackages = await _db.MemberPackages
+                .Include(p => p.PackageType)
+                .Include(p => p.GymClass)
+                .Where(p => p.MemberId == memberId
+                         && p.TenantId == tenantId
+                         && p.Status == "ACTIVE"
+                         && p.ValidFromDate <= today
+                         && (p.ValidToDate == null || p.ValidToDate >= today))
+                .ToListAsync();
+
+            var accessible = new List<MemberPackage>();
+            foreach (var pkg in activePackages)
+            {
+                var policyCode = await _db.BranchAccessPolicyTypes
+                    .Where(b => b.BranchAccessPolicyTypeId == pkg.BranchAccessPolicyTypeId)
+                    .Select(b => b.PolicyCode)
+                    .FirstOrDefaultAsync();
+
+                bool allowed = policyCode switch
+                {
+                    "ALL_BRANCHES"         => true,
+                    "HOME_ONLY"            => pkg.HomeBranchId == branchId,
+                    "SELECTED_BRANCHES"    => pkg.HomeBranchId == branchId
+                                             || pkg.CrossBranchVisitsUsed < (pkg.CrossBranchVisitLimit ?? 0),
+                    "HOME_PLUS_LIMITED"    => pkg.HomeBranchId == branchId
+                                             || pkg.CrossBranchVisitsUsed < (pkg.CrossBranchVisitLimit ?? 0),
+                    "CROSS_BRANCH_LIMITED" => pkg.HomeBranchId == branchId
+                                             || pkg.CrossBranchVisitsUsed < (pkg.CrossBranchVisitLimit ?? 0),
+                    "CUSTOM"               => true,
+                    _                      => false
+                };
+
+                if (allowed) accessible.Add(pkg);
+            }
+
+            return accessible.Select(p =>
+            {
+                bool isClassLinked = p.GymClassId.HasValue || p.PackageType.PackageTypeCode == "CLASS";
+                string label = isClassLinked
+                    ? (p.GymClass != null ? $"Class · {p.GymClass.ClassName}" : "Class")
+                    : p.PackageType.PackageTypeCode switch
+                    {
+                        "OPEN_GYM"     => "Open Gym",
+                        "SESSION"      => "Session",
+                        "SUBSCRIPTION" => "Subscription",
+                        "BUNDLE"       => "Open Gym (Bundle)",
+                        _              => p.PackageNameSnapshot
+                    };
+
+                return new PackageOptionDto
+                {
+                    MemberPackageId   = p.MemberPackageId,
+                    PackageName       = p.PackageNameSnapshot,
+                    PackageTypeCode   = isClassLinked ? "CLASS" : p.PackageType.PackageTypeCode,
+                    SessionsRemaining = p.SessionCountRemaining.HasValue
+                        ? $"{p.SessionCountRemaining} sessions left"
+                        : null,
+                    Label = label
+                };
+            }).ToList();
+        }
+
+        // ── ConfirmPendingAsync ───────────────────────────────────
+        public async Task<ConfirmPendingResult> ConfirmPendingAsync(
+            Guid attendanceRecordId, Guid selectedMemberPackageId, Guid receptionistUserId, Guid tenantId)
+        {
+            var record = await _db.AttendanceRecords
+                .FirstOrDefaultAsync(a => a.AttendanceRecordId == attendanceRecordId
+                                       && a.TenantId == tenantId);
+
+            if (record == null)
+                return new ConfirmPendingResult { Success = false, ErrorMessage = "Scan record not found." };
+
+            var pendingId = await _db.AttendanceStatuses
+                .Where(s => s.StatusCode == "PENDING")
+                .Select(s => s.AttendanceStatusId)
+                .FirstOrDefaultAsync();
+
+            // Only a still-pending record can be confirmed (idempotency guard).
+            if (record.AttendanceStatusId != pendingId)
+                return new ConfirmPendingResult { Success = false, ErrorMessage = "This scan was already confirmed." };
+
+            var package = await _db.MemberPackages
+                .Include(p => p.PackageType)
+                .FirstOrDefaultAsync(p => p.MemberPackageId == selectedMemberPackageId
+                                       && p.TenantId == tenantId);
+
+            if (package == null)
+                return new ConfirmPendingResult { Success = false, ErrorMessage = "Package not found." };
+
+            var manualStatusId = await _db.AttendanceStatuses
+                .Where(s => s.StatusCode == "MANUAL")
+                .Select(s => s.AttendanceStatusId)
+                .FirstOrDefaultAsync();
+
+            // Deduct a session if the chosen package is session-based.
+            bool deductSession = package.SessionCountRemaining.HasValue
+                              && package.PackageType.PackageTypeCode is "SESSION" or "CLASS";
+
+            if (deductSession && package.SessionCountRemaining <= 0)
+                return new ConfirmPendingResult
+                {
+                    Success = false,
+                    ErrorMessage = "No sessions remaining on the selected package."
+                };
+
+            var branch = await _db.Branches.FirstOrDefaultAsync(b => b.BranchId == record.BranchId);
+            var now = DateTime.UtcNow;
+
+            record.MemberPackageId        = package.MemberPackageId;
+            record.AttendanceStatusId     = manualStatusId;
+            record.SessionDeducted        = deductSession;
+            record.SessionsDeductedCount  = deductSession ? 1 : 0;
+            record.IsCrossBranchVisit     = package.HomeBranchId != record.BranchId;
+            record.ReceptionistDecisionUserId = receptionistUserId == Guid.Empty ? null : receptionistUserId;
+            record.PresenceUntilUtc       = now.AddMinutes(branch?.MemberPresenceWindowMinutes ?? 90);
+            record.Notes                  = deductSession
+                ? "Class attendance (reception-confirmed mobile scan)"
+                : "Open gym attendance (reception-confirmed mobile scan)";
+
+            if (deductSession)
+                package.SessionCountRemaining -= 1;
+
+            if (record.IsCrossBranchVisit)
+                package.CrossBranchVisitsUsed += 1;
+
+            await _db.SaveChangesAsync();
+
+            return new ConfirmPendingResult
+            {
+                Success = true,
+                SessionsRemaining = package.SessionCountRemaining,
+                PackageName = package.PackageNameSnapshot
+            };
+        }
+
+        // ── RecordPtSessionAsync ──────────────────────────────────
+        public async Task<PerkUsageResult> RecordPtSessionAsync(
+            Guid memberId, Guid memberPackageId, Guid coachId, Guid branchId,
+            Guid receptionistUserId, Guid tenantId)
+        {
+            var package = await _db.MemberPackages
+                .FirstOrDefaultAsync(p => p.MemberPackageId == memberPackageId
+                                       && p.MemberId == memberId
+                                       && p.TenantId == tenantId);
+
+            if (package == null)
+                return new PerkUsageResult { Success = false, ErrorMessage = "Package not found." };
+
+            if (!package.PtSessionsRemaining.HasValue || package.PtSessionsRemaining.Value <= 0)
+                return new PerkUsageResult { Success = false, ErrorMessage = "No PT sessions remaining." };
+
+            var coachExists = await _db.Coaches.AnyAsync(c => c.CoachId == coachId
+                                                           && c.TenantId == tenantId);
+            if (!coachExists)
+                return new PerkUsageResult { Success = false, ErrorMessage = "Please select a valid coach." };
+
+            package.PtSessionsRemaining -= 1;
+
+            _db.MemberPerkUsages.Add(new MemberPerkUsage
+            {
+                PerkUsageId      = Guid.NewGuid(),
+                TenantId         = tenantId,
+                MemberId         = memberId,
+                MemberPackageId  = memberPackageId,
+                PerkType         = "PT",
+                CoachId          = coachId,
+                BranchId         = branchId,
+                UsedAtUtc        = DateTime.UtcNow,
+                RecordedByUserId = receptionistUserId == Guid.Empty ? null : receptionistUserId,
+            });
+
+            await _db.SaveChangesAsync();
+
+            return new PerkUsageResult { Success = true, Remaining = package.PtSessionsRemaining };
+        }
+
+        // ── RecordInBodyAsync ─────────────────────────────────────
+        public async Task<PerkUsageResult> RecordInBodyAsync(
+            Guid memberId, Guid memberPackageId, Guid branchId,
+            Guid receptionistUserId, Guid tenantId)
+        {
+            var package = await _db.MemberPackages
+                .FirstOrDefaultAsync(p => p.MemberPackageId == memberPackageId
+                                       && p.MemberId == memberId
+                                       && p.TenantId == tenantId);
+
+            if (package == null)
+                return new PerkUsageResult { Success = false, ErrorMessage = "Package not found." };
+
+            if (!package.InBodyRemaining.HasValue || package.InBodyRemaining.Value <= 0)
+                return new PerkUsageResult { Success = false, ErrorMessage = "No InBody scans remaining." };
+
+            package.InBodyRemaining -= 1;
+
+            _db.MemberPerkUsages.Add(new MemberPerkUsage
+            {
+                PerkUsageId      = Guid.NewGuid(),
+                TenantId         = tenantId,
+                MemberId         = memberId,
+                MemberPackageId  = memberPackageId,
+                PerkType         = "INBODY",
+                CoachId          = null,
+                BranchId         = branchId,
+                UsedAtUtc        = DateTime.UtcNow,
+                RecordedByUserId = receptionistUserId == Guid.Empty ? null : receptionistUserId,
+            });
+
+            await _db.SaveChangesAsync();
+
+            return new PerkUsageResult { Success = true, Remaining = package.InBodyRemaining };
         }
 
         // ── GetBranchesAsync ──────────────────────────────────────

@@ -1,6 +1,7 @@
 using GymSaaS.Models;
 using GymSaaS.Persistence;
 using GymSaaS.Persistence.Entities;
+using GymSaaS.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -240,7 +241,11 @@ namespace GymSaaS.Controllers
             if (!string.IsNullOrWhiteSpace(search))
                 query = query.Where(x => x.g.ClassName.Contains(search));
 
-            if (branchId.HasValue)
+            var scopedBranchIds = User.AssignedBranchIds();
+            if (scopedBranchIds.Count > 0)
+                query = query.Where(x => scopedBranchIds.Contains(x.g.BranchId));
+
+            if (branchId.HasValue && User.CanAccessBranch(branchId.Value))
                 query = query.Where(x => x.g.BranchId == branchId.Value);
 
             if (day.HasValue)
@@ -305,16 +310,23 @@ namespace GymSaaS.Controllers
                 ModelState.AddModelError(nameof(model.EndTimeStr), "End time must be after start time.");
         }
 
-        private async Task<List<BranchDropdownItem>> GetBranchesAsync() =>
-            await _db.Branches
-                .Where(b => b.TenantId == TenantId && b.IsActive)
+        private async Task<List<BranchDropdownItem>> GetBranchesAsync()
+        {
+            var scoped = User.AssignedBranchIds();
+            return await _db.Branches
+                .Where(b => b.TenantId == TenantId && b.IsActive
+                         && (scoped.Count == 0 || scoped.Contains(b.BranchId)))
                 .OrderBy(b => b.BranchName)
                 .Select(b => new BranchDropdownItem { BranchId = b.BranchId, BranchName = b.BranchName })
                 .ToListAsync();
+        }
 
-        private async Task<List<CoachDropdownItem>> GetCoachesAsync() =>
-            await _db.Coaches
-                .Where(c => c.TenantId == TenantId && !c.IsDeleted && c.IsActive)
+        private async Task<List<CoachDropdownItem>> GetCoachesAsync()
+        {
+            var scoped = User.AssignedBranchIds();
+            return await _db.Coaches
+                .Where(c => c.TenantId == TenantId && !c.IsDeleted && c.IsActive
+                         && (scoped.Count == 0 || scoped.Contains(c.BranchId)))
                 .OrderBy(c => c.FirstName)
                 .Select(c => new CoachDropdownItem
                 {
@@ -324,16 +336,24 @@ namespace GymSaaS.Controllers
                     BranchId = c.BranchId,
                 })
                 .ToListAsync();
+        }
 
-        private async Task<object> GetBranchesViewDataAsync() =>
-            await _db.Branches
-                .Where(b => b.TenantId == TenantId && b.IsActive)
+        private async Task<object> GetBranchesViewDataAsync()
+        {
+            var scoped = User.AssignedBranchIds();
+            return await _db.Branches
+                .Where(b => b.TenantId == TenantId && b.IsActive
+                         && (scoped.Count == 0 || scoped.Contains(b.BranchId)))
                 .OrderBy(b => b.BranchName)
                 .ToListAsync();
+        }
 
-        private async Task<object> GetCoachesViewDataAsync() =>
-            await _db.Coaches
-                .Where(c => c.TenantId == TenantId && !c.IsDeleted && c.IsActive)
+        private async Task<object> GetCoachesViewDataAsync()
+        {
+            var scoped = User.AssignedBranchIds();
+            return await _db.Coaches
+                .Where(c => c.TenantId == TenantId && !c.IsDeleted && c.IsActive
+                         && (scoped.Count == 0 || scoped.Contains(c.BranchId)))
                 .OrderBy(c => c.FirstName)
                 .Select(c => new CoachDropdownItem
                 {
@@ -343,6 +363,7 @@ namespace GymSaaS.Controllers
                     BranchId = c.BranchId,
                 })
                 .ToListAsync();
+        }
 
         private async Task<string?> SavePhotoAsync(IFormFile? file, Guid classId)
         {

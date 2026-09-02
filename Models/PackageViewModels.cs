@@ -10,6 +10,7 @@ namespace GymSaaS.Models
     {
         public Guid PackageDefinitionId { get; set; }
         public decimal? Price { get; set; }
+        public decimal? MaxDiscountedPrice { get; set; }
 
         public string PackageCode { get; set; } = string.Empty;
         public string PackageName { get; set; } = string.Empty;
@@ -24,11 +25,15 @@ namespace GymSaaS.Models
         public int? OpenGymDurationDays { get; set; }
         public Guid? GymClassId { get; set; }
         public string? GymClassName { get; set; }
+        public Guid? CoachId { get; set; }
+        public string? CoachName { get; set; }
         public int? InvitationCount { get; set; }
         public int? InBodyCount { get; set; }
         public int? PtSessionCount { get; set; }
         public int? FreezeAllowanceDays { get; set; }
         public bool IsActive { get; set; }
+        public bool IsPrivateTraining { get; set; }
+        public decimal? CoachCommissionPercent { get; set; }
         public int AssignedCount { get; set; }
         public int SortOrder { get; set; }
 
@@ -52,6 +57,9 @@ namespace GymSaaS.Models
         [MaxLength(1000)]
         public string? Description { get; set; }
         public decimal? Price { get; set; }
+
+        // Optional floor price — when set, staff cannot discount below this on assignment.
+        public decimal? MaxDiscountedPrice { get; set; }
 
 
         // Validated manually in controller
@@ -98,6 +106,12 @@ namespace GymSaaS.Models
 
         public bool AllowCarryOverSessions { get; set; } = false;
         public bool AllowQueuedRenewal { get; set; } = true;
+        public bool IsPrivateTraining { get; set; } = false;
+
+        // Coach commission % (only used when IsPrivateTraining = true)
+        [Range(0, 100, ErrorMessage = "Coach commission must be between 0 and 100.")]
+        public decimal? CoachCommissionPercent { get; set; }
+
         public bool IsActive { get; set; } = true;
         public int SortOrder { get; set; } = 0;
 
@@ -207,9 +221,9 @@ namespace GymSaaS.Models
     {
         public Guid MemberId { get; set; }
         public Guid HomeBranchId { get; set; }
-        public string HomeBranchName { get; set; } = string.Empty;
-        public string MemberName { get; set; } = string.Empty;
-        public string MembershipNumber { get; set; } = string.Empty;
+        public string? HomeBranchName { get; set; }
+        public string? MemberName { get; set; }
+        public string? MembershipNumber { get; set; }
 
         [Required(ErrorMessage = "Select a package")]
         public Guid? PackageDefinitionId { get; set; }
@@ -224,6 +238,10 @@ namespace GymSaaS.Models
 
         // Carry over from previous package
         public int CarryOverSessions { get; set; } = 0;
+
+        // Final price actually charged to the member. If null, falls back to package
+        // catalog price. Must be ≥ MaxDiscountedPrice when the package defines one.
+        public decimal? FinalPrice { get; set; }
 
         // Perks override — leave null to use package catalog defaults
         public int? CustomInvitationCount { get; set; }
@@ -248,6 +266,12 @@ namespace GymSaaS.Models
 
         // For the class picker (loaded for the home branch)
         public List<ClassDropdownItem> AvailableClasses { get; set; } = new();
+
+        // Coach assignment — required for private training packages
+        public Guid? CoachId { get; set; }
+
+        // For the coach picker (loaded for the home branch)
+        public List<CoachDropdownItem> AvailableCoaches { get; set; } = new();
     }
 
     public class ClassDropdownItem
@@ -256,5 +280,6 @@ namespace GymSaaS.Models
         public string ClassName { get; set; } = string.Empty;
         public string TimeDisplay { get; set; } = string.Empty;
         public string? CoachName { get; set; }
+        public Guid? CoachId { get; set; }
     }
 }

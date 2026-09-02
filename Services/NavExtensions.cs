@@ -44,5 +44,43 @@ namespace GymSaaS.Services
 
             return false;
         }
+
+        // ── Branch scoping ─────────────────────────────────────────────
+        // A staff user can be assigned to one or more branches (UserBranches),
+        // surfaced as "BranchId" claims at login. The rule across the app:
+        //   • assigned to one or more branches → see only those branches' data
+        //   • assigned to no branch            → see ALL branches' data
+
+        /// <summary>
+        /// The branch IDs this user is scoped to. Empty = unrestricted (all branches).
+        /// </summary>
+        public static List<Guid> AssignedBranchIds(this ClaimsPrincipal user)
+        {
+            if (user?.Identity?.IsAuthenticated != true)
+                return new List<Guid>();
+
+            return user.FindAll("BranchId")
+                .Select(c => Guid.TryParse(c.Value, out var id) ? id : Guid.Empty)
+                .Where(id => id != Guid.Empty)
+                .Distinct()
+                .ToList();
+        }
+
+        /// <summary>
+        /// True when the user is restricted to a subset of branches (has at least
+        /// one branch assignment). False = sees all branches.
+        /// </summary>
+        public static bool IsBranchRestricted(this ClaimsPrincipal user) =>
+            user.AssignedBranchIds().Count > 0;
+
+        /// <summary>
+        /// True when the user may see data for the given branch — either they are
+        /// unrestricted, or the branch is among their assignments.
+        /// </summary>
+        public static bool CanAccessBranch(this ClaimsPrincipal user, Guid branchId)
+        {
+            var ids = user.AssignedBranchIds();
+            return ids.Count == 0 || ids.Contains(branchId);
+        }
     }
 }

@@ -387,6 +387,12 @@ else
                                 {
                                     <span class="badge badge-active">Active</span>
                                 }
+                                @if (p.IsPrivateTraining)
+                                {
+                                    <span style="font-size:9.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;background:linear-gradient(135deg,#f97316,#ea580c);color:#fff;padding:2px 7px;border-radius:10px;">
+                                        <i class="bi bi-person-arms-up"></i> Private
+                                    </span>
+                                }
                             </div>
                             <div class="pc-name">@p.PackageName</div>
                             @if (!string.IsNullOrWhiteSpace(p.Description))

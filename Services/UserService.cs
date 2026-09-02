@@ -3,8 +3,6 @@ using GymSaaS.Persistence;
 using GymSaaS.Persistence.Entities;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
-using System.Security.Cryptography;
-using System.Text;
 
 namespace GymSaaS.Services;
 
@@ -97,14 +95,11 @@ public class UserService : IUserService
         if (role == null)
             return (false, "Selected role was not found.");
 
-        var isSuperAdmin = string.Equals(role.RoleName, "SuperAdmin", StringComparison.OrdinalIgnoreCase);
-
-        if (!isSuperAdmin && model.BranchId == null)
-            return (false, "Branch is required for non-SuperAdmin users.");
-
+        // Branch is optional for everyone: a user with no branch assignment can
+        // see all branches' data (unrestricted). Assigning a branch scopes them to it.
         Branch? branch = null;
 
-        if (!isSuperAdmin)
+        if (model.BranchId != null)
         {
             branch = await _db.Branches
                 .FirstOrDefaultAsync(b =>
@@ -117,7 +112,6 @@ public class UserService : IUserService
         }
 
         var (firstName, lastName) = SplitFullName(model.FullName);
-        var (passwordHash, passwordSalt) = HashPassword(model.Password);
 
         var user = new User
         {
@@ -125,8 +119,9 @@ public class UserService : IUserService
             TenantId = tenantId,
             Email = model.Email.Trim(),
             NormalizedEmail = normalizedEmail,
-            PasswordHash = passwordHash,
-            PasswordSalt = passwordSalt,
+            // Passwords are stored in plain text (login compares plain text).
+            PasswordHash = model.Password,
+            PasswordSalt = null,
             FirstName = firstName,
             LastName = lastName,
             PhoneNumber = string.IsNullOrWhiteSpace(model.PhoneNumber) ? null : model.PhoneNumber.Trim(),
@@ -148,7 +143,7 @@ public class UserService : IUserService
             AssignedAtUtc = DateTime.UtcNow
         });
 
-        if (!isSuperAdmin && branch != null)
+        if (branch != null)
         {
             _db.UserBranches.Add(new UserBranch
             {
@@ -247,14 +242,11 @@ public class UserService : IUserService
         if (role == null)
             return (false, "Selected role was not found.");
 
-        var isSuperAdmin = string.Equals(role.RoleName, "SuperAdmin", StringComparison.OrdinalIgnoreCase);
-
-        if (!isSuperAdmin && model.BranchId == null)
-            return (false, "Branch is required for non-SuperAdmin users.");
-
+        // Branch is optional for everyone: a user with no branch assignment can
+        // see all branches' data (unrestricted). Assigning a branch scopes them to it.
         Branch? branch = null;
 
-        if (!isSuperAdmin)
+        if (model.BranchId != null)
         {
             branch = await _db.Branches
                 .FirstOrDefaultAsync(b =>
@@ -278,9 +270,9 @@ public class UserService : IUserService
 
         if (!string.IsNullOrWhiteSpace(model.Password))
         {
-            var (passwordHash, passwordSalt) = HashPassword(model.Password);
-            user.PasswordHash = passwordHash;
-            user.PasswordSalt = passwordSalt;
+            // Plain text — login compares plain text.
+            user.PasswordHash = model.Password;
+            user.PasswordSalt = null;
         }
 
         var existingRoles = await _db.UserRoles
@@ -303,7 +295,7 @@ public class UserService : IUserService
 
         _db.UserBranches.RemoveRange(existingBranches);
 
-        if (!isSuperAdmin && branch != null)
+        if (branch != null)
         {
             _db.UserBranches.Add(new UserBranch
             {
@@ -335,18 +327,5 @@ public class UserService : IUserService
         var lastName = string.Join(' ', parts.Skip(1));
 
         return (firstName, lastName);
-    }
-
-    private static (string Hash, string? Salt) HashPassword(string password)
-    {
-        var saltBytes = RandomNumberGenerator.GetBytes(16);
-        var salt = Convert.ToBase64String(saltBytes);
-
-        using var sha256 = SHA256.Create();
-        var combined = Encoding.UTF8.GetBytes(password + salt);
-        var hashBytes = sha256.ComputeHash(combined);
-        var hash = Convert.ToBase64String(hashBytes);
-
-        return (hash, salt);
     }
 }

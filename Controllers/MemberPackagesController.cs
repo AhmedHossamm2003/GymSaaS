@@ -51,6 +51,7 @@ namespace GymSaaS.Controllers
                 CurrentPackages = await GetCurrentPackagesAsync(memberId),
                 AllBranches = await GetBranchesAsync(),
                 AvailableClasses = await GetClassesAsync(member.HomeBranchId),
+                AvailableCoaches = await GetAvailableCoachesAsync(member.HomeBranchId),
             };
 
             ViewData["Title"] = vm.MemberName;
@@ -73,27 +74,62 @@ namespace GymSaaS.Controllers
             if (model.PackageDefinitionId == null)
                 ModelState.AddModelError(nameof(model.PackageDefinitionId), "Please select a package.");
 
+            var pkgDef = await _db.PackageDefinitions
+                .FirstOrDefaultAsync(p => p.PackageDefinitionId == model.PackageDefinitionId
+                                       && p.TenantId == TenantId);
+
+            if (pkgDef?.IsPrivateTraining == true && model.CoachId == null)
+                ModelState.AddModelError(nameof(model.CoachId), "A coach is required for private training packages.");
+
+            // ── Enforce price floor (MaxDiscountedPrice) ─────────────────────
+            if (pkgDef != null && model.FinalPrice.HasValue)
+            {
+                if (model.FinalPrice.Value < 0)
+                    ModelState.AddModelError(nameof(model.FinalPrice),
+                        "Price cannot be negative.");
+                else if (pkgDef.Price.HasValue && model.FinalPrice.Value > pkgDef.Price.Value)
+                    ModelState.AddModelError(nameof(model.FinalPrice),
+                        $"Price cannot exceed the package price ({pkgDef.Price.Value:N2} EGP).");
+                else if (pkgDef.MaxDiscountedPrice.HasValue
+                      && model.FinalPrice.Value < pkgDef.MaxDiscountedPrice.Value)
+                    ModelState.AddModelError(nameof(model.FinalPrice),
+                        $"Discount limit reached — minimum price for this package is {pkgDef.MaxDiscountedPrice.Value:N2} EGP.");
+            }
+
             if (!ModelState.IsValid)
             {
                 model.AvailablePackages = await GetAvailablePackagesAsync(member.HomeBranchId);
                 model.CurrentPackages = await GetCurrentPackagesAsync(model.MemberId);
                 model.AllBranches = await GetBranchesAsync();
                 model.AvailableClasses = await GetClassesAsync(member.HomeBranchId);
+                model.AvailableCoaches = await GetAvailableCoachesAsync(member.HomeBranchId);
                 ViewData["Title"] = model.MemberName;
                 ViewData["Subtitle"] = "Assign Package";
                 return View(model);
             }
 
-            var pkgDef = await _db.PackageDefinitions
+            pkgDef = await _db.PackageDefinitions
                 .Include(p => p.PackageType)
                 .Include(p => p.BranchAccessPolicyType)
-                .FirstOrDefaultAsync(p => p.PackageDefinitionId == model.PackageDefinitionId
+                .FirstOrDefaultAsync(p => p.PackageDefinitionId == pkgDef.PackageDefinitionId
                                        && p.TenantId == TenantId);
 
             if (pkgDef == null) return NotFound();
 
             var startDate = model.CustomStartDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
             var typeCode = pkgDef.PackageType?.PackageTypeCode ?? "";
+
+            // ── Snapshot pricing + coach commission at moment of assignment ────
+            // Use the staff-entered FinalPrice (after any discount) if provided;
+            // otherwise fall back to the package's catalog price.
+            decimal? priceSnap = model.FinalPrice ?? pkgDef.Price;
+            decimal? commissionPct = null;
+            decimal? commissionAmount = null;
+            if (pkgDef.IsPrivateTraining && pkgDef.CoachCommissionPercent.HasValue && priceSnap.HasValue)
+            {
+                commissionPct = pkgDef.CoachCommissionPercent.Value;
+                commissionAmount = Math.Round(priceSnap.Value * commissionPct.Value / 100m, 2);
+            }
 
             // Resolve perks — use override if provided, else use catalog defaults
             int? invitationsTotal   = model.CustomInvitationCount   ?? pkgDef.InvitationCount;
@@ -147,6 +183,7 @@ namespace GymSaaS.Controllers
                     LinkedPackageGroupId = groupId,
                     PackageComponentRole = "SESSION",
                     OpenGymDailyLimit = 1,
+                    CoachId = model.CoachId,
                     // Perks — stored on the SESSION component row
                     InvitationsTotal     = invitationsTotal,
                     InvitationsRemaining = invitationsTotal,
@@ -157,6 +194,10 @@ namespace GymSaaS.Controllers
                     FreezeAllowanceDays  = freezeAllowance,
                     FreezeRemainingDays  = freezeAllowance,
                     GymClassId           = model.GymClassId ?? pkgDef.GymClassId,
+                    // Commission snapshot attaches to the SESSION component of COMBINED
+                    PriceSnapshot          = priceSnap,
+                    CoachCommissionPercent = commissionPct,
+                    CoachCommissionAmount  = commissionAmount,
                     CreatedAtUtc = DateTime.UtcNow,
                     CreatedByUserId = UserId,
                 };
@@ -189,6 +230,7 @@ namespace GymSaaS.Controllers
                     LinkedPackageGroupId = groupId,
                     PackageComponentRole = "OPEN_GYM",
                     OpenGymDailyLimit = pkgDef.OpenGymDailyLimit,
+                    CoachId = model.CoachId,
                     CreatedAtUtc = DateTime.UtcNow,
                     CreatedByUserId = UserId,
                 };
@@ -239,6 +281,7 @@ namespace GymSaaS.Controllers
                     LinkedPackageGroupId = null,
                     PackageComponentRole = null,
                     OpenGymDailyLimit = pkgDef.OpenGymDailyLimit,
+                    CoachId = model.CoachId,
                     // Perks
                     InvitationsTotal     = invitationsTotal,
                     InvitationsRemaining = invitationsTotal,
@@ -251,6 +294,9 @@ namespace GymSaaS.Controllers
                     GymClassId           = (typeCode == "SESSION" || typeCode == "CLASS")
                         ? (model.GymClassId ?? pkgDef.GymClassId)
                         : null,
+                    PriceSnapshot          = priceSnap,
+                    CoachCommissionPercent = commissionPct,
+                    CoachCommissionAmount  = commissionAmount,
                     CreatedAtUtc = DateTime.UtcNow,
                     CreatedByUserId = UserId,
                 };
@@ -270,8 +316,9 @@ namespace GymSaaS.Controllers
         // ─────────────────────────────────────────────
         // HELPERS
         // ─────────────────────────────────────────────
-        private async Task<List<PackageDefinitionListItem>> GetAvailablePackagesAsync(Guid homeBranchId) =>
-            await _db.PackageDefinitions
+        private async Task<List<PackageDefinitionListItem>> GetAvailablePackagesAsync(Guid homeBranchId)
+        {
+            var items = await _db.PackageDefinitions
                 .Where(p => p.TenantId == TenantId && p.IsActive
                          && (p.RestrictedToBranchId == null || p.RestrictedToBranchId == homeBranchId))
                 .Join(_db.PackageTypes, p => p.PackageTypeId, pt => pt.PackageTypeId, (p, pt) => new { p, pt })
@@ -288,15 +335,52 @@ namespace GymSaaS.Controllers
                     SessionCount = x.p.SessionCount,
                     DurationDays = x.p.DurationDays,
                     OpenGymDurationDays = x.p.OpenGymDurationDays,
+                    GymClassId = x.p.GymClassId,
                     InvitationCount = x.p.InvitationCount,
                     InBodyCount = x.p.InBodyCount,
                     PtSessionCount = x.p.PtSessionCount,
                     FreezeAllowanceDays = x.p.FreezeAllowanceDays,
                     Price = x.p.Price,
+                    MaxDiscountedPrice = x.p.MaxDiscountedPrice,
+                    IsPrivateTraining = x.p.IsPrivateTraining,
                     IsActive = x.p.IsActive,
                     SortOrder = x.p.SortOrder,
                 })
                 .ToListAsync();
+
+            // Resolve class name + coach for packages that have a linked class
+            var classIds = items.Where(i => i.GymClassId.HasValue).Select(i => i.GymClassId!.Value).Distinct().ToList();
+            if (classIds.Count > 0)
+            {
+                var classInfo = await _db.GymClasses
+                    .Where(g => classIds.Contains(g.GymClassId))
+                    .Select(g => new { g.GymClassId, g.ClassName, g.CoachId })
+                    .ToListAsync();
+
+                var coachIds = classInfo.Where(c => c.CoachId.HasValue).Select(c => c.CoachId!.Value).Distinct().ToList();
+                var coachInfo = coachIds.Count > 0
+                    ? await _db.Coaches
+                        .Where(c => coachIds.Contains(c.CoachId))
+                        .Select(c => new { c.CoachId, FullName = (c.FirstName + " " + c.LastName).Trim() })
+                        .ToDictionaryAsync(c => c.CoachId, c => c.FullName)
+                    : new Dictionary<Guid, string>();
+
+                var classMap = classInfo.ToDictionary(c => c.GymClassId);
+
+                foreach (var item in items.Where(i => i.GymClassId.HasValue))
+                {
+                    if (classMap.TryGetValue(item.GymClassId!.Value, out var cls))
+                    {
+                        item.GymClassName = cls.ClassName;
+                        item.CoachId = cls.CoachId;
+                        if (cls.CoachId.HasValue && coachInfo.TryGetValue(cls.CoachId.Value, out var cn))
+                            item.CoachName = cn;
+                    }
+                }
+            }
+
+            return items;
+        }
 
         private async Task<List<MemberPackageListItem>> GetCurrentPackagesAsync(Guid memberId) =>
             await _db.MemberPackages
@@ -352,6 +436,7 @@ namespace GymSaaS.Controllers
                 GymClassId  = g.GymClassId,
                 ClassName   = g.ClassName,
                 TimeDisplay = $"{DayName(g.DayOfWeek)} {g.StartTime:HH:mm}–{g.EndTime:HH:mm}",
+                CoachId     = g.CoachId,
                 CoachName   = g.CoachId.HasValue && coachMap.TryGetValue(g.CoachId.Value, out var cn) ? cn : null,
             }).ToList();
         }
@@ -364,6 +449,19 @@ namespace GymSaaS.Controllers
                 {
                     BranchId = b.BranchId,
                     BranchName = b.BranchName,
+                })
+                .ToListAsync();
+
+        private async Task<List<CoachDropdownItem>> GetAvailableCoachesAsync(Guid branchId) =>
+            await _db.Coaches
+                .Where(c => c.TenantId == TenantId && c.BranchId == branchId && c.IsActive && !c.IsDeleted)
+                .OrderBy(c => c.FirstName).ThenBy(c => c.LastName)
+                .Select(c => new CoachDropdownItem
+                {
+                    CoachId = c.CoachId,
+                    FullName = (c.FirstName + " " + c.LastName).Trim(),
+                    Specialty = c.Specialty,
+                    BranchId = c.BranchId,
                 })
                 .ToListAsync();
 

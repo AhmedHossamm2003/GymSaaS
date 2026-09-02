@@ -63,6 +63,8 @@ public partial class PackageDefinition
 
     public bool IsCustomTemplate { get; set; }
 
+    public bool IsPrivateTraining { get; set; }
+
     public bool IsActive { get; set; }
 
     public int SortOrder { get; set; }
@@ -83,6 +85,16 @@ public partial class PackageDefinition
 
     [Column(TypeName = "decimal(10, 2)")]
     public decimal? Price { get; set; }
+
+    // Floor price at assignment time. When set, sales/reception cannot apply a
+    // discount that takes the charged price below this value.
+    [Column(TypeName = "decimal(10, 2)")]
+    public decimal? MaxDiscountedPrice { get; set; }
+
+    // Percentage of package price paid to the coach (0-100).
+    // Only meaningful when IsPrivateTraining = true. Snapshotted to MemberPackage on assignment.
+    [Column(TypeName = "decimal(5, 2)")]
+    public decimal? CoachCommissionPercent { get; set; }
 
     // When set, only members whose home branch matches may be assigned this package.
     public Guid? RestrictedToBranchId { get; set; }

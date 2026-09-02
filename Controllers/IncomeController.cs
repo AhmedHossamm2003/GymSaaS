@@ -1,6 +1,7 @@
 using GymSaaS.Models;
 using GymSaaS.Persistence;
 using GymSaaS.Persistence.Entities;
+using GymSaaS.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -43,7 +44,11 @@ namespace GymSaaS.Controllers
             if (!string.IsNullOrWhiteSpace(category))
                 q = q.Where(i => i.CategoryCode == category);
 
-            if (branchId.HasValue)
+            var scopedBranchIds = User.AssignedBranchIds();
+            if (scopedBranchIds.Count > 0)
+                q = q.Where(i => i.BranchId != null && scopedBranchIds.Contains(i.BranchId.Value));
+
+            if (branchId.HasValue && User.CanAccessBranch(branchId.Value))
                 q = q.Where(i => i.BranchId == branchId.Value);
 
             var total = await q.CountAsync();
@@ -209,9 +214,12 @@ namespace GymSaaS.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        private async Task<List<BranchDropdownItem>> GetBranchesAsync() =>
-            await _db.Branches
-                .Where(b => b.TenantId == TenantId && b.IsActive)
+        private async Task<List<BranchDropdownItem>> GetBranchesAsync()
+        {
+            var scoped = User.AssignedBranchIds();
+            return await _db.Branches
+                .Where(b => b.TenantId == TenantId && b.IsActive
+                         && (scoped.Count == 0 || scoped.Contains(b.BranchId)))
                 .OrderBy(b => b.BranchName)
                 .Select(b => new BranchDropdownItem
                 {
@@ -219,5 +227,6 @@ namespace GymSaaS.Controllers
                     BranchName = b.BranchName,
                 })
                 .ToListAsync();
+        }
     }
 }

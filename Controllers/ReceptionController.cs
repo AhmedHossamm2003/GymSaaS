@@ -150,8 +150,76 @@ namespace GymSaaS.Controllers
                 photoUrl          = result.PhotoUrl,
                 phoneNumber       = result.PhoneNumber,
                 packageName       = result.PackageName,
+                sessionsRemaining = result.SessionsRemaining,
                 checkInAtUtc      = result.CheckInAtUtc,
+                requiresChoice    = result.RequiresChoice,
+                packageOptions    = result.PackageOptions.Select(o => new
+                {
+                    memberPackageId   = o.MemberPackageId,
+                    packageName       = o.PackageName,
+                    packageTypeCode   = o.PackageTypeCode,
+                    sessionsRemaining = o.SessionsRemaining,
+                    label             = o.Label,
+                }),
             });
+        }
+
+        // ── POST /Reception/ConfirmPending  (AJAX) ────────────────
+        /// <summary>
+        /// Finalizes a PENDING mobile-scan record once the receptionist picks the
+        /// class vs open-gym package the member is attending under.
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ConfirmPending([FromBody] ConfirmPendingRequestModel model)
+        {
+            if (model.AttendanceRecordId == Guid.Empty || model.SelectedMemberPackageId == Guid.Empty)
+                return BadRequest(new { success = false, errorMessage = "Invalid request." });
+
+            var tenantId = CurrentTenantId;
+            var result = await _receptionService.ConfirmPendingAsync(
+                model.AttendanceRecordId, model.SelectedMemberPackageId, CurrentUserId, tenantId);
+
+            return Ok(result);
+        }
+
+        // ── POST /Reception/RecordPtSession  (AJAX) ───────────────
+        /// <summary>
+        /// Records that a member attended a PT session with a chosen coach.
+        /// Deducts one from the package's PtSessionsRemaining.
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RecordPtSession([FromBody] RecordPtSessionRequestModel model)
+        {
+            if (model.MemberId == Guid.Empty || model.MemberPackageId == Guid.Empty
+                || model.CoachId == Guid.Empty || model.BranchId == Guid.Empty)
+                return BadRequest(new { success = false, errorMessage = "Invalid request." });
+
+            var result = await _receptionService.RecordPtSessionAsync(
+                model.MemberId, model.MemberPackageId, model.CoachId, model.BranchId,
+                CurrentUserId, CurrentTenantId);
+
+            return Ok(result);
+        }
+
+        // ── POST /Reception/RecordInBody  (AJAX) ──────────────────
+        /// <summary>
+        /// Records that a member did an InBody scan. Deducts one from InBodyRemaining.
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RecordInBody([FromBody] RecordInBodyRequestModel model)
+        {
+            if (model.MemberId == Guid.Empty || model.MemberPackageId == Guid.Empty
+                || model.BranchId == Guid.Empty)
+                return BadRequest(new { success = false, errorMessage = "Invalid request." });
+
+            var result = await _receptionService.RecordInBodyAsync(
+                model.MemberId, model.MemberPackageId, model.BranchId,
+                CurrentUserId, CurrentTenantId);
+
+            return Ok(result);
         }
 
         // ── POST /Reception/MarkAttendance  (AJAX) ────────────────
@@ -178,6 +246,27 @@ namespace GymSaaS.Controllers
     public class ScanRequestModel
     {
         public string MembershipNumber { get; set; } = null!;
+        public Guid BranchId { get; set; }
+    }
+
+    public class ConfirmPendingRequestModel
+    {
+        public Guid AttendanceRecordId { get; set; }
+        public Guid SelectedMemberPackageId { get; set; }
+    }
+
+    public class RecordPtSessionRequestModel
+    {
+        public Guid MemberId { get; set; }
+        public Guid MemberPackageId { get; set; }
+        public Guid CoachId { get; set; }
+        public Guid BranchId { get; set; }
+    }
+
+    public class RecordInBodyRequestModel
+    {
+        public Guid MemberId { get; set; }
+        public Guid MemberPackageId { get; set; }
         public Guid BranchId { get; set; }
     }
 }

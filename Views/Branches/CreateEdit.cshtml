@@ -252,7 +252,7 @@
             <!-- Branch Name -->
             <div class="field">
                 <label class="field-label" asp-for="BranchName">Branch Name</label>
-                <input asp-for="BranchName" type="text" placeholder="e.g. Ideal Wellness — Cairo" />
+                <input asp-for="BranchName" type="text" placeholder="e.g. Idea Wellness — Cairo" />
                 @if (!ViewData.ModelState.IsValid && ViewData.ModelState["BranchName"]?.Errors.Count > 0)
                 {
                     <div class="field-error visible">@ViewData.ModelState["BranchName"]!.Errors[0].ErrorMessage</div>
@@ -314,7 +314,7 @@
 
                 <div class="field">
                     <label class="field-label" asp-for="ContactEmail">Email Address</label>
-                    <input asp-for="ContactEmail" type="email" placeholder="branch@idealwellness.com" />
+                    <input asp-for="ContactEmail" type="email" placeholder="branch@ideawellness.com" />
                     @if (!ViewData.ModelState.IsValid && ViewData.ModelState["ContactEmail"]?.Errors.Count > 0)
                     {
                         <div class="field-error visible">@ViewData.ModelState["ContactEmail"]!.Errors[0].ErrorMessage</div>

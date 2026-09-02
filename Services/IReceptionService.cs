@@ -82,6 +82,34 @@ namespace GymSaaS.Services.Reception
         // If no conflict — auto check-in was done, return the record id
         public Guid? AutoCheckedInRecordId { get; set; }
         public string? AutoCheckedInPackageName { get; set; }
+
+        // ── Non-attendance perks (recorded from reception) ───────────
+        // PT (personal training) sessions remaining on the member's package.
+        public int? PtSessionsRemaining { get; set; }
+        public Guid? PtPackageId { get; set; }          // package holding the PT perk
+        public string? PtAssignedCoachId { get; set; }  // default coach for the PT package, if any
+
+        // InBody scans remaining.
+        public int? InBodyRemaining { get; set; }
+        public Guid? InBodyPackageId { get; set; }       // package holding the InBody perk
+
+        // Active coaches at the branch — for the PT-session coach picker.
+        public List<CoachOptionDto> CoachOptions { get; set; } = new();
+    }
+
+    /// <summary>One coach selectable in the PT-session picker.</summary>
+    public class CoachOptionDto
+    {
+        public Guid CoachId { get; set; }
+        public string Name { get; set; } = null!;
+    }
+
+    /// <summary>Result of recording a PT session or InBody scan.</summary>
+    public class PerkUsageResult
+    {
+        public bool Success { get; set; }
+        public string? ErrorMessage { get; set; }
+        public int? Remaining { get; set; }
     }
 
     /// <summary>
@@ -130,7 +158,26 @@ namespace GymSaaS.Services.Reception
         public string? PhotoUrl { get; set; }
         public string? PhoneNumber { get; set; }
         public string? PackageName { get; set; }
+        public int? SessionsRemaining { get; set; }
         public string CheckInAtUtc { get; set; } = null!;
+
+        // True when this is a mobile QR scan awaiting the receptionist's choice
+        // between a class/session package and an open-gym package.
+        public bool RequiresChoice { get; set; }
+
+        // Package options to choose from when RequiresChoice is true.
+        public List<PackageOptionDto> PackageOptions { get; set; } = new();
+    }
+
+    /// <summary>
+    /// Result of finalizing a pending (mobile-scan) attendance record.
+    /// </summary>
+    public class ConfirmPendingResult
+    {
+        public bool Success { get; set; }
+        public string? ErrorMessage { get; set; }
+        public int? SessionsRemaining { get; set; }
+        public string? PackageName { get; set; }
     }
 
     // ── Interface ─────────────────────────────────────────────────
@@ -161,6 +208,29 @@ namespace GymSaaS.Services.Reception
         /// Used by the reception page to poll for mobile check-ins and show auto-popup.
         /// </summary>
         Task<LatestCheckInDto?> GetLatestCheckInAsync(Guid branchId, Guid tenantId, DateTime sinceUtc);
+
+        /// <summary>
+        /// Finalizes a PENDING mobile-scan attendance record once the receptionist
+        /// picks which package (class vs open gym) the member is attending under.
+        /// Deducts a session if the chosen package is session-based.
+        /// </summary>
+        Task<ConfirmPendingResult> ConfirmPendingAsync(
+            Guid attendanceRecordId, Guid selectedMemberPackageId, Guid receptionistUserId, Guid tenantId);
+
+        /// <summary>
+        /// Records a PT session for a member: decrements PtSessionsRemaining on the
+        /// chosen package and logs which coach ran it.
+        /// </summary>
+        Task<PerkUsageResult> RecordPtSessionAsync(
+            Guid memberId, Guid memberPackageId, Guid coachId, Guid branchId,
+            Guid receptionistUserId, Guid tenantId);
+
+        /// <summary>
+        /// Records an InBody scan for a member: decrements InBodyRemaining on the chosen package.
+        /// </summary>
+        Task<PerkUsageResult> RecordInBodyAsync(
+            Guid memberId, Guid memberPackageId, Guid branchId,
+            Guid receptionistUserId, Guid tenantId);
 
         /// <summary>
         /// Returns all branches for the tenant (used by Admin/SuperAdmin branch selector).

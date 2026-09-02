@@ -1,6 +1,7 @@
 using GymSaaS.Models;
 using GymSaaS.Persistence;
 using GymSaaS.Persistence.Entities;
+using GymSaaS.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -29,6 +30,7 @@ namespace GymSaaS.Controllers
         // ─────────────────────────────────────────────
         // GET /Members
         // ─────────────────────────────────────────────
+        [Authorize(Policy = "StaffExceptCoach")]
         public async Task<IActionResult> Index(string? search, string? status, Guid? branchId, int page = 1)
         {
             const int pageSize = 20;
@@ -55,7 +57,12 @@ namespace GymSaaS.Controllers
             if (!string.IsNullOrWhiteSpace(status))
                 query = query.Where(x => x.ms.StatusCode == status);
 
-            if (branchId.HasValue)
+            // Branch scope: staff assigned to branches see only those members.
+            var scopedBranchIds = User.AssignedBranchIds();
+            if (scopedBranchIds.Count > 0)
+                query = query.Where(x => scopedBranchIds.Contains(x.m.HomeBranchId));
+
+            if (branchId.HasValue && User.CanAccessBranch(branchId.Value))
                 query = query.Where(x => x.m.HomeBranchId == branchId.Value);
 
             var totalCount = await query.CountAsync();
@@ -146,7 +153,10 @@ namespace GymSaaS.Controllers
             ViewData["Status"] = status;
             ViewData["BranchId"] = branchId;
             ViewData["Statuses"] = await _db.MemberStatuses.OrderBy(s => s.StatusName).ToListAsync();
-            ViewData["Branches"] = await _db.Branches.Where(b => b.TenantId == TenantId && b.IsActive).OrderBy(b => b.BranchName).ToListAsync();
+            ViewData["Branches"] = await _db.Branches
+                .Where(b => b.TenantId == TenantId && b.IsActive
+                         && (scopedBranchIds.Count == 0 || scopedBranchIds.Contains(b.BranchId)))
+                .OrderBy(b => b.BranchName).ToListAsync();
             ViewData["TotalCount"] = totalCount;
             ViewData["Page"] = page;
             ViewData["TotalPages"] = totalPages;
@@ -159,16 +169,23 @@ namespace GymSaaS.Controllers
         // GET /Members/QuickSearch?q=…  (AJAX)
         // ─────────────────────────────────────────────
         [HttpGet]
+        [Authorize(Policy = "StaffExceptCoach")]
         public async Task<IActionResult> QuickSearch(string? q)
         {
             if (string.IsNullOrWhiteSpace(q) || q.Trim().Length < 2)
                 return Json(Array.Empty<object>());
 
             var term = q.Trim();
+            var scopedBranchIds = User.AssignedBranchIds();
 
             var results = await _db.Members
                 .Where(m => m.TenantId == TenantId && !m.IsDeleted &&
-                            (m.MembershipNumber.Contains(term) || m.PhoneNumber.Contains(term)))
+                            (m.MembershipNumber.Contains(term) ||
+                             m.PhoneNumber.Contains(term) ||
+                             m.FirstName.Contains(term) ||
+                             m.LastName.Contains(term) ||
+                             (m.FirstName + " " + m.LastName).Contains(term)) &&
+                            (scopedBranchIds.Count == 0 || scopedBranchIds.Contains(m.HomeBranchId)))
                 .Take(8)
                 .Select(m => new
                 {
@@ -194,6 +211,10 @@ namespace GymSaaS.Controllers
                 .FirstOrDefaultAsync(x => x.MemberId == id && x.TenantId == TenantId && !x.IsDeleted);
 
             if (m == null) return NotFound();
+
+            // Branch-restricted staff may only open members of their branch.
+            if (!User.CanAccessBranch(m.HomeBranchId))
+                return Forbid();
 
             var now = DateTime.UtcNow;
             var today = DateOnly.FromDateTime(now);
@@ -378,7 +399,7 @@ namespace GymSaaS.Controllers
             var memberNumber = await GenerateMembershipNumberAsync();
             var imageUrl = await SaveProfileImageAsync(model.ProfileImage, memberId);
             var password = string.IsNullOrWhiteSpace(model.Password)
-                                ? GeneratePassword(model.FirstName)
+                                ? "demopassword"
                                 : model.Password;
 
             var member = new Member
@@ -401,7 +422,7 @@ namespace GymSaaS.Controllers
                 EmergencyContactName = model.EmergencyContactName?.Trim(),
                 EmergencyContactPhone = model.EmergencyContactPhone?.Trim(),
                 Notes = model.Notes?.Trim(),
-                MustChangePassword = true,
+                MustChangePassword = password == "demopassword",
                 IsActive = true,
                 IsDeleted = false,
                 CreatedAtUtc = DateTime.UtcNow,
@@ -529,6 +550,37 @@ namespace GymSaaS.Controllers
 
             TempData["Toast"] = $"Member status changed to {newStatus.StatusName}.";
             TempData["ToastType"] = statusCode == "ACTIVE" ? "success" : "warning";
+            return RedirectToAction(nameof(Details), new { id });
+        }
+
+        // ─────────────────────────────────────────────
+        // POST /Members/ResetPassword/id
+        // Sets a known temporary password and forces the member to change it
+        // on their next mobile-app login.
+        // ─────────────────────────────────────────────
+        public const string TempPassword = "demopassword";
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [Authorize(Policy = "AnyStaff")]
+        public async Task<IActionResult> ResetPassword(Guid id)
+        {
+            var m = await _db.Members
+                .FirstOrDefaultAsync(x => x.MemberId == id && x.TenantId == TenantId && !x.IsDeleted);
+
+            if (m == null) return NotFound();
+
+            // Branch-restricted staff may only reset their own branch's members.
+            if (!User.CanAccessBranch(m.HomeBranchId)) return Forbid();
+
+            m.PasswordHash = TempPassword;
+            m.MustChangePassword = true;
+            m.UpdatedAtUtc = DateTime.UtcNow;
+            m.UpdatedByUserId = UserId;
+            await _db.SaveChangesAsync();
+
+            TempData["Toast"] = $"Password reset. Temporary password: \"{TempPassword}\" — the member will be asked to set a new one at next login.";
+            TempData["ToastType"] = "success";
             return RedirectToAction(nameof(Details), new { id });
         }
 

@@ -356,6 +356,55 @@
         50%       { opacity: .5; transform: scale(1.3); }
     }
 
+    @@keyframes scan-success-pop {
+        0%   { transform: scale(.6); opacity: 0; }
+        60%  { transform: scale(1.15); opacity: 1; }
+        100% { transform: scale(1); opacity: 1; }
+    }
+
+    @@keyframes scan-success-ring {
+        0%   { box-shadow: 0 0 0 0 rgba(34,197,94,.55); }
+        100% { box-shadow: 0 0 0 28px rgba(34,197,94,0); }
+    }
+
+    .scan-success-anim .member-photo {
+        animation: scan-success-pop .55s ease-out, scan-success-ring 1.1s ease-out;
+        border: 3px solid #22c55e;
+    }
+
+    .sessions-left-alert {
+        background: linear-gradient(135deg, #fff8f3 0%, #ffe9d6 100%);
+        border: 1.5px solid #ff5b14;
+        border-radius: 16px;
+        padding: 14px 16px;
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        animation: scan-success-pop .5s ease-out;
+    }
+
+    .sessions-left-alert .big-num {
+        font-size: 30px;
+        font-weight: 900;
+        color: #ff5b14;
+        line-height: 1;
+        min-width: 42px;
+        text-align: center;
+    }
+
+    .sessions-left-alert .label {
+        font-weight: 800;
+        color: #111827;
+        font-size: 14px;
+    }
+
+    .sessions-left-alert .sub {
+        font-size: 12px;
+        color: #6b7280;
+        margin-top: 2px;
+    }
+
     @@media (max-width: 1200px) {
         .reception-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -777,6 +826,53 @@
                 </div>
             </div>
 
+            <div id="sessionsLeftAlert" class="sessions-left-alert d-none">
+                <div class="big-num" id="sessionsLeftNum">—</div>
+                <div style="flex:1;min-width:0;">
+                    <div class="label" id="sessionsLeftLabel">sessions remaining</div>
+                    <div class="sub" id="sessionsLeftPkgName"></div>
+                </div>
+            </div>
+
+            <!-- PT session perk — shown when member has PT sessions remaining -->
+            <div id="ptPerkPanel" class="d-none"
+                 style="background:#f5f3ff;border:1.5px solid #8b5cf6;border-radius:14px;padding:12px 14px;margin-bottom:12px;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                    <i class="bi bi-person-arms-up" style="color:#7c3aed;font-size:18px;"></i>
+                    <div style="flex:1;">
+                        <div style="font-weight:800;color:#111827;font-size:13.5px;">Personal Training</div>
+                        <div style="font-size:11.5px;color:#6b7280;">
+                            <span id="ptRemainingNum" style="font-weight:800;color:#7c3aed;">0</span> sessions left
+                        </div>
+                    </div>
+                </div>
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <select id="ptCoachSelect" class="scan-input"
+                            style="flex:1;min-height:38px;font-size:13px;"></select>
+                    <button type="button" id="btnRecordPt" class="orange-btn"
+                            style="min-height:38px;padding:0 14px;font-size:12.5px;background:#7c3aed;white-space:nowrap;">
+                        <i class="bi bi-check2"></i> Record PT
+                    </button>
+                </div>
+                <div id="ptFeedback" style="margin-top:7px;font-size:12px;"></div>
+            </div>
+
+            <!-- InBody perk — shown when member has InBody scans remaining -->
+            <div id="inBodyPerkPanel" class="d-none"
+                 style="background:#ecfeff;border:1.5px solid #06b6d4;border-radius:14px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;gap:10px;">
+                <i class="bi bi-clipboard2-pulse" style="color:#0891b2;font-size:18px;"></i>
+                <div style="flex:1;">
+                    <div style="font-weight:800;color:#111827;font-size:13.5px;">InBody Scan</div>
+                    <div style="font-size:11.5px;color:#6b7280;">
+                        <span id="inBodyRemainingNum" style="font-weight:800;color:#0891b2;">0</span> scans left
+                    </div>
+                </div>
+                <button type="button" id="btnRecordInBody" class="orange-btn"
+                        style="min-height:38px;padding:0 14px;font-size:12.5px;background:#0891b2;white-space:nowrap;">
+                    <i class="bi bi-check2"></i> Record InBody
+                </button>
+            </div>
+
             <div id="classInfo" class="d-none"
                  style="background:#fff8f3;border:1px solid #fed7aa;border-radius:12px;padding:10px 14px;margin-bottom:12px;font-size:13px;display:flex;align-items:center;gap:10px;">
                 <i class="bi bi-calendar2-event" style="color:#ff5b14;font-size:16px;flex-shrink:0;"></i>
@@ -1025,7 +1121,10 @@
                     });
                 }
 
+                showSessionsLeft(data);
+                showPerkPanels(data);
                 openModal();
+                playSuccessFeedback();
             }
 
             function showModalError(title, message) {
@@ -1173,6 +1272,171 @@
                 document.getElementById('memberPackageInfo').classList.add('d-none');
                 document.getElementById('classInfo').classList.add('d-none');
                 document.getElementById('classFullAlert').classList.add('d-none');
+                document.getElementById('sessionsLeftAlert').classList.add('d-none');
+                document.getElementById('ptPerkPanel').classList.add('d-none');
+                document.getElementById('inBodyPerkPanel').classList.add('d-none');
+                document.getElementById('ptFeedback').textContent = '';
+                modal.classList.remove('scan-success-anim');
+                // Restore default conflict note (pending flow overrides it)
+                const note = conflictSection.querySelector('.stat-note');
+                if (note) note.textContent =
+                    'This member has multiple active packages. Please select how to check them in:';
+            }
+
+            // ── PT / InBody perk panels ───────────────────────────────
+            function showPerkPanels(data) {
+                // PT sessions
+                if (typeof data.ptSessionsRemaining === 'number' && data.ptSessionsRemaining > 0) {
+                    document.getElementById('ptRemainingNum').textContent = data.ptSessionsRemaining;
+
+                    const sel = document.getElementById('ptCoachSelect');
+                    sel.innerHTML = '';
+                    (data.coachOptions || []).forEach(function (c) {
+                        const opt = document.createElement('option');
+                        opt.value = c.coachId;
+                        opt.textContent = c.name;
+                        if (data.ptAssignedCoachId && c.coachId === data.ptAssignedCoachId)
+                            opt.selected = true;
+                        sel.appendChild(opt);
+                    });
+                    if (!sel.options.length) {
+                        const opt = document.createElement('option');
+                        opt.value = '';
+                        opt.textContent = 'No coaches at this branch';
+                        sel.appendChild(opt);
+                    }
+
+                    const btn = document.getElementById('btnRecordPt');
+                    btn.onclick = function () {
+                        recordPt(data.memberId, data.ptPackageId, sel.value);
+                    };
+                    document.getElementById('ptPerkPanel').classList.remove('d-none');
+                }
+
+                // InBody
+                if (typeof data.inBodyRemaining === 'number' && data.inBodyRemaining > 0) {
+                    document.getElementById('inBodyRemainingNum').textContent = data.inBodyRemaining;
+                    const btn = document.getElementById('btnRecordInBody');
+                    btn.onclick = function () {
+                        recordInBody(data.memberId, data.inBodyPackageId);
+                    };
+                    document.getElementById('inBodyPerkPanel').classList.remove('d-none');
+                }
+            }
+
+            async function recordPt(memberId, memberPackageId, coachId) {
+                const fb = document.getElementById('ptFeedback');
+                if (!coachId) { fb.innerHTML = '<span style="color:#b42318;">Select a coach first.</span>'; return; }
+                const btn = document.getElementById('btnRecordPt');
+                btn.disabled = true;
+                fb.innerHTML = '<span style="color:#6b7280;">Recording…</span>';
+                try {
+                    const res = await fetch('/Reception/RecordPtSession', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': antiforgery },
+                        body: JSON.stringify({ memberId, memberPackageId, coachId, branchId })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        document.getElementById('ptRemainingNum').textContent = data.remaining;
+                        fb.innerHTML = `<span style="color:#16a34a;font-weight:700;"><i class="bi bi-check-circle-fill"></i> PT session recorded. ${data.remaining} left.</span>`;
+                        if (data.remaining <= 0) {
+                            setTimeout(() => document.getElementById('ptPerkPanel').classList.add('d-none'), 1200);
+                        }
+                    } else {
+                        fb.innerHTML = `<span style="color:#b42318;">${data.errorMessage ?? 'Failed.'}</span>`;
+                    }
+                } catch {
+                    fb.innerHTML = '<span style="color:#b42318;">Network error.</span>';
+                } finally {
+                    btn.disabled = false;
+                }
+            }
+
+            async function recordInBody(memberId, memberPackageId) {
+                const btn = document.getElementById('btnRecordInBody');
+                btn.disabled = true;
+                try {
+                    const res = await fetch('/Reception/RecordInBody', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': antiforgery },
+                        body: JSON.stringify({ memberId, memberPackageId, branchId })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        document.getElementById('inBodyRemainingNum').textContent = data.remaining;
+                        btn.innerHTML = '<i class="bi bi-check2-all"></i> Recorded';
+                        if (data.remaining <= 0) {
+                            setTimeout(() => document.getElementById('inBodyPerkPanel').classList.add('d-none'), 1200);
+                        } else {
+                            setTimeout(() => { btn.innerHTML = '<i class="bi bi-check2"></i> Record InBody'; btn.disabled = false; }, 1200);
+                        }
+                    } else {
+                        alert(data.errorMessage ?? 'Failed to record InBody.');
+                        btn.disabled = false;
+                    }
+                } catch {
+                    btn.disabled = false;
+                }
+            }
+
+            // ── Pick the best sessions-remaining value to display.
+            //    Prefers the auto-checked-in package; otherwise the first session-based option.
+            function showSessionsLeft(data) {
+                const opts = data.packageOptions || [];
+                let chosen = null;
+
+                if (data.autoCheckedInPackageName) {
+                    chosen = opts.find(o => o.sessionsRemaining
+                                         && o.packageName === data.autoCheckedInPackageName);
+                }
+                if (!chosen) chosen = opts.find(o => o.sessionsRemaining);
+                if (!chosen) return;
+
+                const m = /(\d+)/.exec(chosen.sessionsRemaining);
+                if (!m) return;
+
+                let n = parseInt(m[1], 10);
+                // If we just auto-deducted a session for THIS package, show post-deduction count.
+                if (data.autoCheckedInPackageName === chosen.packageName) n = Math.max(0, n - 1);
+
+                document.getElementById('sessionsLeftNum').textContent = n;
+                document.getElementById('sessionsLeftLabel').textContent =
+                    n === 1 ? 'session remaining' : 'sessions remaining';
+                document.getElementById('sessionsLeftPkgName').textContent = chosen.packageName || '';
+                document.getElementById('sessionsLeftAlert').classList.remove('d-none');
+            }
+
+            // ── Short upbeat chime via Web Audio API (no asset needed).
+            let _audioCtx = null;
+            function playScanSound() {
+                try {
+                    _audioCtx = _audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+                    const ctx = _audioCtx;
+                    if (ctx.state === 'suspended') ctx.resume();
+                    const now = ctx.currentTime;
+                    // Two ascending tones: G5 → C6
+                    [[784, 0], [1046.5, 0.11]].forEach(([freq, offset]) => {
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+                        osc.type = 'sine';
+                        osc.frequency.value = freq;
+                        gain.gain.setValueAtTime(0.0001, now + offset);
+                        gain.gain.exponentialRampToValueAtTime(0.25, now + offset + 0.02);
+                        gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.22);
+                        osc.connect(gain).connect(ctx.destination);
+                        osc.start(now + offset);
+                        osc.stop(now + offset + 0.24);
+                    });
+                } catch { /* audio not available — skip silently */ }
+            }
+
+            function playSuccessFeedback() {
+                playScanSound();
+                modal.classList.remove('scan-success-anim');
+                // force reflow so the animation restarts on repeated scans
+                void modal.offsetWidth;
+                modal.classList.add('scan-success-anim');
             }
 
             function openModal() {
@@ -1254,6 +1518,12 @@
             function showAutoCheckInPopup(data) {
                 resetModal();
 
+                // Mobile QR scan that needs the receptionist to choose class vs open gym.
+                if (data.requiresChoice) {
+                    showPendingChoicePopup(data);
+                    return;
+                }
+
                 document.getElementById('memberName').textContent      = data.memberName        ?? '—';
                 document.getElementById('membershipBadge').textContent = data.membershipNumber  ?? '—';
 
@@ -1274,7 +1544,92 @@
                 autoAlert.classList.remove('d-none');
                 document.getElementById('autoPackageName').textContent = data.packageName ?? 'Mobile check-in';
 
+                if (typeof data.sessionsRemaining === 'number') {
+                    document.getElementById('sessionsLeftNum').textContent = data.sessionsRemaining;
+                    document.getElementById('sessionsLeftLabel').textContent =
+                        data.sessionsRemaining === 1 ? 'session remaining' : 'sessions remaining';
+                    document.getElementById('sessionsLeftPkgName').textContent = data.packageName ?? '';
+                    document.getElementById('sessionsLeftAlert').classList.remove('d-none');
+                }
+
                 openModal();
+                playSuccessFeedback();
+            }
+
+            // ── Pending mobile-scan: receptionist chooses the package ──
+            function showPendingChoicePopup(data) {
+                document.getElementById('memberName').textContent      = data.memberName        ?? '—';
+                document.getElementById('membershipBadge').textContent = data.membershipNumber  ?? '—';
+
+                const photo = document.getElementById('memberPhoto');
+                photo.src = data.photoUrl ? data.photoUrl : '/images/avatar-placeholder.png';
+
+                if (data.phoneNumber) {
+                    document.getElementById('memberPhoneVal').textContent = data.phoneNumber;
+                    document.getElementById('memberPhone').classList.remove('d-none');
+                }
+
+                conflictSection.classList.remove('d-none');
+                conflictSection.querySelector('.stat-note').textContent =
+                    'Mobile QR scan — choose which package this member is attending under:';
+                packageButtons.innerHTML = '';
+
+                (data.packageOptions || []).forEach(function (opt) {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'package-btn';
+                    btn.innerHTML = `${opt.label}`
+                        + (opt.sessionsRemaining ? ` <small style="color:#6b7280;">(${opt.sessionsRemaining})</small>` : '');
+                    btn.addEventListener('click', function () {
+                        confirmPending(data.attendanceRecordId, opt.memberPackageId, opt.label);
+                    });
+                    packageButtons.appendChild(btn);
+                });
+
+                openModal();
+                playSuccessFeedback();
+            }
+
+            async function confirmPending(attendanceRecordId, memberPackageId, label) {
+                packageButtons.querySelectorAll('button').forEach(b => b.disabled = true);
+                try {
+                    const res = await fetch('/Reception/ConfirmPending', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'RequestVerificationToken': antiforgery
+                        },
+                        body: JSON.stringify({
+                            attendanceRecordId: attendanceRecordId,
+                            selectedMemberPackageId: memberPackageId
+                        })
+                    });
+                    const data = await res.json();
+
+                    conflictSection.classList.add('d-none');
+
+                    if (data.success) {
+                        autoAlert.classList.remove('d-none');
+                        document.getElementById('autoPackageName').textContent = data.packageName ?? label;
+
+                        if (typeof data.sessionsRemaining === 'number') {
+                            document.getElementById('sessionsLeftNum').textContent = data.sessionsRemaining;
+                            document.getElementById('sessionsLeftLabel').textContent =
+                                data.sessionsRemaining === 1 ? 'session remaining' : 'sessions remaining';
+                            document.getElementById('sessionsLeftPkgName').textContent = data.packageName ?? '';
+                            document.getElementById('sessionsLeftAlert').classList.remove('d-none');
+                        }
+                        refreshStats();
+                        if (window.advancePollerCursor) {
+                            window.advancePollerCursor(new Date().toISOString());
+                        }
+                    } else {
+                        showModalError('Confirm Failed', data.errorMessage ?? 'Unknown error.');
+                    }
+                } catch {
+                    showModalError('Network Error', 'Could not reach server.');
+                    packageButtons.querySelectorAll('button').forEach(b => b.disabled = false);
+                }
             }
         })();
 

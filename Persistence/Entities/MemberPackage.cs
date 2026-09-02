@@ -116,8 +116,29 @@ public partial class MemberPackage
 
     public Guid? GymClassId { get; set; }
 
+    public Guid? CoachId { get; set; }
+
+    // ── Pricing / commission snapshot (set at assignment, never changes) ───────
+    // The package price at the moment of assignment. Snapshot to protect accounting
+    // from future package-price edits.
+    [Column(TypeName = "decimal(10, 2)")]
+    public decimal? PriceSnapshot { get; set; }
+
+    // Snapshot of the coach commission percentage at assignment time.
+    // Only set for IsPrivateTraining packages.
+    [Column(TypeName = "decimal(5, 2)")]
+    public decimal? CoachCommissionPercent { get; set; }
+
+    // Calculated coach earnings amount in currency (PriceSnapshot × CoachCommissionPercent / 100).
+    // Gym share = PriceSnapshot - CoachCommissionAmount.
+    [Column(TypeName = "decimal(10, 2)")]
+    public decimal? CoachCommissionAmount { get; set; }
+
     [ForeignKey("GymClassId")]
     public virtual GymClass? GymClass { get; set; }
+
+    [ForeignKey("CoachId")]
+    public virtual Coach? Coach { get; set; }
 
     [InverseProperty("MemberPackage")]
     public virtual ICollection<AttendanceRecord> AttendanceRecords { get; set; } = new List<AttendanceRecord>();

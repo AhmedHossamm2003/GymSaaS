@@ -158,6 +158,13 @@ namespace GymSaaS.Controllers
                 if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
                     return Redirect(returnUrl);
 
+                // Coaches land on their own dashboard
+                if (userRoles.Contains("Coach") && !userRoles.Any(r =>
+                    r is "SuperAdmin" or "Admin" or "BranchManager" or "Receptionist"))
+                {
+                    return RedirectToAction("Dashboard", "Coaches");
+                }
+
                 return RedirectToAction("Index", "Dashboard");
             }
             catch (Exception ex)

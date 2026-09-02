@@ -1,0 +1,81 @@
+@model GymSaaS.Models.AuditLogsViewModel
+@{
+    ViewData["Title"] ??= "Audit Logs";
+
+    var filters = new (string? Code, string Label)[]
+    {
+        (null, "All"),
+        ("CHECKIN", "Check-ins"),
+        ("PACKAGE", "Packages"),
+        ("PERK", "PT / InBody"),
+        ("LOGIN", "Logins"),
+    };
+
+    string TimeAgo(DateTime utc)
+    {
+        var span = DateTime.UtcNow - utc;
+        if (span.TotalMinutes < 1) return "just now";
+        if (span.TotalMinutes < 60) return $"{(int)span.TotalMinutes}m ago";
+        if (span.TotalHours < 24) return $"{(int)span.TotalHours}h ago";
+        if (span.TotalDays < 7) return $"{(int)span.TotalDays}d ago";
+        return utc.ToString("MMM d, yyyy");
+    }
+}
+
+<div style="padding:24px;max-width:920px;margin:0 auto;">
+    <div style="margin-bottom:16px;">
+        <h2 style="font-size:22px;font-weight:800;margin:0;">Audit Logs</h2>
+        <div style="color:#6b7280;font-size:13px;margin-top:2px;">Recent activity across the gym (last 30 days)</div>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;">
+        @foreach (var f in filters)
+        {
+            var active = (Model.CategoryFilter ?? null) == f.Code;
+            <a href="@Url.Action("Index", new { category = f.Code })"
+               style="font-size:12.5px;font-weight:700;padding:7px 14px;border-radius:999px;text-decoration:none;
+                      @(active ? "background:#ff5b14;color:#fff;" : "background:#f3f4f6;color:#374151;")">
+                @f.Label
+            </a>
+        }
+    </div>
+
+    @if (!Model.Items.Any())
+    {
+        <div style="text-align:center;padding:60px 20px;color:#9ca3af;">
+            <i class="bi bi-clock-history" style="font-size:44px;display:block;margin-bottom:12px;"></i>
+            <div style="font-size:15px;font-weight:600;color:#374151;">No activity in this period</div>
+        </div>
+    }
+    else
+    {
+        <div style="display:flex;flex-direction:column;">
+            @foreach (var a in Model.Items)
+            {
+                <div style="display:flex;align-items:flex-start;gap:14px;padding:12px 4px;border-bottom:1px solid #f1f3f5;">
+                    <div style="width:34px;height:34px;border-radius:9px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:@(a.Color)18;">
+                        <i class="bi @a.Icon" style="font-size:16px;color:@a.Color;"></i>
+                    </div>
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-size:13.5px;color:#111827;">
+                            @if (a.MemberId.HasValue)
+                            {
+                                <a href="@Url.Action("Details", "Members", new { id = a.MemberId })" style="font-weight:700;color:#111827;text-decoration:none;">@a.Actor</a>
+                            }
+                            else
+                            {
+                                <span style="font-weight:700;">@a.Actor</span>
+                            }
+                            <span style="color:#374151;"> @a.Action</span>
+                            @if (!string.IsNullOrEmpty(a.Detail))
+                            {
+                                <span style="color:#9ca3af;"> · @a.Detail</span>
+                            }
+                        </div>
+                    </div>
+                    <div style="font-size:11.5px;color:#9ca3af;white-space:nowrap;flex-shrink:0;margin-top:2px;">@TimeAgo(a.WhenUtc)</div>
+                </div>
+            }
+        </div>
+    }
+</div>

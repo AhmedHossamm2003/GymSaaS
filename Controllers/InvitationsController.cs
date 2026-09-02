@@ -1,6 +1,7 @@
 using GymSaaS.Models;
 using GymSaaS.Persistence;
 using GymSaaS.Persistence.Entities;
+using GymSaaS.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -36,6 +37,11 @@ namespace GymSaaS.Controllers
 
             var query = _db.MemberInvitations
                 .Where(i => i.TenantId == tenantId);
+
+            // Branch scope — invitations belong to the inviting member's home branch.
+            var scopedBranchIds = User.AssignedBranchIds();
+            if (scopedBranchIds.Count > 0)
+                query = query.Where(i => scopedBranchIds.Contains(i.Member.HomeBranchId));
 
             if (!string.IsNullOrWhiteSpace(status))
                 query = query.Where(i => i.Status == status);

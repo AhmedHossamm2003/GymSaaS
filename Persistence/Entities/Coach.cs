@@ -51,11 +51,20 @@ public partial class Coach
 
     public Guid? UpdatedByUserId { get; set; }
 
+    public Guid? UserId { get; set; }
+
+    public int CoachTarget { get; set; }
+
     [ForeignKey("TenantId")]
     public virtual Tenant Tenant { get; set; } = null!;
 
     [ForeignKey("BranchId")]
     public virtual Branch Branch { get; set; } = null!;
 
+    [ForeignKey("UserId")]
+    public virtual User? User { get; set; }
+
     public virtual ICollection<GymClass> GymClasses { get; set; } = new List<GymClass>();
+
+    public virtual ICollection<MemberPackage> MemberPackages { get; set; } = new List<MemberPackage>();
 }
