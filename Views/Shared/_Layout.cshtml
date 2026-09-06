@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] — Idea Wellness</title>
+    <link rel="icon" type="image/svg+xml" href="~/images/idea-wellness-favicon.svg" asp-append-version="true" />
 
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet" />
@@ -179,52 +180,18 @@
         .sidebar-logo {
             display: flex;
             align-items: center;
-            gap: 11px;
-            padding: 0 18px;
+            justify-content: center;
+            padding: 0 16px;
             height: var(--topbar-height);
             flex-shrink: 0;
         }
 
-        .logo-mark {
-            width: 34px;
-            height: 34px;
-            background: var(--orange);
-            border-radius: var(--radius-sm);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-            box-shadow: 0 2px 8px rgba(249,115,22,0.25);
+        .sidebar-brand-image {
+            display: block;
+            width: 178px;
+            height: auto;
+            filter: url('#idea-logo-alpha');
         }
-
-            .logo-mark svg {
-                width: 18px;
-                height: 18px;
-                fill: #fff;
-            }
-
-        .logo-text {
-            display: flex;
-            flex-direction: column;
-            line-height: 1.1;
-        }
-
-            .logo-text .name {
-                font-family: var(--font-display);
-                font-size: 15.5px;
-                font-weight: 800;
-                letter-spacing: 0.04em;
-                text-transform: uppercase;
-                color: var(--black);
-            }
-
-            .logo-text .tag {
-                font-size: 9.5px;
-                font-weight: 600;
-                letter-spacing: 0.12em;
-                text-transform: uppercase;
-                color: var(--orange);
-            }
 
         /* ── Nav ── */
         .sidebar-nav {
@@ -1162,6 +1129,19 @@
 </head>
 <body>
 
+    <!-- The supplied logo has an opaque grayscale checkerboard. This filter
+         makes only those neutral pixels transparent while preserving the
+         original orange artwork. -->
+    <svg aria-hidden="true" focusable="false" width="0" height="0" style="position:absolute;overflow:hidden">
+        <filter id="idea-logo-alpha" color-interpolation-filters="sRGB">
+            <feColorMatrix type="matrix" values="
+                1  0  0  0  0
+                0  1  0  0  0
+                0  0  1  0  0
+                2 -1 -1  0  0" />
+        </filter>
+    </svg>
+
     <div class="accent-line"></div>
 
     <div class="app-shell">
@@ -1169,17 +1149,12 @@
         <!-- SIDEBAR -->
         <aside class="sidebar" id="sidebar">
 
-            <div class="sidebar-logo">
-                <div class="logo-mark">
-                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M20.57 14.86L22 13.43 20.57 12 17 15.57 8.43 7 12 3.43 10.57 2 9.14 3.43 7.71 2 5.57 4.14 4.14 2.71 2.71 4.14l1.43 1.43L2 7.71l1.43 1.43L2 10.57 3.43 12 7 8.43 15.57 17 12 20.57 13.43 22l1.43-1.43L16.29 22l2.14-2.14 1.43 1.43 1.43-1.43-1.43-1.43L22 16.29l-1.43-1.43z" />
-                    </svg>
-                </div>
-                <div class="logo-text">
-                    <span class="name">Idea Wellness</span>
-                    <span class="tag">Management</span>
-                </div>
-            </div>
+            <a asp-controller="Dashboard" asp-action="Index" class="sidebar-logo" aria-label="Idea Wellness dashboard">
+                <img src="~/images/idea-wellness-logo.png"
+                     asp-append-version="true"
+                     class="sidebar-brand-image"
+                     alt="Idea Wellness" />
+            </a>
 
             <nav class="sidebar-nav">
                 @{
