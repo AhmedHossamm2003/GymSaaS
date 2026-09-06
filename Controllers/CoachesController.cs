@@ -28,7 +28,7 @@ namespace GymSaaS.Controllers
             Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
         // GET /Coaches
-        [Authorize(Policy = "ManagerAndAbove")]
+        [GymSaaS.Authorization.ViewPermissionAuthorize]
         public async Task<IActionResult> Index(string? search, Guid? branchId, bool? activeOnly)
         {
             var query = _db.Coaches
