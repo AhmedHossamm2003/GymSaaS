@@ -9,7 +9,7 @@ using System.Security.Claims;
 
 namespace GymSaaS.Controllers
 {
-    [Authorize(Policy = "AdminAndAbove")]
+    [GymSaaS.Authorization.ViewPermissionAuthorize]
     public class ReportsController : Controller
     {
         private readonly GymDbContext _db;

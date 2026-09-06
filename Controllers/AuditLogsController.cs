@@ -10,7 +10,7 @@ namespace GymSaaS.Controllers
 {
     // A chronological activity feed assembled from existing data — check-ins,
     // package assignments, PT/InBody perk usage, and user logins. Branch-scoped.
-    [Authorize(Policy = "AdminAndAbove")]
+    [GymSaaS.Authorization.ViewPermissionAuthorize]
     public class AuditLogsController : Controller
     {
         private readonly GymDbContext _db;

@@ -48,6 +48,33 @@ public partial class ManualIncomeEntry
 
     public bool IsDeleted { get; set; }
 
+    // Populated for reception-created drop-in sales. Manual income rows leave
+    // these fields null, so existing finance behavior remains unchanged.
+    [StringLength(40)]
+    public string? SourceCode { get; set; }
+
+    public Guid? MemberId { get; set; }
+
+    public Guid? AttendanceRecordId { get; set; }
+
+    public Guid? GymClassId { get; set; }
+
+    [Column(TypeName = "decimal(12, 2)")]
+    public decimal? BaseAmount { get; set; }
+
+    [StringLength(500)]
+    public string? PriceOverrideReason { get; set; }
+
+    public bool WasMemberCreated { get; set; }
+
+    [Precision(0)]
+    public DateTime? VoidedAtUtc { get; set; }
+
+    public Guid? VoidedByUserId { get; set; }
+
+    [StringLength(500)]
+    public string? VoidReason { get; set; }
+
     [ForeignKey("TenantId")]
     public virtual Tenant Tenant { get; set; } = null!;
 

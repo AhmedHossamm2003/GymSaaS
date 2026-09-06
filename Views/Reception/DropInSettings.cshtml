@@ -1,0 +1,43 @@
+@model GymSaaS.Models.DropInPriceSettingsViewModel
+
+@{
+    ViewData["Title"] = "Drop-In Prices";
+}
+
+<div style="max-width:720px;">
+    <div class="page-header">
+        <div>
+            <div class="page-title">Drop-In Prices</div>
+            <div class="page-subtitle">These prices apply to every branch in this gym business.</div>
+        </div>
+        <a asp-action="Index" class="btn btn-secondary"><i class="bi bi-arrow-left"></i> Reception</a>
+    </div>
+
+    <form asp-action="DropInSettings" method="post">
+        @Html.AntiForgeryToken()
+        <div asp-validation-summary="ModelOnly" style="color:#b42318;margin-bottom:14px;"></div>
+        <div class="card" style="padding:22px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;">
+                <div class="form-group">
+                    <label asp-for="OpenGymPrice">Open Gym Drop-In (EGP)</label>
+                    <input asp-for="OpenGymPrice" type="number" min="0.01" step="0.01" />
+                    <span asp-validation-for="OpenGymPrice" style="color:#b42318;font-size:12px;"></span>
+                </div>
+                <div class="form-group">
+                    <label asp-for="ClassPassPrice">One Class Pass (EGP)</label>
+                    <input asp-for="ClassPassPrice" type="number" min="0.01" step="0.01" />
+                    <span asp-validation-for="ClassPassPrice" style="color:#b42318;font-size:12px;"></span>
+                </div>
+            </div>
+            <div style="font-size:12.5px;color:var(--t3);margin-top:4px;">
+                Reception may override either price during checkout, with a required audit reason.
+            </div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:18px;">
+            <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Save Prices</button>
+            <a asp-action="Index" class="btn btn-ghost">Cancel</a>
+        </div>
+    </form>
+</div>
+
+@section Scripts { <partial name="_ValidationScriptsPartial" /> }

@@ -11,7 +11,7 @@ namespace GymSaaS.Controllers
 {
     // Manual income entries (day passes, merchandise, etc.)
     // Package sales are tracked automatically via MemberPackage.PackageDefinition.Price.
-    [Authorize(Policy = "AdminAndAbove")]
+    [GymSaaS.Authorization.ViewPermissionAuthorize]
     public class IncomeController : Controller
     {
         private readonly GymDbContext _db;
@@ -72,6 +72,7 @@ namespace GymSaaS.Controllers
                     PaymentMethod  = i.PaymentMethod,
                     Notes          = i.Notes,
                     CreatedAtUtc   = i.CreatedAtUtc,
+                    SourceCode     = i.SourceCode,
                 })
                 .ToListAsync();
 
@@ -142,6 +143,8 @@ namespace GymSaaS.Controllers
                 .FirstOrDefaultAsync(x => x.IncomeEntryId == id && x.TenantId == TenantId && !x.IsDeleted);
 
             if (i == null) return NotFound();
+            if (i.SourceCode is DropInProductCodes.OpenGym or DropInProductCodes.ClassPass)
+                return BadRequest("Drop-in entries are managed from Reception so payment and attendance stay synchronized.");
 
             var vm = new ManualIncomeFormViewModel
             {
@@ -169,6 +172,8 @@ namespace GymSaaS.Controllers
                 .FirstOrDefaultAsync(x => x.IncomeEntryId == id && x.TenantId == TenantId && !x.IsDeleted);
 
             if (i == null) return NotFound();
+            if (i.SourceCode is DropInProductCodes.OpenGym or DropInProductCodes.ClassPass)
+                return BadRequest("Drop-in entries are managed from Reception so payment and attendance stay synchronized.");
 
             if (!ModelState.IsValid)
             {
@@ -203,6 +208,8 @@ namespace GymSaaS.Controllers
                 .FirstOrDefaultAsync(x => x.IncomeEntryId == id && x.TenantId == TenantId && !x.IsDeleted);
 
             if (i == null) return NotFound();
+            if (i.SourceCode is DropInProductCodes.OpenGym or DropInProductCodes.ClassPass)
+                return BadRequest("Cancel this drop-in from Reception so its attendance is removed safely.");
 
             i.IsDeleted       = true;
             i.UpdatedAtUtc    = DateTime.UtcNow;

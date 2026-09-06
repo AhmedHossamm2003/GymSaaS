@@ -8,7 +8,7 @@ using System.Security.Claims;
 
 namespace GymSaaS.Controllers
 {
-    [Authorize]
+    [GymSaaS.Authorization.ViewPermissionAuthorize]
     public class AttendanceController : Controller
     {
         private readonly GymDbContext _db;

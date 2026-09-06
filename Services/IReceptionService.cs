@@ -5,6 +5,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using GymSaaS.Models;
 
 namespace GymSaaS.Services.Reception
 {
@@ -83,11 +84,8 @@ namespace GymSaaS.Services.Reception
         public Guid? AutoCheckedInRecordId { get; set; }
         public string? AutoCheckedInPackageName { get; set; }
 
-        // ── Non-attendance perks (recorded from reception) ───────────
-        // PT (personal training) sessions remaining on the member's package.
-        public int? PtSessionsRemaining { get; set; }
-        public Guid? PtPackageId { get; set; }          // package holding the PT perk
-        public string? PtAssignedCoachId { get; set; }  // default coach for the PT package, if any
+        // Standalone PT plans available for this visit.
+        public List<PtPackageOptionDto> PtPackageOptions { get; set; } = new();
 
         // InBody scans remaining.
         public int? InBodyRemaining { get; set; }
@@ -104,12 +102,26 @@ namespace GymSaaS.Services.Reception
         public string Name { get; set; } = null!;
     }
 
+    /// <summary>A PT balance that reception can consume for this visit.</summary>
+    public class PtPackageOptionDto
+    {
+        public Guid MemberPackageId { get; set; }
+        public string PackageName { get; set; } = null!;
+        public string SourceLabel { get; set; } = null!;
+        public int SessionsRemaining { get; set; }
+        // Client owner for this plan. Reception may still choose a different
+        // coach for the session being recorded.
+        public Guid? AssignedCoachId { get; set; }
+    }
+
     /// <summary>Result of recording a PT session or InBody scan.</summary>
     public class PerkUsageResult
     {
         public bool Success { get; set; }
         public string? ErrorMessage { get; set; }
         public int? Remaining { get; set; }
+        public Guid? AttendanceRecordId { get; set; }
+        public decimal? CommissionAmount { get; set; }
     }
 
     /// <summary>
@@ -218,8 +230,9 @@ namespace GymSaaS.Services.Reception
             Guid attendanceRecordId, Guid selectedMemberPackageId, Guid receptionistUserId, Guid tenantId);
 
         /// <summary>
-        /// Records a PT session for a member: decrements PtSessionsRemaining on the
-        /// chosen package and logs which coach ran it.
+        /// Records a PT visit atomically: consumes the selected PT balance, logs
+        /// the coach and per-session commission, and checks the member in when
+        /// they are not already present.
         /// </summary>
         Task<PerkUsageResult> RecordPtSessionAsync(
             Guid memberId, Guid memberPackageId, Guid coachId, Guid branchId,
@@ -236,6 +249,18 @@ namespace GymSaaS.Services.Reception
         /// Returns all branches for the tenant (used by Admin/SuperAdmin branch selector).
         /// </summary>
         Task<List<BranchOptionDto>> GetBranchesAsync(Guid tenantId);
+
+        Task<DropInPageViewModel?> BuildDropInPageAsync(
+            Guid branchId, Guid tenantId, string? phone, bool canEditPrices);
+
+        Task<DropInCheckoutResult> CheckoutDropInAsync(
+            DropInCheckoutViewModel request, Guid receptionistUserId, Guid tenantId);
+
+        Task<(bool Success, string? Error)> VoidDropInAsync(
+            Guid incomeEntryId, Guid branchId, string reason, Guid userId, Guid tenantId);
+
+        Task<(bool Success, string? Error)> UpdateDropInPricesAsync(
+            DropInPriceSettingsViewModel model, Guid tenantId);
     }
 
     public class BranchOptionDto

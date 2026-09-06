@@ -28,6 +28,8 @@ namespace GymSaaS.Models
         public static readonly Dictionary<string, string> All = new()
         {
             ["DAY_PASS"]         = "Day Pass",
+            ["DROP_IN"]          = "Open Gym Drop-In",
+            ["CLASS_PASS"]       = "One Class Pass",
             ["PERSONAL_TRAINING"]= "Personal Training",
             ["MERCHANDISE"]      = "Merchandise",
             ["SUPPLEMENT"]       = "Supplements",
@@ -111,6 +113,8 @@ namespace GymSaaS.Models
         public string? PaymentMethod { get; set; }
         public string? Notes { get; set; }
         public DateTime CreatedAtUtc { get; set; }
+        public string? SourceCode { get; set; }
+        public bool IsDropIn => SourceCode is DropInProductCodes.OpenGym or DropInProductCodes.ClassPass;
     }
 
     public class ManualIncomeFormViewModel

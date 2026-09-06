@@ -1,0 +1,331 @@
+@model GymSaaS.Models.DropInPageViewModel
+@using GymSaaS.Models
+
+@{
+    ViewData["Title"] = "Paid Drop-In";
+    var checkout = Model.Checkout;
+    var selectedProduct = string.IsNullOrWhiteSpace(checkout.ProductCode)
+        ? DropInProductCodes.OpenGym
+        : checkout.ProductCode;
+}
+
+@section Styles {
+<style>
+    .di-shell { max-width:1220px;margin:0 auto; }
+    .di-head { display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:20px; }
+    .di-title { margin:0;font-family:var(--font-display);font-size:24px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--t1); }
+    .di-sub { margin:4px 0 0;color:var(--t3);font-size:13px; }
+    .di-grid { display:grid;grid-template-columns:minmax(0,1.62fr) minmax(310px,.78fr);gap:20px;align-items:start; }
+    .di-card { background:var(--surface);border:1px solid rgba(15,23,42,.08);border-radius:16px;box-shadow:0 8px 24px rgba(15,23,42,.055);overflow:hidden;margin-bottom:18px; }
+    .di-card-head { min-height:60px;padding:13px 18px;background:linear-gradient(180deg,#fff,#fbfcfe);border-bottom:1px solid var(--border);font-family:var(--font-display);font-weight:800;text-transform:uppercase;letter-spacing:.055em;font-size:13px;display:flex;align-items:center;gap:11px; }
+    .di-card-head > i { color:var(--fire);font-size:16px; }
+    .di-card-head small { display:block;margin-top:3px;font-family:var(--font-body,inherit);font-size:11px;font-weight:500;letter-spacing:0;text-transform:none;color:var(--t3); }
+    .di-step { width:29px;height:29px;border-radius:9px;background:var(--fire-soft,#fff4eb);color:var(--fire);display:grid;place-items:center;font-family:var(--font-display);font-size:12px;font-weight:900;flex:0 0 29px; }
+    .di-body { padding:20px; }
+    .di-search { display:flex;gap:10px;align-items:flex-end; }
+    .di-search .field { flex:1;margin:0; }
+    .di-card .field { margin-bottom:0; }
+    .di-card .field-label { display:flex;align-items:center;gap:4px;margin:0 0 7px;color:var(--t2);font-size:10.5px;font-weight:800;letter-spacing:.065em;text-transform:uppercase; }
+    .di-card .field input:not([type="checkbox"]):not([type="radio"]),
+    .di-card .field select,
+    .di-card .field textarea,
+    #diBranch { width:100%;min-height:43px;padding:10px 12px;border:1px solid #dfe3ea;border-radius:10px;background:#fff;color:var(--t1);font:inherit;font-size:13px;outline:none;transition:border-color .15s,box-shadow .15s; }
+    .di-card .field textarea { min-height:72px;resize:vertical; }
+    .di-card .field input:focus,
+    .di-card .field select:focus,
+    .di-card .field textarea:focus,
+    #diBranch:focus { border-color:var(--fire);box-shadow:0 0 0 3px rgba(249,115,22,.11); }
+    .di-card .field input:disabled { color:#697386;background:#f5f7fa;border-style:dashed;cursor:not-allowed; }
+    .di-card .field-hint { margin-top:6px;color:var(--t3);font-size:11px;line-height:1.4; }
+    .di-required { color:var(--fire); }
+    .di-new-visitor { display:flex;align-items:flex-start;gap:11px;margin-bottom:17px;padding:12px 14px;border:1px solid #bfdbfe;border-radius:12px;background:#eff6ff;color:#1e3a5f;font-size:12.5px;line-height:1.45; }
+    .di-new-visitor i { color:#2563eb;font-size:17px;margin-top:1px; }
+    .di-products { display:grid;grid-template-columns:1fr 1fr;gap:12px; }
+    .di-product { position:relative;display:block;border:1.5px solid var(--border);border-radius:14px;padding:16px;cursor:pointer;transition:.15s;background:var(--surface); }
+    .di-product:hover { border-color:#fdba74;transform:translateY(-1px); }
+    .di-product:has(input:checked) { border-color:var(--fire);box-shadow:0 0 0 3px rgba(249,115,22,.10);background:var(--fire-soft); }
+    .di-product input { position:absolute;opacity:0; }
+    .di-product-icon { width:38px;height:38px;border-radius:11px;background:#fff;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--fire);font-size:18px;margin-bottom:12px; }
+    .di-product-name { font-weight:800;color:var(--t1);font-size:14px; }
+    .di-price { margin-top:6px;font-family:var(--font-display);font-size:22px;font-weight:800;color:var(--fire); }
+    .di-price small { font-family:inherit;font-size:11px;color:var(--t3); }
+    .member-hit { display:flex;align-items:center;gap:14px;padding:14px;border:1px solid #bbf7d0;background:#f0fdf4;border-radius:13px; }
+    .member-avatar { width:48px;height:48px;border-radius:50%;background:#fff;border:1px solid #bbf7d0;display:flex;align-items:center;justify-content:center;font-weight:800;color:#15803d;overflow:hidden;flex-shrink:0; }
+    .member-avatar img { width:100%;height:100%;object-fit:cover; }
+    .di-form-grid { display:grid;grid-template-columns:1fr 1fr;gap:16px; }
+    .di-form-span { grid-column:1/-1; }
+    .coverage-warning { border:1px solid #fde68a;background:#fffbeb;color:#92400e;border-radius:12px;padding:12px 14px;font-size:12.5px;margin-top:14px; }
+    .recent-row { display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--border); }
+    .recent-row:last-child { border-bottom:0; }
+    .error-panel { border:1px solid #fecaca;background:#fef2f2;color:#991b1b;border-radius:12px;padding:12px 14px;margin-bottom:16px;font-size:13px; }
+    .di-aside { position:sticky;top:16px; }
+    .di-submit { width:100%;min-height:46px;margin-top:20px;justify-content:center;font-weight:800; }
+    @@media(max-width:900px){.di-grid{grid-template-columns:1fr}.di-aside{position:static}.di-products,.di-form-grid{grid-template-columns:1fr}.di-form-span{grid-column:auto}.di-search{align-items:stretch;flex-direction:column}}
+</style>
+}
+
+<div class="di-shell">
+    <div class="di-head">
+        <div>
+            <h1 class="di-title">Paid Drop-In</h1>
+            <p class="di-sub">Find the visitor, take payment, and record attendance in one step.</p>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+            @if (Model.Branches.Count > 1)
+            {
+                <select id="diBranch" class="form-control" style="min-width:190px;">
+                    @foreach (var branch in Model.Branches)
+                    {
+                        <option value="@branch.BranchId" selected="@(branch.BranchId == Model.BranchId ? "selected" : null)">@branch.BranchName</option>
+                    }
+                </select>
+            }
+            @if (Model.CanEditPrices)
+            {
+                <a asp-action="DropInSettings" class="btn btn-secondary"><i class="bi bi-gear"></i> Prices</a>
+            }
+            <a asp-action="Index" asp-route-branchId="@Model.BranchId" class="btn btn-ghost"><i class="bi bi-arrow-left"></i> Reception</a>
+        </div>
+    </div>
+
+    <div class="di-grid">
+        <main>
+            <div class="di-card">
+                <div class="di-card-head"><span class="di-step">1</span><div>Find Visitor<small>Search the member database using their phone number</small></div></div>
+                <div class="di-body">
+                    <form method="get" asp-action="DropIn" class="di-search">
+                        <input type="hidden" name="branchId" value="@Model.BranchId" />
+                        <div class="field">
+                            <label class="field-label">Phone number <span class="di-required">*</span></label>
+                            <input name="phone" value="@Model.PhoneSearch" type="tel" required placeholder="e.g. 011 2923 132" autocomplete="tel" />
+                        </div>
+                        <button class="btn btn-primary" type="submit" style="min-height:42px;"><i class="bi bi-search"></i> Find</button>
+                        @if (Model.SearchPerformed)
+                        {
+                            <a asp-action="DropIn" asp-route-branchId="@Model.BranchId" class="btn btn-secondary" style="min-height:42px;">Clear</a>
+                        }
+                    </form>
+                </div>
+            </div>
+
+            @if (Model.SearchPerformed)
+            {
+                <form asp-action="CreateDropIn" method="post" id="dropInForm">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="BranchId" value="@Model.BranchId" />
+                    <input type="hidden" name="MemberId" value="@checkout.MemberId" />
+                    <input type="hidden" name="PhoneNumber" value="@checkout.PhoneNumber" />
+
+                    @if (!ViewData.ModelState.IsValid)
+                    {
+                        <div class="error-panel" asp-validation-summary="All"></div>
+                    }
+
+                    <div class="di-card">
+                        <div class="di-card-head"><span class="di-step">2</span><div>Visitor Details<small>Confirm an existing member or create a reusable visitor profile</small></div></div>
+                        <div class="di-body">
+                            @if (Model.ExistingMember != null)
+                            {
+                                var initials = string.Concat(Model.ExistingMember.FullName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(x => x[0]));
+                                <div class="member-hit">
+                                    <div class="member-avatar">
+                                        @if (!string.IsNullOrWhiteSpace(Model.ExistingMember.ProfileImageUrl))
+                                        {
+                                            <img src="@Model.ExistingMember.ProfileImageUrl" alt="" />
+                                        }
+                                        else
+                                        {
+                                            @initials
+                                        }
+                                    </div>
+                                    <div style="flex:1;min-width:0;">
+                                        <div style="font-size:15px;font-weight:800;color:#166534;">@Model.ExistingMember.FullName</div>
+                                        <div style="font-size:12px;color:#4b5563;margin-top:3px;">#@Model.ExistingMember.MembershipNumber · @Model.ExistingMember.PhoneNumber · @Model.ExistingMember.Email</div>
+                                    </div>
+                                    <i class="bi bi-check-circle-fill" style="font-size:22px;color:#16a34a;"></i>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="di-new-visitor">
+                                    <i class="bi bi-person-plus-fill"></i>
+                                    <div><strong>New visitor</strong><br />No matching member was found. Complete the required details below; the profile will be reused on their next visit.</div>
+                                </div>
+                                <div class="di-form-grid">
+                                    <div class="field"><label class="field-label">First name <span class="di-required">*</span></label><input name="FirstName" value="@checkout.FirstName" type="text" required autocomplete="given-name" placeholder="First name" /></div>
+                                    <div class="field"><label class="field-label">Last name <span class="di-required">*</span></label><input name="LastName" value="@checkout.LastName" type="text" required autocomplete="family-name" placeholder="Last name" /></div>
+                                    <div class="field"><label class="field-label">Email <span class="di-required">*</span></label><input name="Email" value="@checkout.Email" type="email" required autocomplete="email" placeholder="visitor@example.com" /></div>
+                                    <div class="field"><label class="field-label">Phone</label><input value="@checkout.PhoneNumber" type="tel" disabled /><div class="field-hint">Taken from the phone search.</div></div>
+                                    <div class="field"><label class="field-label">Date of birth <span style="color:var(--t3);font-weight:400;">(optional)</span></label><input name="DateOfBirth" value="@checkout.DateOfBirth?.ToString("yyyy-MM-dd")" type="date" /></div>
+                                    <div class="field"><label class="field-label">Gender <span style="color:var(--t3);font-weight:400;">(optional)</span></label><select name="Gender"><option value="">—</option><option value="Male" selected="@(checkout.Gender == "Male" ? "selected" : null)">Male</option><option value="Female" selected="@(checkout.Gender == "Female" ? "selected" : null)">Female</option><option value="Other" selected="@(checkout.Gender == "Other" ? "selected" : null)">Other</option></select></div>
+                                    <div class="field di-form-span"><label class="field-label">Initial app password <span style="color:var(--t3);font-weight:500;">(optional)</span></label><input name="Password" type="password" minlength="6" autocomplete="new-password" placeholder="At least 6 characters" /><div class="field-hint">Leave blank to use the standard temporary password.</div></div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="di-card">
+                        <div class="di-card-head"><span class="di-step">3</span><div>Visit & Payment<small>Choose the visit type, confirm the amount, and check the visitor in</small></div></div>
+                        <div class="di-body">
+                            <div class="di-products">
+                                <label class="di-product">
+                                    <input type="radio" name="ProductCode" value="@DropInProductCodes.OpenGym" checked="@(selectedProduct == DropInProductCodes.OpenGym ? "checked" : null)" data-price="@Model.OpenGymPrice.ToString(System.Globalization.CultureInfo.InvariantCulture)" />
+                                    <div class="di-product-icon"><i class="bi bi-door-open"></i></div>
+                                    <div class="di-product-name">Open Gym Drop-In</div>
+                                    <div class="di-price">@Model.OpenGymPrice.ToString("N0") <small>EGP</small></div>
+                                </label>
+                                <label class="di-product">
+                                    <input type="radio" name="ProductCode" value="@DropInProductCodes.ClassPass" checked="@(selectedProduct == DropInProductCodes.ClassPass ? "checked" : null)" data-price="@Model.ClassPassPrice.ToString(System.Globalization.CultureInfo.InvariantCulture)" />
+                                    <div class="di-product-icon"><i class="bi bi-calendar2-check"></i></div>
+                                    <div class="di-product-name">One Class Pass</div>
+                                    <div class="di-price">@Model.ClassPassPrice.ToString("N0") <small>EGP</small></div>
+                                </label>
+                            </div>
+
+                            <div id="classPicker" style="margin-top:16px;display:none;">
+                                <div class="field">
+                                    <label class="field-label">Today's class</label>
+                                    <select name="GymClassId" id="classSelect">
+                                        <option value="">— Select class —</option>
+                                        @foreach (var cls in Model.TodayClasses)
+                                        {
+                                            <option value="@cls.GymClassId" disabled="@(cls.IsFull ? "disabled" : null)" selected="@(checkout.GymClassId == cls.GymClassId ? "selected" : null)">
+                                                @cls.TimeDisplay · @cls.ClassName@(string.IsNullOrWhiteSpace(cls.CoachName) ? "" : $" · {cls.CoachName}") · @(cls.Capacity.HasValue ? $"{cls.AttendeeCount}/{cls.Capacity}" : $"{cls.AttendeeCount} attending")@(cls.IsFull ? " · FULL" : "")
+                                            </option>
+                                        }
+                                    </select>
+                                    @if (!Model.TodayClasses.Any())
+                                    {
+                                        <div class="field-hint" style="color:#b42318;">No classes are scheduled at this branch today.</div>
+                                    }
+                                </div>
+                            </div>
+
+                            @if (Model.ExistingMember?.HasOpenGymCoverage == true || Model.ExistingMember?.HasClassCoverage == true)
+                            {
+                                <div class="coverage-warning" id="coverageWarning"
+                                     data-open="@(Model.ExistingMember.HasOpenGymCoverage ? "true" : "false")"
+                                     data-class="@(Model.ExistingMember.HasClassCoverage ? "true" : "false")">
+                                    <div style="font-weight:800;"><i class="bi bi-exclamation-triangle-fill"></i> Existing package available</div>
+                                    <div style="margin-top:3px;">@Model.ExistingMember.CoverageSummary</div>
+                                    <label style="display:flex;gap:8px;align-items:flex-start;margin-top:10px;cursor:pointer;font-weight:600;">
+                                        <input type="checkbox" name="ConfirmPaidDropIn" value="true" checked="@(checkout.ConfirmPaidDropIn ? "checked" : null)" style="margin-top:2px;" />
+                                        The member still wants to pay for this drop-in.
+                                    </label>
+                                </div>
+                            }
+
+                            <div class="di-form-grid" style="margin-top:16px;">
+                                <div class="field">
+                                    <label class="field-label">Final price (EGP)</label>
+                                    <input name="FinalPrice" id="finalPrice" type="number" min="0.01" step="0.01" required value="@checkout.FinalPrice?.ToString(System.Globalization.CultureInfo.InvariantCulture)" />
+                                </div>
+                                <div class="field">
+                                    <label class="field-label">Payment method</label>
+                                    <select name="PaymentMethod" required>
+                                        <option value="CASH" selected="@(checkout.PaymentMethod == "CASH" ? "selected" : null)">Cash</option>
+                                        <option value="CARD" selected="@(checkout.PaymentMethod == "CARD" ? "selected" : null)">Card</option>
+                                        <option value="BANK" selected="@(checkout.PaymentMethod == "BANK" ? "selected" : null)">Bank transfer</option>
+                                        <option value="OTHER" selected="@(checkout.PaymentMethod == "OTHER" ? "selected" : null)">Other</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="field" id="overrideReasonWrap" style="display:none;margin-top:14px;">
+                                <label class="field-label">Price-change reason</label>
+                                <textarea name="PriceOverrideReason" id="overrideReason" rows="2" maxlength="500" placeholder="Required whenever the standard price is changed">@checkout.PriceOverrideReason</textarea>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary di-submit">
+                                <i class="bi bi-check2-circle"></i> Take Payment & Check In
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            }
+        </main>
+
+        <aside class="di-aside">
+            <div class="di-card">
+                <div class="di-card-head"><i class="bi bi-clock-history"></i> Recent Drop-Ins</div>
+                <div class="di-body" style="padding-top:4px;padding-bottom:4px;">
+                    @if (!Model.RecentSales.Any())
+                    {
+                        <div style="padding:28px 4px;text-align:center;color:var(--t3);font-size:13px;">No paid drop-ins recorded yet.</div>
+                    }
+                    @foreach (var sale in Model.RecentSales)
+                    {
+                        <div class="recent-row">
+                            <div style="min-width:0;">
+                                <div style="font-weight:750;font-size:13px;color:var(--t1);">@sale.MemberName</div>
+                                <div style="font-size:11.5px;color:var(--t3);margin-top:2px;">@sale.ProductName · #@sale.MembershipNumber</div>
+                                <div style="font-size:11px;color:var(--t3);margin-top:2px;">@sale.CreatedAtUtc.ToLocalTime().ToString("MMM d, HH:mm") · @sale.PaymentMethod</div>
+                            </div>
+                            <div style="text-align:right;flex-shrink:0;">
+                                <div style="font-weight:800;color:#15803d;font-size:13px;">@sale.Amount.ToString("N0") EGP</div>
+                                <form asp-action="VoidDropIn" method="post" class="void-form" style="margin-top:4px;">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="incomeEntryId" value="@sale.IncomeEntryId" />
+                                    <input type="hidden" name="branchId" value="@Model.BranchId" />
+                                    <input type="hidden" name="reason" value="" />
+                                    <button type="submit" class="btn btn-ghost" style="padding:2px 7px;color:#b42318;font-size:11px;">Cancel</button>
+                                </form>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </aside>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    (() => {
+        const branch = document.getElementById('diBranch');
+        if (branch) branch.addEventListener('change', () => {
+            window.location.href = '/Reception/DropIn?branchId=' + encodeURIComponent(branch.value);
+        });
+
+        const productInputs = Array.from(document.querySelectorAll('input[name="ProductCode"]'));
+        const classPicker = document.getElementById('classPicker');
+        const classSelect = document.getElementById('classSelect');
+        const finalPrice = document.getElementById('finalPrice');
+        const reasonWrap = document.getElementById('overrideReasonWrap');
+        const reason = document.getElementById('overrideReason');
+        const coverage = document.getElementById('coverageWarning');
+
+        function selectedProduct() { return productInputs.find(x => x.checked); }
+        function syncUi(resetPrice) {
+            const selected = selectedProduct();
+            if (!selected) return;
+            const isClass = selected.value === '@DropInProductCodes.ClassPass';
+            if (classPicker) classPicker.style.display = isClass ? 'block' : 'none';
+            if (classSelect) classSelect.required = isClass;
+            if (resetPrice && finalPrice) finalPrice.value = selected.dataset.price;
+            if (coverage) {
+                const applies = isClass ? coverage.dataset.class === 'true' : coverage.dataset.open === 'true';
+                coverage.style.display = applies ? 'block' : 'none';
+                const confirm = coverage.querySelector('input[name="ConfirmPaidDropIn"]');
+                if (confirm) confirm.required = applies;
+            }
+            syncReason();
+        }
+        function syncReason() {
+            const selected = selectedProduct();
+            if (!selected || !finalPrice || !reasonWrap) return;
+            const changed = Math.abs(Number(finalPrice.value || 0) - Number(selected.dataset.price || 0)) > 0.001;
+            reasonWrap.style.display = changed ? 'block' : 'none';
+            if (reason) reason.required = changed;
+        }
+        productInputs.forEach(x => x.addEventListener('change', () => syncUi(true)));
+        if (finalPrice) finalPrice.addEventListener('input', syncReason);
+        syncUi(false);
+
+        document.querySelectorAll('.void-form').forEach(form => form.addEventListener('submit', e => {
+            const reasonText = window.prompt('Why is this drop-in being cancelled?');
+            if (!reasonText || !reasonText.trim()) { e.preventDefault(); return; }
+            form.querySelector('input[name="reason"]').value = reasonText.trim();
+        }));
+    })();
+</script>
+}

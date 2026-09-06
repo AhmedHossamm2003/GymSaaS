@@ -6,7 +6,7 @@ using System.Security.Claims;
 
 namespace GymSaaS.Controllers;
 
-[Authorize]
+[GymSaaS.Authorization.ViewPermissionAuthorize]
 public class RolesController : Controller
 {
     private readonly IRoleService _roleService;

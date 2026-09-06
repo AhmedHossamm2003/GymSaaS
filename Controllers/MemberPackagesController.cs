@@ -8,7 +8,7 @@ using System.Security.Claims;
 
 namespace GymSaaS.Controllers
 {
-    [Authorize(Policy = "AnyStaff")]
+    [GymSaaS.Authorization.ViewPermissionAuthorize("Members")]
     public class MemberPackagesController : Controller
     {
         private readonly GymDbContext _db;
@@ -75,11 +75,33 @@ namespace GymSaaS.Controllers
                 ModelState.AddModelError(nameof(model.PackageDefinitionId), "Please select a package.");
 
             var pkgDef = await _db.PackageDefinitions
+                .Include(p => p.PackageType)
+                .Include(p => p.BranchAccessPolicyType)
                 .FirstOrDefaultAsync(p => p.PackageDefinitionId == model.PackageDefinitionId
                                        && p.TenantId == TenantId);
 
-            if (pkgDef?.IsPrivateTraining == true && model.CoachId == null)
-                ModelState.AddModelError(nameof(model.CoachId), "A coach is required for private training packages.");
+            if (pkgDef == null)
+                ModelState.AddModelError(nameof(model.PackageDefinitionId),
+                    "The selected package is no longer available.");
+
+            var selectedTypeCode = pkgDef?.PackageType?.PackageTypeCode ?? "";
+            if (model.CoachId.HasValue && selectedTypeCode == "PERSONAL_TRAINING")
+            {
+                var validAssignedCoach = await _db.Coaches.AnyAsync(c =>
+                    c.CoachId == model.CoachId.Value
+                    && c.TenantId == TenantId
+                    && (c.BranchId == member.HomeBranchId
+                        || (c.UserId.HasValue && _db.UserBranches.Any(ub =>
+                            ub.UserId == c.UserId.Value
+                            && ub.BranchId == member.HomeBranchId
+                            && ub.IsActive)))
+                    && c.IsActive
+                    && !c.IsDeleted);
+
+                if (!validAssignedCoach)
+                    ModelState.AddModelError(nameof(model.CoachId),
+                        "Please select an active coach assigned to the member's home branch.");
+            }
 
             // ── Enforce price floor (MaxDiscountedPrice) ─────────────────────
             if (pkgDef != null && model.FinalPrice.HasValue)
@@ -108,33 +130,24 @@ namespace GymSaaS.Controllers
                 return View(model);
             }
 
-            pkgDef = await _db.PackageDefinitions
-                .Include(p => p.PackageType)
-                .Include(p => p.BranchAccessPolicyType)
-                .FirstOrDefaultAsync(p => p.PackageDefinitionId == pkgDef.PackageDefinitionId
-                                       && p.TenantId == TenantId);
-
             if (pkgDef == null) return NotFound();
 
             var startDate = model.CustomStartDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
             var typeCode = pkgDef.PackageType?.PackageTypeCode ?? "";
+            var isPersonalTraining = typeCode == "PERSONAL_TRAINING";
 
-            // ── Snapshot pricing + coach commission at moment of assignment ────
+            // Snapshot the charged price and commission rate. Commission money is
+            // earned later, one delivered PT session at a time.
             // Use the staff-entered FinalPrice (after any discount) if provided;
             // otherwise fall back to the package's catalog price.
             decimal? priceSnap = model.FinalPrice ?? pkgDef.Price;
-            decimal? commissionPct = null;
-            decimal? commissionAmount = null;
-            if (pkgDef.IsPrivateTraining && pkgDef.CoachCommissionPercent.HasValue && priceSnap.HasValue)
-            {
-                commissionPct = pkgDef.CoachCommissionPercent.Value;
-                commissionAmount = Math.Round(priceSnap.Value * commissionPct.Value / 100m, 2);
-            }
+            decimal? commissionPct = isPersonalTraining
+                ? pkgDef.CoachCommissionPercent
+                : null;
 
             // Resolve perks — use override if provided, else use catalog defaults
             int? invitationsTotal   = model.CustomInvitationCount   ?? pkgDef.InvitationCount;
             int? inBodyTotal        = model.CustomInBodyCount        ?? pkgDef.InBodyCount;
-            int? ptSessionsTotal    = model.CustomPtSessionCount     ?? pkgDef.PtSessionCount;
             int? freezeAllowance    = model.CustomFreezeAllowanceDays ?? pkgDef.FreezeAllowanceDays;
 
             // ── Build final allowed branch list (home always included) ─────────
@@ -149,112 +162,13 @@ namespace GymSaaS.Controllers
                         finalBranchIds.Add(bid);
             }
 
-            // ── COMBINED — create two linked rows ─────────────────────────────
-            if (typeCode == "COMBINED")
-            {
-                var groupId = Guid.NewGuid();
-
-                // Row 1: Sessions component
-                var sessionPkgId = Guid.NewGuid();
-                var sessionExpiry = model.CustomSessionExpiry ?? startDate.AddDays(pkgDef.DurationDays ?? 30);
-                var sessionCount = model.CustomSessionCount ?? pkgDef.SessionCount ?? 0;
-                var sessionTypeId = await GetTypeIdAsync("SESSION");
-
-                var sessionPkg = new MemberPackage
-                {
-                    MemberPackageId = sessionPkgId,
-                    TenantId = TenantId,
-                    MemberId = model.MemberId,
-                    PackageDefinitionId = pkgDef.PackageDefinitionId,
-                    PackageNameSnapshot = pkgDef.PackageName,
-                    PackageTypeId = sessionTypeId,
-                    BranchAccessPolicyTypeId = pkgDef.BranchAccessPolicyTypeId,
-                    HomeBranchId = member.HomeBranchId,
-                    CrossBranchVisitLimit = pkgDef.CrossBranchVisitLimit,
-                    Status = "ACTIVE",
-                    IsCustomPackage = model.CustomSessionCount.HasValue,
-                    SessionCountOriginal = sessionCount,
-                    SessionCountRemaining = sessionCount + model.CarryOverSessions,
-                    CarryOverSessionsAdded = model.CarryOverSessions,
-                    DurationDays = pkgDef.DurationDays,
-                    ValidFromDate = startDate,
-                    ValidToDate = sessionExpiry,
-                    Notes = model.Notes,
-                    LinkedPackageGroupId = groupId,
-                    PackageComponentRole = "SESSION",
-                    OpenGymDailyLimit = 1,
-                    CoachId = model.CoachId,
-                    // Perks — stored on the SESSION component row
-                    InvitationsTotal     = invitationsTotal,
-                    InvitationsRemaining = invitationsTotal,
-                    InBodyTotal          = inBodyTotal,
-                    InBodyRemaining      = inBodyTotal,
-                    PtSessionsTotal      = ptSessionsTotal,
-                    PtSessionsRemaining  = ptSessionsTotal,
-                    FreezeAllowanceDays  = freezeAllowance,
-                    FreezeRemainingDays  = freezeAllowance,
-                    GymClassId           = model.GymClassId ?? pkgDef.GymClassId,
-                    // Commission snapshot attaches to the SESSION component of COMBINED
-                    PriceSnapshot          = priceSnap,
-                    CoachCommissionPercent = commissionPct,
-                    CoachCommissionAmount  = commissionAmount,
-                    CreatedAtUtc = DateTime.UtcNow,
-                    CreatedByUserId = UserId,
-                };
-
-                // Row 2: Open gym component
-                var gymPkgId = Guid.NewGuid();
-                var gymExpiry = model.CustomOpenGymExpiry ?? startDate.AddDays(pkgDef.OpenGymDurationDays ?? pkgDef.DurationDays ?? 30);
-                var gymTypeId = await GetTypeIdAsync("OPEN_GYM");
-
-                var gymPkg = new MemberPackage
-                {
-                    MemberPackageId = gymPkgId,
-                    TenantId = TenantId,
-                    MemberId = model.MemberId,
-                    PackageDefinitionId = pkgDef.PackageDefinitionId,
-                    PackageNameSnapshot = pkgDef.PackageName,
-                    PackageTypeId = gymTypeId,
-                    BranchAccessPolicyTypeId = pkgDef.BranchAccessPolicyTypeId,
-                    HomeBranchId = member.HomeBranchId,
-                    CrossBranchVisitLimit = pkgDef.CrossBranchVisitLimit,
-                    Status = "ACTIVE",
-                    IsCustomPackage = model.CustomOpenGymExpiry.HasValue,
-                    SessionCountOriginal = null,
-                    SessionCountRemaining = null,
-                    CarryOverSessionsAdded = 0,
-                    DurationDays = pkgDef.OpenGymDurationDays ?? pkgDef.DurationDays,
-                    ValidFromDate = startDate,
-                    ValidToDate = gymExpiry,
-                    Notes = model.Notes,
-                    LinkedPackageGroupId = groupId,
-                    PackageComponentRole = "OPEN_GYM",
-                    OpenGymDailyLimit = pkgDef.OpenGymDailyLimit,
-                    CoachId = model.CoachId,
-                    CreatedAtUtc = DateTime.UtcNow,
-                    CreatedByUserId = UserId,
-                };
-
-                _db.MemberPackages.Add(sessionPkg);
-                _db.MemberPackages.Add(gymPkg);
-                await _db.SaveChangesAsync();
-
-                // Save allowed branches for both rows
-                if (finalBranchIds.Any())
-                {
-                    await SaveAllowedBranches(sessionPkgId, finalBranchIds);
-                    await SaveAllowedBranches(gymPkgId, finalBranchIds);
-                }
-            }
-            else
-            {
-                // ── Single row (SESSION or OPEN_GYM) ──────────────────────────
+            // ── Single row (SESSION, OPEN_GYM, or PERSONAL_TRAINING) ──────────
                 var pkgId = Guid.NewGuid();
                 var typeId = pkgDef.PackageTypeId;
-                var expiry = typeCode == "SESSION"
+                var expiry = typeCode is "SESSION" or "PERSONAL_TRAINING"
                     ? (model.CustomSessionExpiry ?? startDate.AddDays(pkgDef.DurationDays ?? 30))
                     : (model.CustomOpenGymExpiry ?? startDate.AddDays(pkgDef.DurationDays ?? 30));
-                var sessions = typeCode == "SESSION"
+                var sessions = typeCode is "SESSION" or "PERSONAL_TRAINING"
                     ? (model.CustomSessionCount ?? pkgDef.SessionCount ?? 0)
                     : (int?)null;
 
@@ -281,22 +195,21 @@ namespace GymSaaS.Controllers
                     LinkedPackageGroupId = null,
                     PackageComponentRole = null,
                     OpenGymDailyLimit = pkgDef.OpenGymDailyLimit,
-                    CoachId = model.CoachId,
+                    // Optional client owner. The coach who actually delivers a session
+                    // is still selected independently at reception.
+                    CoachId = isPersonalTraining ? model.CoachId : null,
                     // Perks
                     InvitationsTotal     = invitationsTotal,
                     InvitationsRemaining = invitationsTotal,
                     InBodyTotal          = inBodyTotal,
                     InBodyRemaining      = inBodyTotal,
-                    PtSessionsTotal      = ptSessionsTotal,
-                    PtSessionsRemaining  = ptSessionsTotal,
                     FreezeAllowanceDays  = freezeAllowance,
                     FreezeRemainingDays  = freezeAllowance,
-                    GymClassId           = (typeCode == "SESSION" || typeCode == "CLASS")
+                    GymClassId           = typeCode is "SESSION" or "CLASS"
                         ? (model.GymClassId ?? pkgDef.GymClassId)
                         : null,
                     PriceSnapshot          = priceSnap,
                     CoachCommissionPercent = commissionPct,
-                    CoachCommissionAmount  = commissionAmount,
                     CreatedAtUtc = DateTime.UtcNow,
                     CreatedByUserId = UserId,
                 };
@@ -306,7 +219,6 @@ namespace GymSaaS.Controllers
 
                 if (finalBranchIds.Any())
                     await SaveAllowedBranches(pkgId, finalBranchIds);
-            }
 
             TempData["Toast"] = $"Package \"{pkgDef.PackageName}\" assigned to {model.MemberName}.";
             TempData["ToastType"] = "success";
@@ -320,6 +232,7 @@ namespace GymSaaS.Controllers
         {
             var items = await _db.PackageDefinitions
                 .Where(p => p.TenantId == TenantId && p.IsActive
+                         && p.PackageType.PackageTypeCode != "COMBINED"
                          && (p.RestrictedToBranchId == null || p.RestrictedToBranchId == homeBranchId))
                 .Join(_db.PackageTypes, p => p.PackageTypeId, pt => pt.PackageTypeId, (p, pt) => new { p, pt })
                 .Join(_db.BranchAccessPolicyTypes, x => x.p.BranchAccessPolicyTypeId, bp => bp.BranchAccessPolicyTypeId, (x, bp) => new { x.p, x.pt, bp })
@@ -338,11 +251,9 @@ namespace GymSaaS.Controllers
                     GymClassId = x.p.GymClassId,
                     InvitationCount = x.p.InvitationCount,
                     InBodyCount = x.p.InBodyCount,
-                    PtSessionCount = x.p.PtSessionCount,
                     FreezeAllowanceDays = x.p.FreezeAllowanceDays,
                     Price = x.p.Price,
                     MaxDiscountedPrice = x.p.MaxDiscountedPrice,
-                    IsPrivateTraining = x.p.IsPrivateTraining,
                     IsActive = x.p.IsActive,
                     SortOrder = x.p.SortOrder,
                 })
@@ -454,7 +365,10 @@ namespace GymSaaS.Controllers
 
         private async Task<List<CoachDropdownItem>> GetAvailableCoachesAsync(Guid branchId) =>
             await _db.Coaches
-                .Where(c => c.TenantId == TenantId && c.BranchId == branchId && c.IsActive && !c.IsDeleted)
+                .Where(c => c.TenantId == TenantId && c.IsActive && !c.IsDeleted
+                         && (c.BranchId == branchId
+                             || (c.UserId.HasValue && _db.UserBranches.Any(ub =>
+                                 ub.UserId == c.UserId.Value && ub.BranchId == branchId && ub.IsActive))))
                 .OrderBy(c => c.FirstName).ThenBy(c => c.LastName)
                 .Select(c => new CoachDropdownItem
                 {
@@ -464,12 +378,6 @@ namespace GymSaaS.Controllers
                     BranchId = c.BranchId,
                 })
                 .ToListAsync();
-
-        private async Task<Guid> GetTypeIdAsync(string typeCode) =>
-            await _db.PackageTypes
-                .Where(pt => pt.PackageTypeCode == typeCode)
-                .Select(pt => pt.PackageTypeId)
-                .FirstAsync();
 
         private async Task SaveAllowedBranches(Guid memberPackageId, List<Guid> branchIds)
         {

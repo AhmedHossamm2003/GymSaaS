@@ -8,7 +8,7 @@ using System.Security.Claims;
 
 namespace GymSaaS.Controllers
 {
-    [Authorize(Policy = "ManagerAndAbove")]
+    [GymSaaS.Authorization.ViewPermissionAuthorize]
     public class WorkoutTemplatesController : Controller
     {
         private readonly GymDbContext _db;

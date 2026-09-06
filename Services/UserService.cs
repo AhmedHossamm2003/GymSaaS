@@ -39,7 +39,20 @@ public class UserService : IUserService
         .OrderBy(x => x.FullName)
         .ToListAsync();
 
-        return users;
+        return users
+            .GroupBy(u => u.UserId)
+            .Select(group => new UserListItemViewModel
+            {
+                UserId = group.Key,
+                FullName = group.First().FullName,
+                Email = group.First().Email,
+                RoleName = string.Join(", ", group.Select(u => u.RoleName).Distinct()),
+                BranchName = string.Join(", ", group.Select(u => u.BranchName)
+                    .Where(name => !string.IsNullOrWhiteSpace(name)).Distinct()),
+                IsActive = group.First().IsActive,
+            })
+            .OrderBy(u => u.FullName)
+            .ToList();
     }
 
     public async Task<CreateUserViewModel> BuildCreateModelAsync(Guid tenantId)
@@ -213,6 +226,63 @@ public class UserService : IUserService
         return model;
     }
 
+    public async Task<UserDetailsViewModel?> BuildDetailsModelAsync(Guid userId, Guid tenantId)
+    {
+        var user = await _db.Users
+            .Where(u => u.UserId == userId && u.TenantId == tenantId && u.DeletedAtUtc == null)
+            .Select(u => new
+            {
+                u.UserId,
+                u.FullName,
+                u.FirstName,
+                u.LastName,
+                u.Email,
+                u.PhoneNumber,
+                u.IsActive,
+                u.IsLocked,
+                u.CreatedAtUtc,
+                u.UpdatedAtUtc,
+                u.LastLoginAtUtc,
+            })
+            .FirstOrDefaultAsync();
+
+        if (user == null) return null;
+
+        var roles = await _db.UserRoles
+            .Where(ur => ur.UserId == userId && ur.Role.TenantId == tenantId)
+            .OrderBy(ur => ur.Role.RoleName)
+            .Select(ur => ur.Role.RoleName)
+            .Distinct()
+            .ToListAsync();
+
+        var branches = await _db.UserBranches
+            .Where(ub => ub.UserId == userId && ub.IsActive
+                      && ub.Branch.TenantId == tenantId && ub.Branch.IsActive)
+            .OrderBy(ub => ub.Branch.BranchName)
+            .Select(ub => ub.Branch.BranchName)
+            .Distinct()
+            .ToListAsync();
+
+        return new UserDetailsViewModel
+        {
+            UserId = user.UserId,
+            FullName = string.IsNullOrWhiteSpace(user.FullName)
+                ? $"{user.FirstName} {user.LastName}".Trim()
+                : user.FullName,
+            Email = user.Email,
+            PhoneNumber = user.PhoneNumber,
+            IsActive = user.IsActive,
+            IsLocked = user.IsLocked,
+            CreatedAtUtc = user.CreatedAtUtc,
+            UpdatedAtUtc = user.UpdatedAtUtc,
+            LastLoginAtUtc = user.LastLoginAtUtc,
+            RoleNames = roles,
+            BranchNames = branches,
+            IsCoach = await _db.Coaches.AnyAsync(c =>
+                c.UserId == userId && c.TenantId == tenantId && !c.IsDeleted),
+        };
+    }
+
     public async Task<(bool Success, string? Error)> UpdateAsync(Guid tenantId, EditUserViewModel model)
     {
         var user = await _db.Users
@@ -293,18 +363,41 @@ public class UserService : IUserService
             .Where(x => x.UserId == user.UserId)
             .ToListAsync();
 
-        _db.UserBranches.RemoveRange(existingBranches);
+        var isLinkedCoach = await _db.Coaches.AnyAsync(c =>
+            c.UserId == user.UserId && c.TenantId == tenantId && !c.IsDeleted);
 
-        if (branch != null)
+        if (isLinkedCoach)
         {
-            _db.UserBranches.Add(new UserBranch
+            // Coach branch membership is managed from the Coaches page because it can contain many branches.
+            // A generic user edit must not silently collapse those assignments to one branch.
+            if (branch != null)
             {
-                UserBranchId = Guid.NewGuid(),
-                UserId = user.UserId,
-                BranchId = branch.BranchId,
-                IsActive = true,
-                AssignedAtUtc = DateTime.UtcNow
-            });
+                var existing = existingBranches.FirstOrDefault(x => x.BranchId == branch.BranchId);
+                if (existing != null) existing.IsActive = true;
+                else _db.UserBranches.Add(new UserBranch
+                {
+                    UserBranchId = Guid.NewGuid(),
+                    UserId = user.UserId,
+                    BranchId = branch.BranchId,
+                    IsActive = true,
+                    AssignedAtUtc = DateTime.UtcNow
+                });
+            }
+        }
+        else
+        {
+            _db.UserBranches.RemoveRange(existingBranches);
+            if (branch != null)
+            {
+                _db.UserBranches.Add(new UserBranch
+                {
+                    UserBranchId = Guid.NewGuid(),
+                    UserId = user.UserId,
+                    BranchId = branch.BranchId,
+                    IsActive = true,
+                    AssignedAtUtc = DateTime.UtcNow
+                });
+            }
         }
 
         await _db.SaveChangesAsync();

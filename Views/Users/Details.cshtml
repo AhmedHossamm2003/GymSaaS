@@ -1,62 +1,107 @@
-﻿@model GymSaaS.Models.EditUserViewModel
+@model GymSaaS.Models.UserDetailsViewModel
 
 @{
     ViewData["Title"] = "User Details";
-    var roleName = Model.Roles.FirstOrDefault(x => x.Value == Model.RoleId.ToString())?.Text ?? "-";
-    var branchName = Model.Branches.FirstOrDefault(x => x.Value == Model.BranchId?.ToString())?.Text ?? "-";
+    var initials = string.IsNullOrWhiteSpace(Model.Initials) ? "U" : Model.Initials;
 }
 
-<div class="mb-4">
-    <h2 class="mb-1">User Details</h2>
-    <p class="text-muted mb-0">View user information.</p>
-</div>
+<style>
+    .ud-page { max-width:1040px; margin:0 auto; }
+    .ud-top { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px; }
+    .ud-eyebrow { color:var(--text-faint,#8b93a7); font-size:11px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; margin-bottom:4px; }
+    .ud-title { color:var(--black,#111827); font-size:24px; font-weight:800; margin:0; }
+    .ud-actions { display:flex; gap:9px; }
+    .ud-hero { background:linear-gradient(135deg,#171923 0%,#242735 100%); color:white; border-radius:16px; padding:26px; display:flex; align-items:center; justify-content:space-between; gap:24px; box-shadow:0 12px 30px rgba(17,24,39,.14); }
+    .ud-identity { display:flex; align-items:center; gap:18px; min-width:0; }
+    .ud-avatar { width:68px; height:68px; flex:0 0 68px; border-radius:18px; display:grid; place-items:center; background:linear-gradient(145deg,#fb923c,#f97316); color:white; font-size:22px; font-weight:900; box-shadow:0 8px 22px rgba(249,115,22,.3); }
+    .ud-name { font-size:23px; line-height:1.15; font-weight:800; margin-bottom:7px; }
+    .ud-email { color:#cbd0dc; font-size:13px; overflow-wrap:anywhere; }
+    .ud-status { display:inline-flex; align-items:center; gap:7px; border-radius:999px; padding:8px 12px; font-size:12px; font-weight:800; white-space:nowrap; background:@(Model.IsActive && !Model.IsLocked ? "rgba(34,197,94,.16)" : "rgba(239,68,68,.18)"); color:@(Model.IsActive && !Model.IsLocked ? "#86efac" : "#fca5a5"); }
+    .ud-status-dot { width:7px; height:7px; border-radius:50%; background:currentColor; }
+    .ud-grid { display:grid; grid-template-columns:minmax(0,1.45fr) minmax(280px,.85fr); gap:18px; margin-top:18px; }
+    .ud-card { background:var(--bg-card,#fff); border:1px solid var(--border,#e6e8ef); border-radius:14px; padding:22px; box-shadow:0 4px 16px rgba(17,24,39,.045); }
+    .ud-card-title { display:flex; align-items:center; gap:9px; color:var(--black,#111827); font-size:14px; font-weight:800; margin-bottom:18px; }
+    .ud-card-title i { color:var(--orange,#f97316); }
+    .ud-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+    .ud-field { min-width:0; padding:14px; border-radius:10px; background:var(--bg-raised,#f8f9fb); border:1px solid var(--border,#e8eaf0); }
+    .ud-label { color:var(--text-faint,#8b93a7); font-size:10.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; margin-bottom:6px; }
+    .ud-value { color:var(--black,#111827); font-size:13.5px; font-weight:650; overflow-wrap:anywhere; }
+    .ud-chip-list { display:flex; flex-wrap:wrap; gap:8px; }
+    .ud-chip { display:inline-flex; align-items:center; gap:6px; padding:7px 10px; border:1px solid #fed7aa; border-radius:999px; background:#fff7ed; color:#c2410c; font-size:11.5px; font-weight:800; }
+    .ud-chip.branch { border-color:#ddd6fe; background:#f5f3ff; color:#6d28d9; }
+    .ud-empty { color:var(--text-faint,#8b93a7); font-size:12.5px; }
+    .ud-meta { display:grid; gap:11px; }
+    .ud-meta-row { display:flex; justify-content:space-between; gap:16px; padding-bottom:11px; border-bottom:1px solid var(--border,#eceef3); }
+    .ud-meta-row:last-child { padding:0; border:0; }
+    .ud-meta-key { color:var(--text-faint,#8b93a7); font-size:12px; }
+    .ud-meta-value { color:var(--black,#111827); font-size:12px; font-weight:700; text-align:right; }
+    @@media(max-width:760px) {
+        .ud-top, .ud-hero { align-items:flex-start; flex-direction:column; }
+        .ud-grid { grid-template-columns:1fr; }
+        .ud-fields { grid-template-columns:1fr; }
+        .ud-actions { width:100%; }
+        .ud-actions .btn { flex:1; justify-content:center; }
+    }
+</style>
 
-<div class="card shadow-sm border-0">
-    <div class="card-body">
-        <div class="row g-4">
-            <div class="col-md-4">
-                <div class="text-muted small">Full Name</div>
-                <div class="fw-semibold">@Model.FullName</div>
+<div class="ud-page">
+    <div class="ud-top">
+        <div>
+            <div class="ud-eyebrow">Account management</div>
+            <h1 class="ud-title">User Details</h1>
+        </div>
+        <div class="ud-actions">
+            <a asp-action="Index" class="btn btn-secondary"><i class="bi bi-arrow-left"></i> Back</a>
+            <a asp-action="Edit" asp-route-id="@Model.UserId" class="btn btn-primary"><i class="bi bi-pencil"></i> Edit User</a>
+        </div>
+    </div>
+
+    <section class="ud-hero">
+        <div class="ud-identity">
+            <div class="ud-avatar">@initials</div>
+            <div style="min-width:0">
+                <div class="ud-name">@Model.FullName</div>
+                <div class="ud-email"><i class="bi bi-envelope" style="margin-right:6px"></i>@Model.Email</div>
             </div>
+        </div>
+        <div class="ud-status"><span class="ud-status-dot"></span>@(Model.IsLocked ? "Locked" : Model.IsActive ? "Active account" : "Inactive account")</div>
+    </section>
 
-            <div class="col-md-4">
-                <div class="text-muted small">Email</div>
-                <div>@Model.Email</div>
-            </div>
-
-            <div class="col-md-4">
-                <div class="text-muted small">Phone Number</div>
-                <div>@(string.IsNullOrWhiteSpace(Model.PhoneNumber) ? "-" : Model.PhoneNumber)</div>
-            </div>
-
-            <div class="col-md-4">
-                <div class="text-muted small">Role</div>
-                <div>@roleName</div>
-            </div>
-
-            <div class="col-md-4">
-                <div class="text-muted small">Branch</div>
-                <div>@branchName</div>
-            </div>
-
-            <div class="col-md-4">
-                <div class="text-muted small">Status</div>
-                <div>
-                    @if (Model.IsActive)
-                    {
-                        <span class="badge bg-success">Active</span>
-                    }
-                    else
-                    {
-                        <span class="badge bg-danger">Inactive</span>
-                    }
+    <div class="ud-grid">
+        <div style="display:grid;gap:18px">
+            <section class="ud-card">
+                <div class="ud-card-title"><i class="bi bi-person-vcard"></i> Contact information</div>
+                <div class="ud-fields">
+                    <div class="ud-field"><div class="ud-label">Full name</div><div class="ud-value">@Model.FullName</div></div>
+                    <div class="ud-field"><div class="ud-label">Phone number</div><div class="ud-value">@(string.IsNullOrWhiteSpace(Model.PhoneNumber) ? "Not provided" : Model.PhoneNumber)</div></div>
+                    <div class="ud-field" style="grid-column:1/-1"><div class="ud-label">Email address</div><div class="ud-value">@Model.Email</div></div>
                 </div>
-            </div>
+            </section>
+
+            <section class="ud-card">
+                <div class="ud-card-title"><i class="bi bi-shield-check"></i> Access & assignments</div>
+                <div class="ud-label">Roles</div>
+                <div class="ud-chip-list" style="margin-bottom:18px">
+                    @if (Model.RoleNames.Count == 0) { <span class="ud-empty">No role assigned</span> }
+                    else { foreach (var role in Model.RoleNames) { <span class="ud-chip"><i class="bi bi-shield"></i>@role</span> } }
+                </div>
+                <div class="ud-label">Branches</div>
+                <div class="ud-chip-list">
+                    @if (Model.BranchNames.Count == 0) { <span class="ud-empty">All branches (unrestricted)</span> }
+                    else { foreach (var branch in Model.BranchNames) { <span class="ud-chip branch"><i class="bi bi-geo-alt"></i>@branch</span> } }
+                </div>
+            </section>
         </div>
 
-        <div class="mt-4 d-flex gap-2">
-            <a asp-action="Edit" asp-route-id="@Model.UserId" class="btn btn-primary">Edit</a>
-            <a asp-action="Index" class="btn btn-outline-secondary">Back</a>
-        </div>
+        <section class="ud-card" style="align-self:start">
+            <div class="ud-card-title"><i class="bi bi-clock-history"></i> Account activity</div>
+            <div class="ud-meta">
+                <div class="ud-meta-row"><span class="ud-meta-key">Account type</span><span class="ud-meta-value">@(Model.IsCoach ? "Coach account" : "Staff account")</span></div>
+                <div class="ud-meta-row"><span class="ud-meta-key">Created</span><span class="ud-meta-value">@Model.CreatedAtUtc.ToLocalTime().ToString("dd MMM yyyy")</span></div>
+                <div class="ud-meta-row"><span class="ud-meta-key">Last updated</span><span class="ud-meta-value">@(Model.UpdatedAtUtc?.ToLocalTime().ToString("dd MMM yyyy, HH:mm") ?? "Not yet")</span></div>
+                <div class="ud-meta-row"><span class="ud-meta-key">Last login</span><span class="ud-meta-value">@(Model.LastLoginAtUtc?.ToLocalTime().ToString("dd MMM yyyy, HH:mm") ?? "Never")</span></div>
+                <div class="ud-meta-row"><span class="ud-meta-key">User ID</span><span class="ud-meta-value" style="font-family:monospace;font-size:10px">@Model.UserId</span></div>
+            </div>
+        </section>
     </div>
 </div>

@@ -11,7 +11,7 @@ namespace GymSaaS.Controllers
     // Notifications are derived live from current data (no dedicated table):
     // expiring/expired packages, low session counts, and mobile scans awaiting
     // a reception decision. All branch-scoped to the signed-in user.
-    [Authorize]
+    [GymSaaS.Authorization.ViewPermissionAuthorize]
     public class NotificationsController : Controller
     {
         private readonly GymDbContext _db;

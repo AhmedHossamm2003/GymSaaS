@@ -26,6 +26,10 @@ public partial class AttendanceRecord
 
     public Guid? MemberPackageId { get; set; }
 
+    // Direct class link is used by paid one-class drop-ins, which intentionally
+    // have no MemberPackage row.
+    public Guid? GymClassId { get; set; }
+
     public Guid AttendanceStatusId { get; set; }
 
     [Precision(0)]
@@ -83,6 +87,9 @@ public partial class AttendanceRecord
     [ForeignKey("MemberPackageId")]
     [InverseProperty("AttendanceRecords")]
     public virtual MemberPackage? MemberPackage { get; set; }
+
+    [ForeignKey("GymClassId")]
+    public virtual GymClass? GymClass { get; set; }
 
     [ForeignKey("OverrideRequestId")]
     [InverseProperty("AttendanceRecords")]

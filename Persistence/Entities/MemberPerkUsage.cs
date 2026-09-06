@@ -32,6 +32,18 @@ public partial class MemberPerkUsage
     // Coach who ran the PT session (null for InBody).
     public Guid? CoachId { get; set; }
 
+    // Attendance created by the same PT action. Null when the member was
+    // already checked in and only the PT delivery needed recording.
+    public Guid? AttendanceRecordId { get; set; }
+
+    // Commission terms and earned amount frozen at the moment the PT session
+    // is delivered. Null for non-PT perks or plans without commission.
+    [Column(TypeName = "decimal(5, 2)")]
+    public decimal? CommissionPercentSnapshot { get; set; }
+
+    [Column(TypeName = "decimal(10, 2)")]
+    public decimal? CommissionAmount { get; set; }
+
     public Guid BranchId { get; set; }
 
     [Precision(0)]

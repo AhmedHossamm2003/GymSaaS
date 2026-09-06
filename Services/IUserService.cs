@@ -8,5 +8,6 @@ public interface IUserService
     Task<CreateUserViewModel> BuildCreateModelAsync(Guid tenantId);
     Task<(bool Success, string? Error)> CreateAsync(Guid tenantId, CreateUserViewModel model);
     Task<EditUserViewModel?> BuildEditModelAsync(Guid userId, Guid tenantId);
+    Task<UserDetailsViewModel?> BuildDetailsModelAsync(Guid userId, Guid tenantId);
     Task<(bool Success, string? Error)> UpdateAsync(Guid tenantId, EditUserViewModel model);
 }

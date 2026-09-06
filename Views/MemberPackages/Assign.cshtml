@@ -189,10 +189,10 @@
                 border: 1px solid var(--blue-border);
             }
 
-            .pkg-opt-icon.COMBINED {
-                background: var(--canvas);
-                color: var(--t2);
-                border: 1px solid var(--border);
+            .pkg-opt-icon.PERSONAL_TRAINING {
+                background: #f5f3ff;
+                color: #7c3aed;
+                border: 1px solid #ddd6fe;
             }
 
         .pkg-opt-info {
@@ -238,10 +238,10 @@
                 border-color: var(--blue-border);
             }
 
-            .pkg-opt-badge.COMBINED {
-                background: var(--canvas);
-                color: var(--t2);
-                border-color: var(--border);
+            .pkg-opt-badge.PERSONAL_TRAINING {
+                background: #f5f3ff;
+                color: #6d28d9;
+                border-color: #ddd6fe;
             }
 
         .pkg-opt-check {
@@ -464,7 +464,7 @@
                         {
                             "SESSION" => $"{pkg.SessionCount} sessions · {pkg.DurationDays} days validity",
                             "OPEN_GYM" => $"{pkg.DurationDays} days open gym access",
-                            "COMBINED" => $"{pkg.SessionCount} sessions ({pkg.DurationDays}d) + gym ({pkg.OpenGymDurationDays}d)",
+                            "PERSONAL_TRAINING" => $"{pkg.SessionCount} PT sessions · {pkg.DurationDays} days validity",
                             _ => ""
                         };
 
@@ -476,10 +476,9 @@
                             _ => pkg.BranchAccessPolicy
                         };
 
-                        <label class="pkg-option @(pkg.IsPrivateTraining ? "is-private" : "")" onclick="selectPackage(this)"
+                        <label class="pkg-option @(pkg.IsPersonalTraining ? "is-private" : "")" onclick="selectPackage(this)"
                                data-type="@pkg.PackageTypeCode"
                                data-policy="@pkg.BranchAccessPolicy"
-                               data-private="@(pkg.IsPrivateTraining ? "1" : "0")"
                                data-gym-class-id="@(pkg.GymClassId?.ToString() ?? "")"
                                data-coach-id="@(pkg.CoachId?.ToString() ?? "")"
                                data-sessions="@(pkg.SessionCount?.ToString() ?? "")"
@@ -487,13 +486,12 @@
                                data-gym-duration="@(pkg.OpenGymDurationDays?.ToString() ?? "")"
                                data-invitations="@(pkg.InvitationCount?.ToString() ?? "")"
                                data-inbody="@(pkg.InBodyCount?.ToString() ?? "")"
-                               data-pt="@(pkg.PtSessionCount?.ToString() ?? "")"
                                data-freeze="@(pkg.FreezeAllowanceDays?.ToString() ?? "")"
                                data-price="@(pkg.Price?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "")"
                                data-min-price="@(pkg.MaxDiscountedPrice?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "")">
                             <input type="radio" name="PackageDefinitionId" value="@pkg.PackageDefinitionId" />
                             <div class="pkg-opt-icon @pkg.PackageTypeCode">
-                                @if (pkg.IsPrivateTraining)
+                                @if (pkg.IsPersonalTraining)
                                 {
                                     <i class="bi bi-person-arms-up"></i>
                                 }
@@ -514,12 +512,6 @@
                                 <div style="display:flex; align-items:center; gap:7px; margin-bottom:3px; flex-wrap:wrap;">
                                     <span class="pkg-opt-name">@pkg.PackageName</span>
                                     <span class="pkg-opt-badge @pkg.PackageTypeCode">@pkg.PackageTypeName</span>
-                                    @if (pkg.IsPrivateTraining)
-                                    {
-                                        <span style="font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;background:linear-gradient(135deg,#f97316,#ea580c);color:#fff;padding:3px 9px;border-radius:10px;box-shadow:0 2px 6px rgba(249,115,22,.35);">
-                                            <i class="bi bi-person-arms-up"></i> Private Training
-                                        </span>
-                                    }
                                 </div>
                                 <div class="pkg-opt-meta">
                                     <span>@meta</span>
@@ -600,7 +592,7 @@
         </div>
     </div>
 
-    <!-- 2b. Class link (shown for SESSION / COMBINED) -->
+    <!-- 2b. Class link (shown for SESSION only) -->
     <div class="form-card" id="classLinkCard" style="display:none;">
         <div class="form-section-head">
             <div class="form-section-icon"><i class="bi bi-calendar2-week"></i></div>
@@ -623,15 +615,15 @@
         </div>
     </div>
 
-    <!-- 2c. Coach assignment (shown only for Private Training packages) -->
+    <!-- 2c. Assigned client owner (optional for standalone PT plans) -->
     <div class="form-card" id="coachLinkCard" style="display:none; border-color:var(--fire-border); background:linear-gradient(180deg, var(--fire-soft) 0%, var(--surface) 30%);">
         <div class="form-section-head" style="background:var(--fire-soft);">
             <div class="form-section-icon"><i class="bi bi-person-arms-up"></i></div>
-            <span class="form-section-title">Assign Personal Trainer <span style="color:var(--fire);">*</span></span>
+            <span class="form-section-title">Assigned Personal Trainer <span style="font-size:11px;color:var(--t3);">(optional)</span></span>
         </div>
         <div class="form-body">
             <div class="field" style="max-width:480px;">
-                <label class="field-label" asp-for="CoachId">Coach</label>
+                <label class="field-label" asp-for="CoachId">Assigned coach</label>
                 @if (!Model.AvailableCoaches.Any())
                 {
                     <div style="font-size:13px; color:var(--t3); font-style:italic; padding:10px 0;">
@@ -642,7 +634,7 @@
                 else
                 {
                     <select asp-for="CoachId" class="form-select" id="coachSelect">
-                        <option value="">— Select a coach —</option>
+                        <option value="">— Shared plan / no assigned coach —</option>
                         @foreach (var c in Model.AvailableCoaches)
                         {
                             <option value="@c.CoachId">@c.FullName@(string.IsNullOrEmpty(c.Specialty) ? "" : $" · {c.Specialty}")</option>
@@ -650,7 +642,8 @@
                     </select>
                 }
                 <div class="field-hint">
-                    <i class="bi bi-info-circle"></i> A coach is required for private training packages.
+                    <i class="bi bi-info-circle"></i>
+                    The assigned coach manages this client. Reception may still select another coach for an individual session, and that coach earns that session's commission. Leave blank for a shared plan.
                 </div>
                 @if (!ViewData.ModelState.IsValid && ViewData.ModelState["CoachId"]?.Errors.Count > 0)
                 {
@@ -674,7 +667,7 @@
                 <div class="field-hint">Defaults to today if not set.</div>
             </div>
 
-            <!-- SESSION date override -->
+            <!-- SESSION / PERSONAL_TRAINING date override -->
             <div class="date-section" id="sessionDateSection">
                 <div class="field" style="max-width:220px;">
                     <label class="field-label" asp-for="CustomSessionExpiry">Session Expiry Date</label>
@@ -689,22 +682,6 @@
                     <label class="field-label" asp-for="CustomOpenGymExpiry">Open Gym Expiry Date</label>
                     <input asp-for="CustomOpenGymExpiry" type="date" />
                     <div class="field-hint">Leave blank to auto-calculate from package duration.</div>
-                </div>
-            </div>
-
-            <!-- COMBINED date overrides -->
-            <div class="date-section" id="combinedDateSection">
-                <div class="combined-sep">Sessions Expiry</div>
-                <div class="field" style="max-width:220px;">
-                    <label class="field-label" asp-for="CustomSessionExpiry">Session Expiry Date</label>
-                    <input asp-for="CustomSessionExpiry" type="date" />
-                    <div class="field-hint">Leave blank to auto-calculate.</div>
-                </div>
-                <div class="combined-sep">Open Gym Expiry</div>
-                <div class="field" style="max-width:220px;">
-                    <label class="field-label" asp-for="CustomOpenGymExpiry">Open Gym Expiry Date</label>
-                    <input asp-for="CustomOpenGymExpiry" type="date" />
-                    <div class="field-hint">Leave blank to auto-calculate.</div>
                 </div>
             </div>
 
@@ -785,11 +762,6 @@
                            placeholder="Default from package" />
                 </div>
                 <div class="field">
-                    <label class="field-label"><i class="bi bi-person-arms-up" style="color:var(--green);margin-right:4px;"></i> PT Sessions</label>
-                    <input asp-for="CustomPtSessionCount" type="number" min="0" id="customPt"
-                           placeholder="Default from package" />
-                </div>
-                <div class="field">
                     <label class="field-label"><i class="bi bi-snow" style="color:var(--blue);margin-right:4px;"></i> Freeze Days</label>
                     <input asp-for="CustomFreezeAllowanceDays" type="number" min="0" id="customFreeze"
                            placeholder="Default from package" />
@@ -838,24 +810,24 @@
             const policy = el.dataset.policy;
 
             // Show/hide date sections
-            document.getElementById('sessionDateSection').classList.toggle('show',  type === 'SESSION');
+            document.getElementById('sessionDateSection').classList.toggle('show',  type === 'SESSION' || type === 'PERSONAL_TRAINING');
             document.getElementById('gymDateSection').classList.toggle('show',      type === 'OPEN_GYM');
-            document.getElementById('combinedDateSection').classList.toggle('show', type === 'COMBINED');
 
             // Show session override card for session-based packages
-            const showSessions = type === 'SESSION' || type === 'COMBINED';
+            const showSessions = type === 'SESSION' || type === 'PERSONAL_TRAINING';
             document.getElementById('sessionOverrideCard').style.display = showSessions ? 'block' : 'none';
 
             // Show "Link to Class" picker for class-eligible package types
-            const showClassLink = type === 'SESSION' || type === 'COMBINED' || type === 'CLASS';
+            const showClassLink = type === 'SESSION' || type === 'CLASS';
             document.getElementById('classLinkCard').style.display = showClassLink ? 'block' : 'none';
             if (!showClassLink) {
                 const sel = document.querySelector('#classLinkCard select');
                 if (sel) sel.value = '';
             }
 
-            // Show coach card ONLY for private training packages
-            const isPrivate = el.dataset.private === '1';
+            // The assigned coach owns the client relationship; session delivery is
+            // still selected independently at reception.
+            const hasPtService = type === 'PERSONAL_TRAINING';
             const coachCard = document.getElementById('coachLinkCard');
             const coachSel  = document.getElementById('coachSelect');
             const classSel  = document.getElementById('gymClassSelect');
@@ -863,24 +835,24 @@
             const presetCoachId = el.dataset.coachId || '';
 
             if (coachCard) {
-                coachCard.style.display = isPrivate ? 'block' : 'none';
-                if (coachSel) coachSel.required = isPrivate;
+                coachCard.style.display = hasPtService ? 'block' : 'none';
+                if (coachSel) coachSel.required = false;
             }
 
             // Auto-fill the linked CLASS if the package has one
             if (classSel && presetClassId) {
                 classSel.value = presetClassId;
-            } else if (classSel && !isPrivate) {
-                // keep user's manual selection on non-private; don't override
+            } else if (classSel) {
+                // Keep a manual class selection unless the selected type cannot use it.
             }
 
-            // Auto-fill the COACH for private packages (from the linked class's coach)
+            // Preserve a preset assigned coach if one is supplied.
             if (coachSel) {
-                if (isPrivate && presetCoachId) {
+                if (hasPtService && presetCoachId) {
                     // Only set if the coach exists in the dropdown options
                     const exists = Array.from(coachSel.options).some(o => o.value === presetCoachId);
                     if (exists) coachSel.value = presetCoachId;
-                } else if (!isPrivate) {
+                } else if (!hasPtService) {
                     coachSel.value = '';
                 }
             }
@@ -900,9 +872,8 @@
             // Perks card — always show, populate placeholder text with package defaults
             const invitations = el.dataset.invitations;
             const inbody      = el.dataset.inbody;
-            const pt          = el.dataset.pt;
             const freeze      = el.dataset.freeze;
-            const hasPerks    = invitations || inbody || pt || freeze;
+            const hasPerks    = invitations || inbody || freeze;
 
             document.getElementById('perksCard').style.display = hasPerks ? 'block' : 'none';
 
@@ -915,13 +886,11 @@
                 };
                 setPlaceholder('customInvitations', invitations);
                 setPlaceholder('customInBody',      inbody);
-                setPlaceholder('customPt',          pt);
                 setPlaceholder('customFreeze',      freeze);
 
                 const parts = [];
                 if (invitations) parts.push(`${invitations} invitation${invitations != '1' ? 's' : ''}`);
                 if (inbody)      parts.push(`${inbody} InBody`);
-                if (pt)          parts.push(`${pt} PT session${pt != '1' ? 's' : ''}`);
                 if (freeze)      parts.push(`${freeze}d freeze`);
                 const note = document.getElementById('perksDefaultNote');
                 note.textContent = parts.length ? `Package includes: ${parts.join(' · ')}` : '';

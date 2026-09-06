@@ -65,17 +65,15 @@ namespace GymSaaS.Services
             if (branchFilterId.HasValue)
                 packageIncomeQuery = packageIncomeQuery.Where(x => x.mp.HomeBranchId == branchFilterId.Value);
 
-            // Avoid double-counting COMBINED rows (they have two MemberPackage rows but one sale)
-            // → group by LinkedPackageGroupId when present; otherwise count individually
-            // Use the SNAPSHOT price/commission on MemberPackage so historical accounting is stable.
-            // For private packages, subtract the coach's commission so income reflects only the gym's share.
+            // Group legacy linked rows as one sale. Current catalog plans use one row per assignment.
+            // Use the price snapshot on MemberPackage so historical accounting is stable.
             var pkgRows = await packageIncomeQuery
                 .Select(x => new
                 {
                     GroupKey         = x.mp.LinkedPackageGroupId ?? x.mp.MemberPackageId,
                     // Prefer snapshot price; fall back to live PackageDefinition.Price for legacy rows.
                     Price            = x.mp.PriceSnapshot ?? x.pd.Price ?? 0,
-                    CoachCut         = x.mp.CoachCommissionAmount ?? 0,
+                    CoachCut         = 0m,
                     PackageName      = x.pd.PackageName,
                     HomeBranchId     = x.mp.HomeBranchId,
                     ComponentRole    = x.mp.PackageComponentRole,
@@ -96,7 +94,19 @@ namespace GymSaaS.Services
                 .ToList();
 
             // Income = gym's share only (full price for non-private packages, price - coach cut for private)
-            vm.IncomeFromPackages = pkgGroupedForIncome.Sum(g => g.GymShare);
+            var ptCommissionQuery = _db.MemberPerkUsages
+                .Where(u => u.TenantId == tenantId
+                         && u.PerkType == "PT"
+                         && u.CommissionAmount != null
+                         && u.UsedAtUtc >= fromDt
+                         && u.UsedAtUtc <= toDt);
+            if (branchFilterId.HasValue)
+                ptCommissionQuery = ptCommissionQuery.Where(u => u.BranchId == branchFilterId.Value);
+            var deliveredPtCommission =
+                await ptCommissionQuery.SumAsync(u => (decimal?)u.CommissionAmount) ?? 0m;
+
+            vm.IncomeFromPackages =
+                pkgGroupedForIncome.Sum(g => g.GymShare) - deliveredPtCommission;
 
             // Manual income
             var manualIncQuery = _db.ManualIncomeEntries
@@ -134,12 +144,23 @@ namespace GymSaaS.Services
                 {
                     GroupKey = x.mp.LinkedPackageGroupId ?? x.mp.MemberPackageId,
                     Price    = x.mp.PriceSnapshot ?? x.pd.Price ?? 0,
-                    CoachCut = x.mp.CoachCommissionAmount ?? 0,
+                    CoachCut = 0m,
                 }).ToListAsync();
 
             var prevPkgIncome = prevPkgRows
                 .GroupBy(r => r.GroupKey)
                 .Sum(g => g.First().Price - g.First().CoachCut);
+
+            var prevPtCommissionQuery = _db.MemberPerkUsages
+                .Where(u => u.TenantId == tenantId
+                         && u.PerkType == "PT"
+                         && u.CommissionAmount != null
+                         && u.UsedAtUtc >= prevFromDt
+                         && u.UsedAtUtc <= prevToDt);
+            if (branchFilterId.HasValue)
+                prevPtCommissionQuery = prevPtCommissionQuery.Where(u => u.BranchId == branchFilterId.Value);
+            prevPkgIncome -=
+                await prevPtCommissionQuery.SumAsync(u => (decimal?)u.CommissionAmount) ?? 0m;
 
             var prevManualQuery = _db.ManualIncomeEntries
                 .Where(i => i.TenantId == tenantId && !i.IsDeleted
@@ -284,6 +305,15 @@ namespace GymSaaS.Services
                     .GroupBy(r => r.GroupKey)
                     .Sum(g => g.First().Price - g.First().CoachCut);
 
+                bPkgIncome -= await _db.MemberPerkUsages
+                    .Where(u => u.TenantId == tenantId
+                             && u.BranchId == b.BranchId
+                             && u.PerkType == "PT"
+                             && u.CommissionAmount != null
+                             && u.UsedAtUtc >= fromDt
+                             && u.UsedAtUtc <= toDt)
+                    .SumAsync(u => (decimal?)u.CommissionAmount) ?? 0m;
+
                 var bManualIncome = await _db.ManualIncomeEntries
                     .Where(i => i.TenantId == tenantId && !i.IsDeleted
                              && i.IncomeDate >= fromDate && i.IncomeDate <= toDate
@@ -361,12 +391,21 @@ namespace GymSaaS.Services
                     {
                         GroupKey = x.mp.LinkedPackageGroupId ?? x.mp.MemberPackageId,
                         Price    = x.mp.PriceSnapshot ?? x.pd.Price ?? 0,
-                        CoachCut = x.mp.CoachCommissionAmount ?? 0,
+                        CoachCut = 0m,
                     })
                     .ToListAsync();
                 var mPkgIncome = mPkgRows
                     .GroupBy(r => r.GroupKey)
                     .Sum(g => g.First().Price - g.First().CoachCut);
+
+                mPkgIncome -= await _db.MemberPerkUsages
+                    .Where(u => u.TenantId == tenantId
+                             && u.PerkType == "PT"
+                             && u.CommissionAmount != null
+                             && u.UsedAtUtc >= mStartDt
+                             && u.UsedAtUtc <= mEndDt
+                             && (!branchFilterId.HasValue || u.BranchId == branchFilterId.Value))
+                    .SumAsync(u => (decimal?)u.CommissionAmount) ?? 0m;
 
                 var mManualQ = _db.ManualIncomeEntries
                     .Where(x => x.TenantId == tenantId && !x.IsDeleted

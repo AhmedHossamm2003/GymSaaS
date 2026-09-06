@@ -29,10 +29,8 @@ namespace GymSaaS.Models
         public string? CoachName { get; set; }
         public int? InvitationCount { get; set; }
         public int? InBodyCount { get; set; }
-        public int? PtSessionCount { get; set; }
         public int? FreezeAllowanceDays { get; set; }
         public bool IsActive { get; set; }
-        public bool IsPrivateTraining { get; set; }
         public decimal? CoachCommissionPercent { get; set; }
         public int AssignedCount { get; set; }
         public int SortOrder { get; set; }
@@ -41,10 +39,12 @@ namespace GymSaaS.Models
         public string SessionLabel => PackageTypeCode switch
         {
             "SESSION" => $"{SessionCount} sessions",
+            "PERSONAL_TRAINING" => $"{SessionCount} PT sessions",
             "OPEN_GYM" => $"{DurationDays} days",
-            "COMBINED" => $"{SessionCount} sessions + {OpenGymDurationDays ?? DurationDays} days gym",
             _ => "—"
         };
+
+        public bool IsPersonalTraining => PackageTypeCode == "PERSONAL_TRAINING";
     }
 
     public class PackageDefinitionFormViewModel
@@ -77,20 +77,19 @@ namespace GymSaaS.Models
         // For the branch restriction dropdown
         public List<BranchDropdownItem> AvailableBranches { get; set; } = new();
 
-        // SESSION + COMBINED: number of sessions
+        // SESSION / PERSONAL_TRAINING: number of sessions
         [Range(1, 9999, ErrorMessage = "Must be between 1 and 9999")]
         public int? SessionCount { get; set; }
 
-        // Linked class — for SESSION / COMBINED packages
+        // Linked class — for SESSION packages only
         public Guid? GymClassId { get; set; }
 
         // Package perks — defaults applied at assignment; staff can override
         [Range(0, 999)] public int? InvitationCount { get; set; }
         [Range(0, 999)] public int? InBodyCount { get; set; }
-        [Range(0, 999)] public int? PtSessionCount { get; set; }
         [Range(0, 365)] public int? FreezeAllowanceDays { get; set; }
 
-        // SESSION + COMBINED: how many days the sessions are valid
+        // SESSION / PERSONAL_TRAINING: how many days the sessions are valid
         [Range(1, 3650, ErrorMessage = "Must be between 1 and 3650 days")]
         public int? DurationDays { get; set; }
 
@@ -98,17 +97,11 @@ namespace GymSaaS.Models
         [Range(1, 3650)]
         public int? OpenGymDurationDays { get; set; }
 
-        // COMBINED only: separate open gym duration
-        // If null on COMBINED, falls back to DurationDays
-        public int? OpenGymDurationDaysSeparate { get; set; }
-
         public int OpenGymDailyLimit { get; set; } = 1;
 
         public bool AllowCarryOverSessions { get; set; } = false;
         public bool AllowQueuedRenewal { get; set; } = true;
-        public bool IsPrivateTraining { get; set; } = false;
-
-        // Coach commission % (only used when IsPrivateTraining = true)
+        // Coach commission % used by PERSONAL_TRAINING plans.
         [Range(0, 100, ErrorMessage = "Coach commission must be between 0 and 100.")]
         public decimal? CoachCommissionPercent { get; set; }
 
@@ -122,9 +115,10 @@ namespace GymSaaS.Models
         public bool IsEdit => PackageDefinitionId.HasValue;
 
         // Helpers for view logic
-        public bool HasSessions => PackageTypeCode is "SESSION" or "COMBINED";
-        public bool HasOpenGym => PackageTypeCode is "OPEN_GYM" or "COMBINED";
-        public bool IsCombined => PackageTypeCode == "COMBINED";
+        public bool HasSessions => PackageTypeCode is "SESSION" or "PERSONAL_TRAINING";
+        public bool HasOpenGym => PackageTypeCode == "OPEN_GYM";
+        public bool IsPersonalTraining => PackageTypeCode == "PERSONAL_TRAINING";
+        public bool SupportsClassLink => PackageTypeCode == "SESSION";
     }
 
     public class BranchPolicyDropdownItem
@@ -160,8 +154,6 @@ namespace GymSaaS.Models
         public int? InvitationsRemaining { get; set; }
         public int? InBodyTotal { get; set; }
         public int? InBodyRemaining { get; set; }
-        public int? PtSessionsTotal { get; set; }
-        public int? PtSessionsRemaining { get; set; }
         public int? FreezeAllowanceDays { get; set; }
         public int? FreezeRemainingDays { get; set; }
         public bool IsFrozen { get; set; }
@@ -169,7 +161,7 @@ namespace GymSaaS.Models
 
         // Helper: true if this subscription carries any perks worth displaying
         public bool HasPerks =>
-            InvitationsTotal > 0 || InBodyTotal > 0 || PtSessionsTotal > 0 || FreezeAllowanceDays > 0;
+            InvitationsTotal > 0 || InBodyTotal > 0 || FreezeAllowanceDays > 0;
 
         // Display helpers
         public bool IsActive => Status == "ACTIVE";
@@ -184,7 +176,7 @@ namespace GymSaaS.Models
 
         // Component role helpers
         public bool IsSessionBased =>
-            PackageComponentRole == "SESSION" || PackageTypeCode == "SESSION";
+            PackageComponentRole == "SESSION" || PackageTypeCode is "SESSION" or "PERSONAL_TRAINING";
 
         public bool IsOpenGym =>
             PackageComponentRole == "OPEN_GYM" || PackageTypeCode == "OPEN_GYM";
@@ -196,6 +188,7 @@ namespace GymSaaS.Models
             _ => PackageTypeCode switch
             {
                 "SESSION" => "Sessions",
+                "PERSONAL_TRAINING" => "Personal Training",
                 "OPEN_GYM" => "Open Gym",
                 _ => ""
             }
@@ -246,7 +239,6 @@ namespace GymSaaS.Models
         // Perks override — leave null to use package catalog defaults
         public int? CustomInvitationCount { get; set; }
         public int? CustomInBodyCount { get; set; }
-        public int? CustomPtSessionCount { get; set; }
         public int? CustomFreezeAllowanceDays { get; set; }
 
         [MaxLength(1000)]
@@ -267,7 +259,8 @@ namespace GymSaaS.Models
         // For the class picker (loaded for the home branch)
         public List<ClassDropdownItem> AvailableClasses { get; set; } = new();
 
-        // Coach assignment — required for private training packages
+        // Optional assigned/primary coach who manages the client relationship.
+        // Individual PT sessions may still be delivered by another coach.
         public Guid? CoachId { get; set; }
 
         // For the coach picker (loaded for the home branch)

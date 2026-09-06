@@ -9,7 +9,7 @@ using System.Security.Claims;
 
 namespace GymSaaS.Controllers
 {
-    [Authorize(Policy = "ManagerAndAbove")]
+    [GymSaaS.Authorization.ViewPermissionAuthorize]
     public class ClassesController : Controller
     {
         private readonly GymDbContext _db;
@@ -90,6 +90,7 @@ namespace GymSaaS.Controllers
         public async Task<IActionResult> Create(ClassFormViewModel model)
         {
             ValidateTimes(model);
+            await ValidateCoachBranchAsync(model);
 
             if (!ModelState.IsValid)
             {
@@ -171,6 +172,7 @@ namespace GymSaaS.Controllers
             if (g == null) return NotFound();
 
             ValidateTimes(model);
+            await ValidateCoachBranchAsync(model);
 
             if (!ModelState.IsValid)
             {
@@ -321,21 +323,65 @@ namespace GymSaaS.Controllers
                 .ToListAsync();
         }
 
+        private async Task ValidateCoachBranchAsync(ClassFormViewModel model)
+        {
+            if (!model.CoachId.HasValue || model.BranchId == Guid.Empty) return;
+
+            var valid = await _db.Coaches.AnyAsync(c =>
+                c.CoachId == model.CoachId.Value
+                && c.TenantId == TenantId
+                && c.IsActive && !c.IsDeleted
+                && (c.BranchId == model.BranchId
+                    || (c.UserId.HasValue && _db.UserBranches.Any(ub =>
+                        ub.UserId == c.UserId.Value
+                        && ub.BranchId == model.BranchId
+                        && ub.IsActive))));
+            if (!valid)
+                ModelState.AddModelError(nameof(model.CoachId),
+                    "Select a coach who is assigned to this branch.");
+        }
+
         private async Task<List<CoachDropdownItem>> GetCoachesAsync()
         {
             var scoped = User.AssignedBranchIds();
-            return await _db.Coaches
-                .Where(c => c.TenantId == TenantId && !c.IsDeleted && c.IsActive
-                         && (scoped.Count == 0 || scoped.Contains(c.BranchId)))
+            var query = _db.Coaches
+                .Where(c => c.TenantId == TenantId && !c.IsDeleted && c.IsActive);
+            if (scoped.Count > 0)
+                query = query.Where(c => scoped.Contains(c.BranchId)
+                    || (c.UserId.HasValue && _db.UserBranches.Any(ub =>
+                        ub.UserId == c.UserId.Value && ub.IsActive && scoped.Contains(ub.BranchId))));
+
+            var raw = await query
                 .OrderBy(c => c.FirstName)
-                .Select(c => new CoachDropdownItem
+                .Select(c => new
                 {
-                    CoachId = c.CoachId,
+                    c.CoachId,
                     FullName = c.FirstName + " " + c.LastName,
-                    Specialty = c.Specialty,
-                    BranchId = c.BranchId,
+                    c.Specialty,
+                    c.BranchId,
+                    c.UserId,
                 })
                 .ToListAsync();
+
+            var userIds = raw.Where(c => c.UserId.HasValue).Select(c => c.UserId!.Value).ToList();
+            var branchRows = await _db.UserBranches
+                .Where(ub => userIds.Contains(ub.UserId) && ub.IsActive)
+                .Select(ub => new { ub.UserId, ub.BranchId })
+                .ToListAsync();
+            var branchesByUser = branchRows
+                .GroupBy(x => x.UserId)
+                .ToDictionary(g => g.Key, g => g.Select(x => x.BranchId).Distinct().ToList());
+
+            return raw.Select(c => new CoachDropdownItem
+            {
+                CoachId = c.CoachId,
+                FullName = c.FullName,
+                Specialty = c.Specialty,
+                BranchId = c.BranchId,
+                BranchIds = c.UserId.HasValue && branchesByUser.TryGetValue(c.UserId.Value, out var branchIds)
+                    ? branchIds
+                    : new List<Guid> { c.BranchId },
+            }).ToList();
         }
 
         private async Task<object> GetBranchesViewDataAsync()
@@ -348,22 +394,7 @@ namespace GymSaaS.Controllers
                 .ToListAsync();
         }
 
-        private async Task<object> GetCoachesViewDataAsync()
-        {
-            var scoped = User.AssignedBranchIds();
-            return await _db.Coaches
-                .Where(c => c.TenantId == TenantId && !c.IsDeleted && c.IsActive
-                         && (scoped.Count == 0 || scoped.Contains(c.BranchId)))
-                .OrderBy(c => c.FirstName)
-                .Select(c => new CoachDropdownItem
-                {
-                    CoachId = c.CoachId,
-                    FullName = c.FirstName + " " + c.LastName,
-                    Specialty = c.Specialty,
-                    BranchId = c.BranchId,
-                })
-                .ToListAsync();
-        }
+        private async Task<object> GetCoachesViewDataAsync() => await GetCoachesAsync();
 
         private async Task<string?> SavePhotoAsync(IFormFile? file, Guid classId)
         {

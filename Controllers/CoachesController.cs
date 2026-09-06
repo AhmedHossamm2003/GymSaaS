@@ -32,46 +32,59 @@ namespace GymSaaS.Controllers
         public async Task<IActionResult> Index(string? search, Guid? branchId, bool? activeOnly)
         {
             var query = _db.Coaches
-                .Where(c => c.TenantId == TenantId && !c.IsDeleted)
-                .Join(_db.Branches,
-                      c => c.BranchId,
-                      b => b.BranchId,
-                      (c, b) => new { c, b });
+                .Where(c => c.TenantId == TenantId && !c.IsDeleted);
 
             if (!string.IsNullOrWhiteSpace(search))
-                query = query.Where(x =>
-                    x.c.FirstName.Contains(search) ||
-                    x.c.LastName.Contains(search) ||
-                    x.c.Specialty.Contains(search));
+                query = query.Where(c =>
+                    c.FirstName.Contains(search) ||
+                    c.LastName.Contains(search) ||
+                    c.Specialty.Contains(search));
 
             var scopedBranchIds = User.AssignedBranchIds();
             if (scopedBranchIds.Count > 0)
-                query = query.Where(x => scopedBranchIds.Contains(x.c.BranchId));
+                query = query.Where(c => scopedBranchIds.Contains(c.BranchId)
+                    || (c.UserId.HasValue && _db.UserBranches.Any(ub =>
+                        ub.UserId == c.UserId.Value && ub.IsActive
+                        && scopedBranchIds.Contains(ub.BranchId))));
 
             if (branchId.HasValue && User.CanAccessBranch(branchId.Value))
-                query = query.Where(x => x.c.BranchId == branchId.Value);
+                query = query.Where(c => c.BranchId == branchId.Value
+                    || (c.UserId.HasValue && _db.UserBranches.Any(ub =>
+                        ub.UserId == c.UserId.Value && ub.BranchId == branchId.Value && ub.IsActive)));
 
             if (activeOnly == true)
-                query = query.Where(x => x.c.IsActive);
+                query = query.Where(c => c.IsActive);
 
             var raw = await query
-                .OrderByDescending(x => x.c.CreatedAtUtc)
-                .Select(x => new
+                .OrderByDescending(c => c.CreatedAtUtc)
+                .Select(c => new
                 {
-                    x.c.CoachId,
-                    x.c.FirstName,
-                    x.c.LastName,
-                    x.c.Specialty,
-                    x.c.PhotoUrl,
-                    x.c.Phone,
-                    x.c.Email,
-                    x.c.IsActive,
-                    x.c.CoachTarget,
-                    x.c.CreatedAtUtc,
-                    x.c.BranchId,
-                    BranchName = x.b.BranchName,
+                    c.CoachId,
+                    c.FirstName,
+                    c.LastName,
+                    c.Specialty,
+                    c.PhotoUrl,
+                    c.Phone,
+                    c.Email,
+                    c.IsActive,
+                    c.CoachTarget,
+                    c.CreatedAtUtc,
+                    c.BranchId,
+                    c.UserId,
+                    PrimaryBranchName = c.Branch.BranchName,
                 })
                 .ToListAsync();
+
+            var linkedUserIds = raw.Where(c => c.UserId.HasValue).Select(c => c.UserId!.Value).ToList();
+            var branchRows = await _db.UserBranches
+                .Where(ub => linkedUserIds.Contains(ub.UserId) && ub.IsActive
+                          && ub.Branch.TenantId == TenantId && ub.Branch.IsActive)
+                .OrderBy(ub => ub.Branch.BranchName)
+                .Select(ub => new { ub.UserId, ub.BranchId, ub.Branch.BranchName })
+                .ToListAsync();
+            var branchesByUser = branchRows
+                .GroupBy(x => x.UserId)
+                .ToDictionary(g => g.Key, g => g.Select(x => x.BranchName).Distinct().ToList());
 
             var coachIds = raw.Select(x => x.CoachId).ToList();
             var classCounts = await _db.GymClasses
@@ -96,7 +109,9 @@ namespace GymSaaS.Controllers
                 Phone = x.Phone,
                 Email = x.Email,
                 IsActive = x.IsActive,
-                BranchName = x.BranchName,
+                BranchName = x.UserId.HasValue && branchesByUser.TryGetValue(x.UserId.Value, out var names)
+                    ? string.Join(", ", names)
+                    : x.PrimaryBranchName,
                 BranchId = x.BranchId,
                 CreatedAtUtc = x.CreatedAtUtc,
                 ClassCount = classCounts.TryGetValue(x.CoachId, out var cnt) ? cnt : 0,
@@ -138,6 +153,16 @@ namespace GymSaaS.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(CoachFormViewModel model)
         {
+            model.BranchIds = model.BranchIds.Where(id => id != Guid.Empty).Distinct().ToList();
+            var availableBranches = await GetBranchesAsync();
+            var availableBranchIds = availableBranches.Select(b => b.BranchId).ToHashSet();
+            if (model.BranchIds.Count == 0)
+                ModelState.AddModelError(nameof(model.BranchIds), "Select at least one branch.");
+            else if (model.BranchIds.Any(id => !availableBranchIds.Contains(id)))
+                ModelState.AddModelError(nameof(model.BranchIds), "One or more selected branches are not available.");
+            else
+                model.BranchId = model.BranchIds[0];
+
             // Required for auto-creating the User account
             if (string.IsNullOrWhiteSpace(model.Email))
                 ModelState.AddModelError(nameof(model.Email), "Email is required (used for the coach's login account).");
@@ -169,7 +194,7 @@ namespace GymSaaS.Controllers
 
             if (!ModelState.IsValid)
             {
-                model.Branches = await GetBranchesAsync();
+                model.Branches = availableBranches;
                 ViewData["Title"] = "Coaches";
                 ViewData["Subtitle"] = "New Coach";
                 return View("CreateEdit", model);
@@ -211,15 +236,18 @@ namespace GymSaaS.Controllers
                 AssignedAtUtc = DateTime.UtcNow,
             });
 
-            // 3. Assign user to coach's branch
-            _db.UserBranches.Add(new UserBranch
+            // 3. Assign the coach account to every selected branch.
+            foreach (var selectedBranchId in model.BranchIds)
             {
-                UserBranchId = Guid.NewGuid(),
-                UserId = userId,
-                BranchId = model.BranchId,
-                IsActive = true,
-                AssignedAtUtc = DateTime.UtcNow,
-            });
+                _db.UserBranches.Add(new UserBranch
+                {
+                    UserBranchId = Guid.NewGuid(),
+                    UserId = userId,
+                    BranchId = selectedBranchId,
+                    IsActive = true,
+                    AssignedAtUtc = DateTime.UtcNow,
+                });
+            }
 
             // 4. Create the Coach record linked to the User
             var coach = new Coach
@@ -269,6 +297,14 @@ namespace GymSaaS.Controllers
                     .FirstOrDefaultAsync();
             }
 
+            var assignedBranchIds = c.UserId.HasValue
+                ? await _db.UserBranches
+                    .Where(ub => ub.UserId == c.UserId.Value && ub.IsActive)
+                    .Select(ub => ub.BranchId)
+                    .ToListAsync()
+                : new List<Guid>();
+            if (assignedBranchIds.Count == 0) assignedBranchIds.Add(c.BranchId);
+
             var vm = new CoachFormViewModel
             {
                 CoachId = c.CoachId,
@@ -279,6 +315,7 @@ namespace GymSaaS.Controllers
                 Phone = c.Phone,
                 Email = c.Email,
                 BranchId = c.BranchId,
+                BranchIds = assignedBranchIds,
                 CoachTarget = c.CoachTarget,
                 ExistingPhotoUrl = c.PhotoUrl,
                 IsActive = c.IsActive,
@@ -303,10 +340,24 @@ namespace GymSaaS.Controllers
 
             if (c == null) return NotFound();
 
+            model.BranchIds = model.BranchIds.Where(branchId => branchId != Guid.Empty).Distinct().ToList();
+            var availableBranches = await GetBranchesAsync();
+            var availableBranchIds = availableBranches.Select(b => b.BranchId).ToHashSet();
+            if (model.BranchIds.Count == 0)
+                ModelState.AddModelError(nameof(model.BranchIds), "Select at least one branch.");
+            else if (model.BranchIds.Any(branchId => !availableBranchIds.Contains(branchId)))
+                ModelState.AddModelError(nameof(model.BranchIds), "One or more selected branches are not available.");
+            else
+                model.BranchId = model.BranchIds[0];
+
             if (!ModelState.IsValid)
             {
                 model.ExistingPhotoUrl = c.PhotoUrl;
-                model.Branches = await GetBranchesAsync();
+                model.Branches = availableBranches;
+                model.HasLinkedUser = c.UserId.HasValue;
+                model.LinkedUserEmail = c.UserId.HasValue
+                    ? await _db.Users.Where(u => u.UserId == c.UserId.Value).Select(u => u.Email).FirstOrDefaultAsync()
+                    : null;
                 ViewData["Title"] = "Coaches";
                 ViewData["Subtitle"] = "Edit Coach";
                 return View("CreateEdit", model);
@@ -329,6 +380,45 @@ namespace GymSaaS.Controllers
             c.IsActive = model.IsActive;
             c.UpdatedAtUtc = DateTime.UtcNow;
             c.UpdatedByUserId = UserId;
+
+            if (c.UserId.HasValue)
+            {
+                var linkedUser = await _db.Users.FirstOrDefaultAsync(u =>
+                    u.UserId == c.UserId.Value && u.TenantId == TenantId && u.DeletedAtUtc == null);
+                if (linkedUser != null)
+                {
+                    linkedUser.FirstName = c.FirstName;
+                    linkedUser.LastName = c.LastName;
+                    linkedUser.PhoneNumber = c.Phone;
+                    linkedUser.IsActive = c.IsActive;
+                    linkedUser.UpdatedAtUtc = DateTime.UtcNow;
+                    if (!string.IsNullOrWhiteSpace(model.LoginPassword))
+                    {
+                        // Keep the current authentication storage format so existing login remains compatible.
+                        linkedUser.PasswordHash = model.LoginPassword;
+                        linkedUser.PasswordSalt = null;
+                    }
+
+                    var existingAssignments = await _db.UserBranches
+                        .Where(ub => ub.UserId == linkedUser.UserId)
+                        .ToListAsync();
+                    foreach (var assignment in existingAssignments)
+                        assignment.IsActive = model.BranchIds.Contains(assignment.BranchId);
+
+                    var existingBranchIds = existingAssignments.Select(ub => ub.BranchId).ToHashSet();
+                    foreach (var selectedBranchId in model.BranchIds.Where(branchId => !existingBranchIds.Contains(branchId)))
+                    {
+                        _db.UserBranches.Add(new UserBranch
+                        {
+                            UserBranchId = Guid.NewGuid(),
+                            UserId = linkedUser.UserId,
+                            BranchId = selectedBranchId,
+                            IsActive = true,
+                            AssignedAtUtc = DateTime.UtcNow,
+                        });
+                    }
+                }
+            }
 
             await _db.SaveChangesAsync();
 
@@ -385,9 +475,13 @@ namespace GymSaaS.Controllers
             var thirtyDays = today.AddDays(30);
             var todayDow = (int)DateTime.Today.DayOfWeek;
 
-            // Pull active PT packages once
+            // Client ownership comes only from the coach assigned to the PT plan.
+            // Delivering a guest session earns commission but does not transfer ownership.
             var activePtPackages = await _db.MemberPackages
-                .Where(mp => mp.CoachId == coachId && mp.Status == "ACTIVE")
+                .Where(mp => mp.Status == "ACTIVE"
+                          && mp.TenantId == TenantId
+                          && mp.PackageType.PackageTypeCode == "PERSONAL_TRAINING"
+                          && mp.CoachId == coachId)
                 .Select(mp => new
                 {
                     mp.MemberId,
@@ -400,7 +494,6 @@ namespace GymSaaS.Controllers
                     mp.CreatedAtUtc,
                     mp.PriceSnapshot,
                     mp.CoachCommissionPercent,
-                    mp.CoachCommissionAmount,
                 })
                 .ToListAsync();
 
@@ -412,18 +505,21 @@ namespace GymSaaS.Controllers
 
             var activeTraineesCount = distinctTrainees.Count;
             var newTraineesThisMonth = distinctTrainees.Count(p => p.CreatedAtUtc >= monthStartUtc);
-            var sessionsRemainingTotal = activePtPackages.Sum(p => p.SessionCountRemaining ?? 0);
+            var sessionsRemainingTotal = activePtPackages.Sum(
+                p => p.SessionCountRemaining ?? 0);
 
             // Expiring soon (next 30 days)
             var expiringSoon = activePtPackages
                 .Where(p => p.ValidToDate.HasValue && p.ValidToDate.Value <= thirtyDays && p.ValidToDate.Value >= today)
                 .ToList();
 
-            // Sessions delivered this month — attendance records linked to this coach's packages, this month
-            var ptPackageIds = activePtPackages.Select(p => p.MemberPackageId).ToList();
-            var sessionsDeliveredThisMonth = ptPackageIds.Count == 0 ? 0 : await _db.AttendanceRecords
-                .Where(a => ptPackageIds.Contains(a.MemberPackageId ?? Guid.Empty)
-                         && a.CheckInAtUtc >= monthStartUtc)
+            // Sessions delivered this month are credited to the coach selected
+            // at reception, independent of the assigned coach on the package.
+            var sessionsDeliveredThisMonth = await _db.MemberPerkUsages
+                .Where(u => u.TenantId == TenantId
+                         && u.CoachId == coachId
+                         && u.PerkType == "PT"
+                         && u.UsedAtUtc >= monthStartUtc)
                 .CountAsync();
 
             // Upcoming expirations (top 5 nearest)
@@ -462,31 +558,35 @@ namespace GymSaaS.Controllers
                 .OrderBy(c => c.StartTime)
                 .ToList();
 
-            // ── Coach earnings — all-time and this month (commission from private packages) ──
-            var allEarningsRows = await _db.MemberPackages
-                .Where(mp => mp.CoachId == coachId
-                          && mp.TenantId == TenantId
-                          && mp.CoachCommissionAmount != null
-                          && mp.Status != "CANCELLED")
-                .Select(mp => new
+            // Coach earnings are created per delivered PT session.
+            var allEarningsRows = await _db.MemberPerkUsages
+                .Where(u => u.CoachId == coachId
+                         && u.TenantId == TenantId
+                         && u.PerkType == "PT"
+                         && u.CommissionAmount != null
+                         && u.MemberPackageId != null)
+                .Join(_db.MemberPackages,
+                      u => u.MemberPackageId!.Value,
+                      mp => mp.MemberPackageId,
+                      (u, mp) => new
                 {
                     mp.MemberPackageId,
-                    mp.MemberId,
+                    u.MemberId,
                     mp.PackageNameSnapshot,
                     mp.PriceSnapshot,
-                    mp.CoachCommissionPercent,
-                    mp.CoachCommissionAmount,
-                    mp.CreatedAtUtc,
+                    CoachCommissionPercent = u.CommissionPercentSnapshot,
+                    CommissionAmount = u.CommissionAmount,
+                    CreatedAtUtc = u.UsedAtUtc,
                 })
                 .ToListAsync();
 
             var earningsThisMonth = allEarningsRows
                 .Where(r => r.CreatedAtUtc >= monthStartUtc)
-                .Sum(r => r.CoachCommissionAmount ?? 0m);
+                .Sum(r => r.CommissionAmount ?? 0m);
 
-            var earningsAllTime = allEarningsRows.Sum(r => r.CoachCommissionAmount ?? 0m);
+            var earningsAllTime = allEarningsRows.Sum(r => r.CommissionAmount ?? 0m);
 
-            var commissionPackagesThisMonth = allEarningsRows.Count(r => r.CreatedAtUtc >= monthStartUtc);
+            var commissionSessionsThisMonth = allEarningsRows.Count(r => r.CreatedAtUtc >= monthStartUtc);
 
             // Recent earnings (5 latest) — resolve member names
             var recentEarningsRaw = allEarningsRows
@@ -508,8 +608,8 @@ namespace GymSaaS.Controllers
                     PackageName = r.PackageNameSnapshot,
                     PackagePrice = r.PriceSnapshot ?? 0m,
                     CommissionPercent = r.CoachCommissionPercent ?? 0m,
-                    CommissionAmount = r.CoachCommissionAmount ?? 0m,
-                    AssignedAtUtc = r.CreatedAtUtc,
+                    CommissionAmount = r.CommissionAmount ?? 0m,
+                    EarnedAtUtc = r.CreatedAtUtc,
                 })
                 .ToList();
 
@@ -532,7 +632,7 @@ namespace GymSaaS.Controllers
                 UpcomingExpirations = upcoming,
                 EarningsThisMonth = earningsThisMonth,
                 EarningsAllTime = earningsAllTime,
-                CommissionPackagesThisMonth = commissionPackagesThisMonth,
+                CommissionSessionsThisMonth = commissionSessionsThisMonth,
                 RecentEarnings = recentEarnings,
             };
 
@@ -560,7 +660,10 @@ namespace GymSaaS.Controllers
             var coachId = coach.CoachId;
 
             var trainees = await _db.MemberPackages
-                .Where(mp => mp.CoachId == coachId && mp.Status == "ACTIVE")
+                .Where(mp => mp.Status == "ACTIVE"
+                          && mp.TenantId == TenantId
+                          && mp.PackageType.PackageTypeCode == "PERSONAL_TRAINING"
+                          && mp.CoachId == coachId)
                 .Join(_db.Members, mp => mp.MemberId, m => m.MemberId, (mp, m) => new { mp, m })
                 .Select(x => new CoachMyTraineeItem
                 {
@@ -568,7 +671,7 @@ namespace GymSaaS.Controllers
                     MemberId = x.m.MemberId,
                     MemberName = (x.m.FirstName + " " + x.m.LastName).Trim(),
                     PackageName = x.mp.PackageNameSnapshot,
-                    TrainingType = x.mp.SessionCountRemaining.HasValue ? "Classes" : "Open Gym",
+                    TrainingType = "Personal Training",
                     SessionsRemaining = x.mp.SessionCountRemaining,
                     DaysRemaining = x.mp.DurationDays,
                     ValidToDate = x.mp.ValidToDate ?? x.mp.ValidFromDate.AddDays(x.mp.DurationDays ?? 30),

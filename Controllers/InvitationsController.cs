@@ -10,7 +10,7 @@ using System.Linq;
 
 namespace GymSaaS.Controllers
 {
-    [Authorize]
+    [GymSaaS.Authorization.ViewPermissionAuthorize]
     public class InvitationsController : Controller
     {
         private readonly GymDbContext _db;
@@ -29,7 +29,6 @@ namespace GymSaaS.Controllers
         // ─────────────────────────────────────────────
         // GET /Invitations/Index  — Invitations Attendance Log
         // ─────────────────────────────────────────────
-        [Authorize(Policy = "AnyStaff")]
         public async Task<IActionResult> Index(string? status, string? search, int page = 1)
         {
             const int pageSize = 25;
@@ -160,7 +159,6 @@ namespace GymSaaS.Controllers
         // ─────────────────────────────────────────────
         [HttpPost]
         [ValidateAntiForgeryToken]
-        [Authorize(Policy = "AnyStaff")]
         public async Task<IActionResult> CreateAtReception([FromBody] CreateInvitationViewModel model)
         {
             if (!ModelState.IsValid)
@@ -252,7 +250,6 @@ namespace GymSaaS.Controllers
         // ─────────────────────────────────────────────
         [HttpPost]
         [ValidateAntiForgeryToken]
-        [Authorize(Policy = "AnyStaff")]
         public async Task<IActionResult> Create(CreateInvitationViewModel model)
         {
             if (!ModelState.IsValid)
@@ -328,7 +325,6 @@ namespace GymSaaS.Controllers
         // ─────────────────────────────────────────────
         [HttpPost]
         [ValidateAntiForgeryToken]
-        [Authorize(Policy = "AnyStaff")]
         public async Task<IActionResult> Cancel(Guid id, Guid memberId, bool returnToIndex = false)
         {
             var invitation = await _db.MemberInvitations
@@ -371,7 +367,6 @@ namespace GymSaaS.Controllers
         // ─────────────────────────────────────────────
         [HttpPost]
         [ValidateAntiForgeryToken]
-        [Authorize(Policy = "AnyStaff")]
         public async Task<IActionResult> MarkUsed(Guid id, Guid memberId, bool returnToIndex = false)
         {
             var invitation = await _db.MemberInvitations

@@ -42,6 +42,13 @@ public partial class Tenant
     [Precision(0)]
     public DateTime? UpdatedAtUtc { get; set; }
 
+    // Business-wide one-visit prices. Branches share these values.
+    [Column(TypeName = "decimal(10, 2)")]
+    public decimal OpenGymDropInPrice { get; set; } = 550m;
+
+    [Column(TypeName = "decimal(10, 2)")]
+    public decimal OneClassPassPrice { get; set; } = 450m;
+
     [InverseProperty("Tenant")]
     public virtual ICollection<AttendanceOverrideRequest> AttendanceOverrideRequests { get; set; } = new List<AttendanceOverrideRequest>();
 

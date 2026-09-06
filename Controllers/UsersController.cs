@@ -6,7 +6,7 @@ using System.Security.Claims;
 
 namespace GymSaaS.Controllers;
 
-[Authorize]
+[GymSaaS.Authorization.ViewPermissionAuthorize]
 public class UsersController : Controller
 {
     private readonly IUserService _userService;
@@ -161,7 +161,7 @@ public class UsersController : Controller
     public async Task<IActionResult> Details(Guid id)
     {
         var tenantId = GetTenantId();
-        var model = await _userService.BuildEditModelAsync(id, tenantId);
+        var model = await _userService.BuildDetailsModelAsync(id, tenantId);
 
         if (model == null)
             return NotFound();

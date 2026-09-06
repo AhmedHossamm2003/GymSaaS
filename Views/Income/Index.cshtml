@@ -189,16 +189,23 @@
                             <td style="color:var(--t2);font-size:12px;">@(string.IsNullOrEmpty(i.PaymentMethod) ? "—" : i.PaymentMethod)</td>
                             <td style="text-align:right;" class="amount-cell">@i.Amount.ToString("N2")</td>
                             <td style="text-align:right;white-space:nowrap;">
-                                <a asp-action="Edit" asp-route-id="@i.IncomeEntryId" class="btn btn-ghost" style="padding:4px 8px;border:1px solid var(--border);">
-                                    <i class="bi bi-pencil"></i>
-                                </a>
-                                <form asp-action="Delete" asp-route-id="@i.IncomeEntryId" method="post" style="display:inline;"
-                                      onsubmit="return confirm('Delete this entry?')">
-                                    @Html.AntiForgeryToken()
-                                    <button type="submit" class="btn btn-ghost" style="padding:4px 8px;color:var(--red);border:1px solid var(--border);">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </form>
+                                @if (i.IsDropIn)
+                                {
+                                    <span title="Managed from Reception" style="font-size:11px;color:var(--t3);"><i class="bi bi-lock"></i> Reception</span>
+                                }
+                                else
+                                {
+                                    <a asp-action="Edit" asp-route-id="@i.IncomeEntryId" class="btn btn-ghost" style="padding:4px 8px;border:1px solid var(--border);">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <form asp-action="Delete" asp-route-id="@i.IncomeEntryId" method="post" style="display:inline;"
+                                          onsubmit="return confirm('Delete this entry?')">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="btn btn-ghost" style="padding:4px 8px;color:var(--red);border:1px solid var(--border);">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                }
                             </td>
                         </tr>
                     }

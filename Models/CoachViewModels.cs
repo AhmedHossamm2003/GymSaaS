@@ -51,15 +51,21 @@ namespace GymSaaS.Models
         [StringLength(255)]
         public string? Email { get; set; }
 
-        [Required(ErrorMessage = "Branch is required.")]
         public Guid BranchId { get; set; }
+
+        public List<Guid> BranchIds { get; set; } = new();
 
         [Range(0, 999, ErrorMessage = "Target must be between 0 and 999.")]
         public int CoachTarget { get; set; } = 0;
 
-        // Used only when creating a new coach — sets the login password for the auto-created User account
+        // Required on create; optional on edit (blank keeps the current password).
         [StringLength(100, MinimumLength = 6, ErrorMessage = "Password must be at least 6 characters.")]
+        [DataType(DataType.Password)]
         public string? LoginPassword { get; set; }
+
+        [DataType(DataType.Password)]
+        [Compare(nameof(LoginPassword), ErrorMessage = "Passwords do not match.")]
+        public string? ConfirmLoginPassword { get; set; }
 
         public IFormFile? Photo { get; set; }
         public string? ExistingPhotoUrl { get; set; }
@@ -79,6 +85,7 @@ namespace GymSaaS.Models
         public string FullName { get; set; } = string.Empty;
         public string Specialty { get; set; } = string.Empty;
         public Guid BranchId { get; set; }
+        public List<Guid> BranchIds { get; set; } = new();
     }
 
     public class CoachDashboardViewModel
@@ -105,7 +112,7 @@ namespace GymSaaS.Models
         // Earnings (commission from private training packages)
         public decimal EarningsThisMonth { get; set; }
         public decimal EarningsAllTime { get; set; }
-        public int CommissionPackagesThisMonth { get; set; }
+        public int CommissionSessionsThisMonth { get; set; }
         public List<CoachEarningsItem> RecentEarnings { get; set; } = new();
     }
 
@@ -118,7 +125,7 @@ namespace GymSaaS.Models
         public decimal PackagePrice { get; set; }
         public decimal CommissionPercent { get; set; }
         public decimal CommissionAmount { get; set; }
-        public DateTime AssignedAtUtc { get; set; }
+        public DateTime EarnedAtUtc { get; set; }
     }
 
     public class CoachUpcomingTraineeItem

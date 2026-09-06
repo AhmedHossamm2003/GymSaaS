@@ -57,3 +57,24 @@ public class EditUserViewModel : CreateUserViewModel
     [Compare("Password")]
     public new string? ConfirmPassword { get; set; }
 }
+
+public class UserDetailsViewModel
+{
+    public Guid UserId { get; set; }
+    public string FullName { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+    public string? PhoneNumber { get; set; }
+    public bool IsActive { get; set; }
+    public bool IsLocked { get; set; }
+    public DateTime CreatedAtUtc { get; set; }
+    public DateTime? UpdatedAtUtc { get; set; }
+    public DateTime? LastLoginAtUtc { get; set; }
+    public List<string> RoleNames { get; set; } = new();
+    public List<string> BranchNames { get; set; } = new();
+    public bool IsCoach { get; set; }
+
+    public string Initials => string.Concat(
+        FullName.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Take(2)
+            .Select(part => char.ToUpperInvariant(part[0])));
+}

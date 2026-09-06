@@ -351,30 +351,40 @@
         </div>
     </div>
 
-    <!-- Section 3: App Password (create only) -->
-    @if (!isEdit)
-    {
-        <div class="form-card">
-            <div class="form-section-head">
-                <div class="form-section-icon"><i class="bi bi-lock"></i></div>
-                <span class="form-section-title">App Password</span>
-            </div>
-            <div class="form-body">
-                <div class="field" style="max-width:340px;">
-                    <label class="field-label" asp-for="Password">Initial Password</label>
+    <!-- Section 3: App Password -->
+    <div class="form-card">
+        <div class="form-section-head">
+            <div class="form-section-icon"><i class="bi bi-lock"></i></div>
+            <span class="form-section-title">App Password</span>
+        </div>
+        <div class="form-body">
+            <div class="form-grid-2">
+                <div class="field">
+                    <label class="field-label" asp-for="Password">@(isEdit ? "New Password" : "Initial Password")</label>
                     <div class="pwd-box">
-                        <input asp-for="Password" type="password" id="pwdInput"
-                               placeholder="Leave blank to auto-generate" />
-                        <i class="bi bi-eye pwd-toggle" id="pwdToggle"></i>
+                        <input asp-for="Password" type="password" class="password-field"
+                               placeholder="@(isEdit ? "Leave blank to keep current" : "Leave blank for temporary default")" />
+                        <i class="bi bi-eye pwd-toggle"></i>
                     </div>
-                    <div class="field-hint">
-                        If left blank, a temporary password is auto-generated and shown after creation.
-                        Format: Name + 4 digits + ! (e.g. <strong>Ahm4821!</strong>)
+                    <span asp-validation-for="Password" class="field-error visible"></span>
+                </div>
+                <div class="field">
+                    <label class="field-label" asp-for="ConfirmPassword">Confirm Password</label>
+                    <div class="pwd-box">
+                        <input asp-for="ConfirmPassword" type="password" class="password-field"
+                               placeholder="Enter the same password" />
+                        <i class="bi bi-eye pwd-toggle"></i>
                     </div>
+                    <span asp-validation-for="ConfirmPassword" class="field-error visible"></span>
                 </div>
             </div>
+            <div class="field-hint" style="margin-top:10px">
+                @(isEdit
+                    ? "Leave both fields blank if the member's current password should not change."
+                    : "If left blank, the member receives the standard temporary password and is prompted to change it.")
+            </div>
         </div>
-    }
+    </div>
 
     <!-- Section 4: Emergency Contact -->
     <div class="form-card">
@@ -442,13 +452,12 @@
             reader.readAsDataURL(file);
         });
 
-        // Password toggle
-        const pwdInput  = document.getElementById('pwdInput');
-        const pwdToggle = document.getElementById('pwdToggle');
-        pwdToggle?.addEventListener('click', () => {
-            const isHidden = pwdInput.type === 'password';
-            pwdInput.type  = isHidden ? 'text' : 'password';
-            pwdToggle.className = `bi bi-${isHidden ? 'eye-slash' : 'eye'} pwd-toggle`;
-        });
+        // Password visibility toggles
+        document.querySelectorAll('.pwd-toggle').forEach(toggle => toggle.addEventListener('click', () => {
+            const input = toggle.previousElementSibling;
+            const isHidden = input.type === 'password';
+            input.type = isHidden ? 'text' : 'password';
+            toggle.className = `bi bi-${isHidden ? 'eye-slash' : 'eye'} pwd-toggle`;
+        }));
     </script>
 }

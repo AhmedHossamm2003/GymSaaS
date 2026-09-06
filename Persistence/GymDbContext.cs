@@ -131,6 +131,11 @@ public partial class GymDbContext : DbContext
 
             entity.HasOne(d => d.BranchQrcode).WithMany(p => p.AttendanceRecords).HasConstraintName("FK_AttendanceRecords_BranchQRCodes");
 
+            entity.HasOne(d => d.GymClass).WithMany()
+                .HasForeignKey(d => d.GymClassId)
+                .OnDelete(DeleteBehavior.NoAction)
+                .HasConstraintName("FK_AttendanceRecords_GymClasses");
+
             entity.HasOne(d => d.Member).WithMany(p => p.AttendanceRecords)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_AttendanceRecords_Members");
@@ -219,6 +224,10 @@ public partial class GymDbContext : DbContext
             entity.Property(e => e.MemberPackageId).HasDefaultValueSql("(newsequentialid())");
             entity.Property(e => e.CreatedAtUtc).HasDefaultValueSql("(sysutcdatetime())");
             entity.Property(e => e.OpenGymDailyLimit).HasDefaultValue(1);
+            // Retain legacy PT add-on columns as shadow properties so existing
+            // development data is preserved but application code cannot use it.
+            entity.Property<int?>("PtSessionsRemaining");
+            entity.Property<int?>("PtSessionsTotal");
 
             entity.HasOne(d => d.BranchAccessPolicyType).WithMany(p => p.MemberPackages)
                 .OnDelete(DeleteBehavior.ClientSetNull)
@@ -289,6 +298,8 @@ public partial class GymDbContext : DbContext
             entity.Property(e => e.CreatedAtUtc).HasDefaultValueSql("(sysutcdatetime())");
             entity.Property(e => e.IsActive).HasDefaultValue(true);
             entity.Property(e => e.OpenGymDailyLimit).HasDefaultValue(1);
+            // Legacy add-on storage only. PT is now a standalone package type.
+            entity.Property<int?>("PtSessionCount");
 
             entity.HasOne(d => d.BranchAccessPolicyType).WithMany(p => p.PackageDefinitions)
                 .OnDelete(DeleteBehavior.ClientSetNull)
@@ -355,6 +366,8 @@ public partial class GymDbContext : DbContext
             entity.Property(e => e.CreatedAtUtc).HasDefaultValueSql("(sysutcdatetime())");
             entity.Property(e => e.DefaultLanguage).HasDefaultValue("en");
             entity.Property(e => e.IsActive).HasDefaultValue(true);
+            entity.Property(e => e.OpenGymDropInPrice).HasDefaultValue(550m);
+            entity.Property(e => e.OneClassPassPrice).HasDefaultValue(450m);
             entity.Property(e => e.TimeZoneId).HasDefaultValue("Africa/Cairo");
         });
 

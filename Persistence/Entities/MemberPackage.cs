@@ -75,10 +75,6 @@ public partial class MemberPackage
 
     public int? InBodyRemaining { get; set; }
 
-    public int? PtSessionsTotal { get; set; }
-
-    public int? PtSessionsRemaining { get; set; }
-
     public int? FreezeAllowanceDays { get; set; }
 
     public int? FreezeRemainingDays { get; set; }
@@ -116,6 +112,8 @@ public partial class MemberPackage
 
     public Guid? GymClassId { get; set; }
 
+    // Optional assigned coach who owns/manages the client relationship.
+    // Actual session delivery and commission are recorded separately per usage.
     public Guid? CoachId { get; set; }
 
     // ── Pricing / commission snapshot (set at assignment, never changes) ───────
@@ -124,15 +122,11 @@ public partial class MemberPackage
     [Column(TypeName = "decimal(10, 2)")]
     public decimal? PriceSnapshot { get; set; }
 
-    // Snapshot of the coach commission percentage at assignment time.
-    // Only set for IsPrivateTraining packages.
+    // Snapshot of the coach commission percentage at assignment time. The
+    // actual commission is earned per delivered PT session and stored on
+    // MemberPerkUsage.
     [Column(TypeName = "decimal(5, 2)")]
     public decimal? CoachCommissionPercent { get; set; }
-
-    // Calculated coach earnings amount in currency (PriceSnapshot × CoachCommissionPercent / 100).
-    // Gym share = PriceSnapshot - CoachCommissionAmount.
-    [Column(TypeName = "decimal(10, 2)")]
-    public decimal? CoachCommissionAmount { get; set; }
 
     [ForeignKey("GymClassId")]
     public virtual GymClass? GymClass { get; set; }

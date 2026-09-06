@@ -8,10 +8,12 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using GymSaaS.Services.Reception;
+using GymSaaS.Services;
+using GymSaaS.Models;
 
 namespace GymSaaS.Controllers
 {
-    [Authorize]
+    [GymSaaS.Authorization.ViewPermissionAuthorize]
     public class ReceptionController : Controller
     {
         private readonly IReceptionService _receptionService;
@@ -80,6 +82,128 @@ namespace GymSaaS.Controllers
             }
 
             return View();
+        }
+
+        // ── Paid drop-in desk ─────────────────────────────────────
+        [HttpGet]
+        public async Task<IActionResult> DropIn(Guid? branchId, string? phone)
+        {
+            var branches = await GetAccessibleBranchesAsync();
+            var selectedBranchId = branchId ?? branches.FirstOrDefault()?.BranchId;
+            if (!selectedBranchId.HasValue) return NotFound("No active branch is available.");
+            if (!CanUseBranch(selectedBranchId.Value)) return Forbid();
+
+            var vm = await _receptionService.BuildDropInPageAsync(
+                selectedBranchId.Value, CurrentTenantId, phone, IsAdminOrSuper);
+            if (vm == null) return NotFound();
+            vm.Branches = branches;
+            ViewData["Title"] = "Paid Drop-In";
+            return View(vm);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CreateDropIn(DropInCheckoutViewModel model)
+        {
+            if (!CanUseBranch(model.BranchId)) return Forbid();
+
+            if (model.MemberId == null)
+            {
+                if (string.IsNullOrWhiteSpace(model.FirstName))
+                    ModelState.AddModelError(nameof(model.FirstName), "First name is required for a new member.");
+                if (string.IsNullOrWhiteSpace(model.LastName))
+                    ModelState.AddModelError(nameof(model.LastName), "Last name is required for a new member.");
+                if (string.IsNullOrWhiteSpace(model.Email))
+                    ModelState.AddModelError(nameof(model.Email), "Email is required for a new member.");
+            }
+
+            if (!ModelState.IsValid)
+                return await RenderDropInErrorAsync(model, "Please correct the highlighted information.");
+
+            var result = await _receptionService.CheckoutDropInAsync(
+                model, CurrentUserId, CurrentTenantId);
+            if (!result.Success)
+                return await RenderDropInErrorAsync(model, result.ErrorMessage ?? "The drop-in could not be recorded.");
+
+            TempData["Toast"] = result.MemberCreated
+                ? $"{result.MemberName} was created and checked in. Membership # {result.MembershipNumber}. Paid {result.Amount:N2} EGP."
+                : $"{result.MemberName} checked in. Paid {result.Amount:N2} EGP.";
+            TempData["ToastType"] = "success";
+            return RedirectToAction(nameof(DropIn), new { branchId = model.BranchId });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> VoidDropIn(Guid incomeEntryId, Guid branchId, string reason)
+        {
+            if (!CanUseBranch(branchId)) return Forbid();
+            var result = await _receptionService.VoidDropInAsync(
+                incomeEntryId, branchId, reason, CurrentUserId, CurrentTenantId);
+            TempData["Toast"] = result.Success
+                ? "Drop-in payment was cancelled and its attendance was removed."
+                : result.Error ?? "The drop-in could not be cancelled.";
+            TempData["ToastType"] = result.Success ? "warning" : "danger";
+            return RedirectToAction(nameof(DropIn), new { branchId });
+        }
+
+        [HttpGet]
+        [Authorize(Policy = "AdminAndAbove")]
+        public async Task<IActionResult> DropInSettings()
+        {
+            var page = await _receptionService.BuildDropInPageAsync(
+                (await _receptionService.GetBranchesAsync(CurrentTenantId)).FirstOrDefault()?.BranchId ?? Guid.Empty,
+                CurrentTenantId, null, true);
+            if (page == null) return NotFound();
+            ViewData["Title"] = "Drop-In Prices";
+            return View(new DropInPriceSettingsViewModel
+            {
+                OpenGymPrice = page.OpenGymPrice,
+                ClassPassPrice = page.ClassPassPrice,
+            });
+        }
+
+        [HttpPost]
+        [Authorize(Policy = "AdminAndAbove")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DropInSettings(DropInPriceSettingsViewModel model)
+        {
+            if (!ModelState.IsValid) return View(model);
+            var result = await _receptionService.UpdateDropInPricesAsync(model, CurrentTenantId);
+            if (!result.Success)
+            {
+                ModelState.AddModelError(string.Empty, result.Error ?? "Prices could not be saved.");
+                return View(model);
+            }
+
+            TempData["Toast"] = "Business-wide drop-in prices updated.";
+            TempData["ToastType"] = "success";
+            return RedirectToAction(nameof(Index));
+        }
+
+        private async Task<IActionResult> RenderDropInErrorAsync(
+            DropInCheckoutViewModel model, string error)
+        {
+            ModelState.AddModelError(string.Empty, error);
+            var vm = await _receptionService.BuildDropInPageAsync(
+                model.BranchId, CurrentTenantId, model.PhoneNumber, IsAdminOrSuper);
+            if (vm == null) return NotFound();
+            vm.Branches = await GetAccessibleBranchesAsync();
+            vm.Checkout = model;
+            ViewData["Title"] = "Paid Drop-In";
+            return View("DropIn", vm);
+        }
+
+        private bool CanUseBranch(Guid branchId) =>
+            IsAdminOrSuper || User.CanAccessBranch(branchId);
+
+        private async Task<List<BranchOptionDto>> GetAccessibleBranchesAsync()
+        {
+            var branches = await _receptionService.GetBranchesAsync(CurrentTenantId);
+            if (IsAdminOrSuper) return branches;
+            var scoped = User.AssignedBranchIds();
+            return scoped.Count == 0
+                ? branches
+                : branches.Where(b => scoped.Contains(b.BranchId)).ToList();
         }
 
         // ── POST /Reception/Scan  (AJAX) ──────────────────────────
@@ -186,7 +310,7 @@ namespace GymSaaS.Controllers
         // ── POST /Reception/RecordPtSession  (AJAX) ───────────────
         /// <summary>
         /// Records that a member attended a PT session with a chosen coach.
-        /// Deducts one from the package's PtSessionsRemaining.
+        /// Deducts one session from a standalone Personal Training plan.
         /// </summary>
         [HttpPost]
         [ValidateAntiForgeryToken]

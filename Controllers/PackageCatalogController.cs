@@ -8,7 +8,7 @@ using System.Security.Claims;
 
 namespace GymSaaS.Controllers
 {
-    [Authorize(Policy = "AdminAndAbove")]
+    [GymSaaS.Authorization.ViewPermissionAuthorize]
     public class PackageCatalogController : Controller
     {
         private readonly GymDbContext _db;
@@ -32,6 +32,7 @@ namespace GymSaaS.Controllers
                       p => p.PackageTypeId,
                       pt => pt.PackageTypeId,
                       (p, pt) => new { p, pt })
+                .Where(x => x.pt.PackageTypeCode != "COMBINED")
                 .Join(_db.BranchAccessPolicyTypes,
                       x => x.p.BranchAccessPolicyTypeId,
                       bp => bp.BranchAccessPolicyTypeId,
@@ -56,11 +57,9 @@ namespace GymSaaS.Controllers
                     GymClassId = x.p.GymClassId,
                     InvitationCount = x.p.InvitationCount,
                     InBodyCount = x.p.InBodyCount,
-                    PtSessionCount = x.p.PtSessionCount,
                     FreezeAllowanceDays = x.p.FreezeAllowanceDays,
                     Price = x.p.Price,
                     MaxDiscountedPrice = x.p.MaxDiscountedPrice,
-                    IsPrivateTraining = x.p.IsPrivateTraining,
                     CoachCommissionPercent = x.p.CoachCommissionPercent,
                     IsActive = x.p.IsActive,
                     SortOrder = x.p.SortOrder,
@@ -127,7 +126,8 @@ namespace GymSaaS.Controllers
                 return View("CreateEdit", model);
             }
 
-            var typeId = await GetPackageTypeIdAsync(model.PackageTypeCode!.Trim().ToUpperInvariant());
+            var typeCode = model.PackageTypeCode.Trim().ToUpperInvariant();
+            var typeId = await GetPackageTypeIdAsync(typeCode);
             if (typeId == null)
             {
                 ModelState.AddModelError(nameof(model.PackageTypeCode), $"Invalid package type: '{model.PackageTypeCode}'");
@@ -153,13 +153,12 @@ namespace GymSaaS.Controllers
                 RestrictedToBranchId = model.RestrictedToBranchId,
                 CrossBranchVisitLimit = model.CrossBranchVisitLimit,
                 SessionCount = model.HasSessions ? model.SessionCount : null,
-                GymClassId = model.HasSessions ? model.GymClassId : null,
+                GymClassId = model.SupportsClassLink ? model.GymClassId : null,
                 DurationDays = model.DurationDays,
-                OpenGymDurationDays = model.IsCombined ? model.OpenGymDurationDaysSeparate : null,
-                OpenGymDailyLimit = model.OpenGymDailyLimit,
+                OpenGymDurationDays = null,
+                OpenGymDailyLimit = model.HasOpenGym ? model.OpenGymDailyLimit : 1,
                 InvitationCount = model.InvitationCount,
                 InBodyCount = model.InBodyCount,
-                PtSessionCount = model.PtSessionCount,
                 FreezeAllowanceDays = model.FreezeAllowanceDays,
                 Price = model.Price,
                 MaxDiscountedPrice = model.MaxDiscountedPrice,
@@ -167,8 +166,9 @@ namespace GymSaaS.Controllers
                 AllowQueuedRenewal = model.AllowQueuedRenewal,
                 AllowCustomOverrideDuringAssignment = true,
                 IsCustomTemplate = false,
-                IsPrivateTraining = model.IsPrivateTraining,
-                CoachCommissionPercent = model.IsPrivateTraining ? model.CoachCommissionPercent : null,
+                CoachCommissionPercent = model.IsPersonalTraining
+                    ? model.CoachCommissionPercent
+                    : null,
                 IsActive = model.IsActive,
                 SortOrder = model.SortOrder,
                 CreatedAtUtc = DateTime.UtcNow,
@@ -205,16 +205,13 @@ namespace GymSaaS.Controllers
                 GymClassId = pkg.GymClassId,
                 InvitationCount = pkg.InvitationCount,
                 InBodyCount = pkg.InBodyCount,
-                PtSessionCount = pkg.PtSessionCount,
                 FreezeAllowanceDays = pkg.FreezeAllowanceDays,
                 DurationDays = pkg.DurationDays,
-                OpenGymDurationDaysSeparate = pkg.OpenGymDurationDays,
                 OpenGymDailyLimit = pkg.OpenGymDailyLimit,
                 Price = pkg.Price,
                 MaxDiscountedPrice = pkg.MaxDiscountedPrice,
                 AllowCarryOverSessions = pkg.AllowCarryOverSessions,
                 AllowQueuedRenewal = pkg.AllowQueuedRenewal,
-                IsPrivateTraining = pkg.IsPrivateTraining,
                 CoachCommissionPercent = pkg.CoachCommissionPercent,
                 IsActive = pkg.IsActive,
                 SortOrder = pkg.SortOrder,
@@ -255,26 +252,31 @@ namespace GymSaaS.Controllers
                 return View("CreateEdit", model);
             }
 
+            var typeCode = model.PackageTypeCode.Trim().ToUpperInvariant();
+            var typeId = await GetPackageTypeIdAsync(typeCode);
+            if (typeId == null) return BadRequest("Invalid package type.");
+
             pkg.PackageName = model.PackageName.Trim();
             pkg.Description = model.Description?.Trim();
+            pkg.PackageTypeId = typeId.Value;
             pkg.BranchAccessPolicyTypeId = model.BranchAccessPolicyTypeId;
             pkg.RestrictedToBranchId = model.RestrictedToBranchId;
             pkg.CrossBranchVisitLimit = model.CrossBranchVisitLimit;
             pkg.SessionCount = model.HasSessions ? model.SessionCount : null;
-            pkg.GymClassId = model.HasSessions ? model.GymClassId : null;
+            pkg.GymClassId = model.SupportsClassLink ? model.GymClassId : null;
             pkg.InvitationCount = model.InvitationCount;
             pkg.InBodyCount = model.InBodyCount;
-            pkg.PtSessionCount = model.PtSessionCount;
             pkg.FreezeAllowanceDays = model.FreezeAllowanceDays;
             pkg.DurationDays = model.DurationDays;
-            pkg.OpenGymDurationDays = model.IsCombined ? model.OpenGymDurationDaysSeparate : null;
-            pkg.OpenGymDailyLimit = model.OpenGymDailyLimit;
+            pkg.OpenGymDurationDays = null;
+            pkg.OpenGymDailyLimit = model.HasOpenGym ? model.OpenGymDailyLimit : 1;
             pkg.Price = model.Price;
             pkg.MaxDiscountedPrice = model.MaxDiscountedPrice;
             pkg.AllowCarryOverSessions = model.AllowCarryOverSessions;
             pkg.AllowQueuedRenewal = model.AllowQueuedRenewal;
-            pkg.IsPrivateTraining = model.IsPrivateTraining;
-            pkg.CoachCommissionPercent = model.IsPrivateTraining ? model.CoachCommissionPercent : null;
+            pkg.CoachCommissionPercent = model.IsPersonalTraining
+                ? model.CoachCommissionPercent
+                : null;
             pkg.IsActive = model.IsActive;
             pkg.SortOrder = model.SortOrder;
             pkg.UpdatedAtUtc = DateTime.UtcNow;
@@ -386,8 +388,13 @@ namespace GymSaaS.Controllers
         {
             var typeCode = (model.PackageTypeCode ?? "").Trim().ToUpperInvariant();
 
+            var allowedTypes = new[] { "SESSION", "OPEN_GYM", "PERSONAL_TRAINING" };
             if (string.IsNullOrWhiteSpace(typeCode))
                 ModelState.AddModelError(nameof(model.PackageTypeCode), "Please select a package type.");
+            else if (!allowedTypes.Contains(typeCode))
+            {
+                ModelState.AddModelError(nameof(model.PackageTypeCode), $"Invalid package type: '{typeCode}'");
+            }
             else
             {
                 var exists = await _db.PackageTypes.AnyAsync(pt => pt.PackageTypeCode == typeCode);
@@ -397,6 +404,23 @@ namespace GymSaaS.Controllers
 
             if (string.IsNullOrWhiteSpace(model.PackageName))
                 ModelState.AddModelError(nameof(model.PackageName), "Package name is required.");
+
+            if (model.Price.HasValue && model.Price.Value < 0)
+                ModelState.AddModelError(nameof(model.Price), "Price cannot be negative.");
+
+            if (typeCode == "PERSONAL_TRAINING" && (!model.Price.HasValue || model.Price.Value <= 0))
+                ModelState.AddModelError(nameof(model.Price),
+                    "A positive total plan price is required for personal training.");
+
+            if (typeCode == "PERSONAL_TRAINING"
+                && (!model.CoachCommissionPercent.HasValue || model.CoachCommissionPercent.Value <= 0))
+                ModelState.AddModelError(nameof(model.CoachCommissionPercent),
+                    "Coach commission percentage is required for a personal training plan.");
+
+            if (model.CoachCommissionPercent.HasValue
+                && (model.CoachCommissionPercent.Value < 0 || model.CoachCommissionPercent.Value > 100))
+                ModelState.AddModelError(nameof(model.CoachCommissionPercent),
+                    "Coach commission must be between 0 and 100.");
 
             if (model.MaxDiscountedPrice.HasValue)
             {
@@ -414,24 +438,18 @@ namespace GymSaaS.Controllers
             if (model.BranchAccessPolicyTypeId == Guid.Empty)
                 ModelState.AddModelError(nameof(model.BranchAccessPolicyTypeId), "Please select a branch access policy.");
 
-            if (typeCode is "SESSION" or "COMBINED")
+            if (typeCode is "SESSION" or "PERSONAL_TRAINING")
             {
                 if (model.SessionCount == null || model.SessionCount < 1)
                     ModelState.AddModelError(nameof(model.SessionCount), "Session count is required.");
             }
 
-            if (typeCode is "SESSION" or "OPEN_GYM" or "COMBINED")
+            if (typeCode is "SESSION" or "OPEN_GYM" or "PERSONAL_TRAINING")
             {
                 if (model.DurationDays == null || model.DurationDays < 1)
                     ModelState.AddModelError(nameof(model.DurationDays), "Duration (days) is required.");
             }
 
-            if (typeCode == "COMBINED")
-            {
-                if (model.OpenGymDurationDaysSeparate == null || model.OpenGymDurationDaysSeparate < 1)
-                    ModelState.AddModelError(nameof(model.OpenGymDurationDaysSeparate),
-                        "Open gym duration is required for combined packages.");
-            }
         }
     }
 }

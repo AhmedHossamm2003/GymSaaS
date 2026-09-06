@@ -41,15 +41,22 @@
             </div>
 
             <div class="form-group">
-                <label asp-for="BranchId">Branch</label>
-                <select asp-for="BranchId">
-                    <option value="">— Select Branch —</option>
+                <label>Assigned Branches</label>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:9px;padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--bg-raised)">
                     @foreach (var b in Model.Branches)
                     {
-                        <option value="@b.BranchId">@b.BranchName</option>
+                        <label style="display:flex;align-items:center;gap:9px;margin:0;padding:8px 10px;border:1px solid var(--border);border-radius:7px;cursor:pointer;background:var(--bg-card)">
+                            <input type="checkbox" name="BranchIds" value="@b.BranchId"
+                                   checked="@(Model.BranchIds.Contains(b.BranchId) ? "checked" : null)"
+                                   style="width:16px;height:16px;accent-color:var(--orange)" />
+                            <span style="font-size:13px;font-weight:600">@b.BranchName</span>
+                        </label>
                     }
-                </select>
-                <span asp-validation-for="BranchId" style="color:#dc2626;font-size:11px"></span>
+                </div>
+                <span asp-validation-for="BranchIds" style="color:#dc2626;font-size:11px"></span>
+                <div style="font-size:11.5px;color:var(--text-faint);margin-top:5px">
+                    The coach can work, run classes, and record PT sessions at every selected branch.
+                </div>
             </div>
 
             <div class="form-group" style="margin-bottom:0">
@@ -84,36 +91,45 @@
             </div>
         </div>
 
-        <!-- Login account (Create only) -->
-        @if (!Model.IsEdit)
+        <!-- Login account -->
+        @if (!Model.IsEdit || Model.HasLinkedUser)
         {
             <div class="card" style="margin-bottom:20px;border:1px solid var(--orange);background:rgba(249,115,22,.04)">
                 <div class="card-header">
                     <span class="card-title"><i class="bi bi-shield-lock" style="color:var(--orange)"></i> Login Account</span>
                 </div>
                 <div style="font-size:12.5px;color:var(--text-secondary);margin-bottom:14px">
-                    A user account with the <strong>Coach</strong> role will be automatically created. The coach will use the email above and the password below to log in.
+                    @if (Model.IsEdit)
+                    {
+                        <span>Account: <strong>@Model.LinkedUserEmail</strong>. Leave both password fields blank to keep the current password.</span>
+                    }
+                    else
+                    {
+                        <span>A user account with the <strong>Coach</strong> role will be created. The coach will use the email above and this password to log in.</span>
+                    }
                 </div>
-                <div class="form-group" style="margin-bottom:0;max-width:360px">
-                    <label asp-for="LoginPassword">Initial Password <span style="color:var(--orange)">*</span></label>
-                    <input asp-for="LoginPassword" type="password" placeholder="Minimum 6 characters" autocomplete="new-password" />
-                    <span asp-validation-for="LoginPassword" style="color:#dc2626;font-size:11px"></span>
-                    <div style="font-size:11.5px;color:var(--text-faint);margin-top:5px">
-                        Share this password with the coach so they can log in. They can change it later.
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px">
+                    <div class="form-group" style="margin-bottom:0">
+                        <label asp-for="LoginPassword">@(Model.IsEdit ? "New Password" : "Initial Password") @if (!Model.IsEdit) { <span style="color:var(--orange)">*</span> }</label>
+                        <input asp-for="LoginPassword" type="password" placeholder="Minimum 6 characters" autocomplete="new-password" />
+                        <span asp-validation-for="LoginPassword" style="color:#dc2626;font-size:11px"></span>
+                    </div>
+                    <div class="form-group" style="margin-bottom:0">
+                        <label asp-for="ConfirmLoginPassword">Confirm Password</label>
+                        <input asp-for="ConfirmLoginPassword" type="password" placeholder="Enter the same password" autocomplete="new-password" />
+                        <span asp-validation-for="ConfirmLoginPassword" style="color:#dc2626;font-size:11px"></span>
                     </div>
                 </div>
             </div>
         }
-        else if (Model.HasLinkedUser)
+        else
         {
             <div class="card" style="margin-bottom:20px;border:1px solid var(--border);background:var(--bg-raised)">
                 <div style="display:flex;align-items:center;gap:10px">
-                    <i class="bi bi-check-circle-fill" style="color:#16a34a;font-size:18px"></i>
+                    <i class="bi bi-exclamation-circle" style="color:#d97706;font-size:18px"></i>
                     <div>
-                        <div style="font-size:13px;font-weight:600;color:var(--black)">Login account linked</div>
-                        <div style="font-size:12px;color:var(--text-secondary);margin-top:2px">
-                            Email: <strong>@Model.LinkedUserEmail</strong>
-                        </div>
+                        <div style="font-size:13px;font-weight:600;color:var(--black)">No login account is linked</div>
+                        <div style="font-size:12px;color:var(--text-secondary);margin-top:2px">A password cannot be changed for this legacy coach profile.</div>
                     </div>
                 </div>
             </div>

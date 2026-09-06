@@ -86,8 +86,8 @@
                 background: var(--blue);
             }
 
-            .pkg-card.COMBINED::before {
-                background: linear-gradient(90deg, var(--fire) 50%, var(--blue) 50%);
+            .pkg-card.PERSONAL_TRAINING::before {
+                background: #7c3aed;
             }
 
         .pc-head {
@@ -127,10 +127,10 @@
                 border-color: var(--blue-border);
             }
 
-            .pc-type-badge.COMBINED {
-                background: linear-gradient(90deg, var(--fire-soft), var(--blue-bg));
-                color: var(--t1);
-                border-color: var(--border);
+            .pc-type-badge.PERSONAL_TRAINING {
+                background: #f5f3ff;
+                color: #6d28d9;
+                border-color: #ddd6fe;
             }
 
         .pc-name {
@@ -311,9 +311,9 @@
                 color: var(--blue);
             }
 
-            .type-icon.COMBINED {
-                background: var(--canvas);
-                color: var(--t2);
+            .type-icon.PERSONAL_TRAINING {
+                background: #f5f3ff;
+                color: #7c3aed;
             }
     </style>
 }
@@ -348,7 +348,7 @@ else
         {
             "SESSION" => "Sessions Packages",
             "OPEN_GYM" => "Open Gym Packages",
-            "COMBINED" => "Combined Packages",
+            "PERSONAL_TRAINING" => "Personal Training Plans",
             _ => group.Key
         };
 
@@ -356,7 +356,7 @@ else
         {
             "SESSION" => "bi-ticket-perforated",
             "OPEN_GYM" => "bi-door-open",
-            "COMBINED" => "bi-collection",
+            "PERSONAL_TRAINING" => "bi-person-arms-up",
             _ => "bi-box-seam"
         };
 
@@ -387,12 +387,6 @@ else
                                 {
                                     <span class="badge badge-active">Active</span>
                                 }
-                                @if (p.IsPrivateTraining)
-                                {
-                                    <span style="font-size:9.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;background:linear-gradient(135deg,#f97316,#ea580c);color:#fff;padding:2px 7px;border-radius:10px;">
-                                        <i class="bi bi-person-arms-up"></i> Private
-                                    </span>
-                                }
                             </div>
                             <div class="pc-name">@p.PackageName</div>
                             @if (!string.IsNullOrWhiteSpace(p.Description))
@@ -403,7 +397,7 @@ else
 
                         <!-- Stats -->
                         <div class="pc-stats">
-                            @if (p.PackageTypeCode == "SESSION" || p.PackageTypeCode == "COMBINED")
+                            @if (p.PackageTypeCode is "SESSION" or "PERSONAL_TRAINING")
                             {
                                 <div class="pc-stat">
                                     <div class="pc-stat-val" style="color:var(--fire);">@(p.SessionCount?.ToString() ?? "—")</div>
@@ -417,22 +411,11 @@ else
                                     <div class="pc-stat-lbl">Days</div>
                                 </div>
                             }
-                            @if (p.PackageTypeCode == "SESSION")
+                            @if (p.PackageTypeCode is "SESSION" or "PERSONAL_TRAINING")
                             {
                                 <div class="pc-stat">
                                     <div class="pc-stat-val">@(p.DurationDays?.ToString() ?? "—")</div>
                                     <div class="pc-stat-lbl">Valid Days</div>
-                                </div>
-                            }
-                            @if (p.PackageTypeCode == "COMBINED")
-                            {
-                                <div class="pc-stat">
-                                    <div class="pc-stat-val">@(p.DurationDays?.ToString() ?? "—")</div>
-                                    <div class="pc-stat-lbl">Sess. Days</div>
-                                </div>
-                                <div class="pc-stat">
-                                    <div class="pc-stat-val" style="color:var(--blue);">@(p.OpenGymDurationDays?.ToString() ?? "—")</div>
-                                    <div class="pc-stat-lbl">Gym Days</div>
                                 </div>
                             }
                             <div class="pc-stat">
@@ -463,19 +446,32 @@ else
                                     <span>Home branch + limited other branches</span>
                                 }
                             </div>
+                            @if (!string.IsNullOrEmpty(p.RestrictedToBranchName))
+                            {
+                                <div class="pc-info-row">
+                                    <i class="bi bi-pin-map"></i>
+                                    <span>Assignable at @p.RestrictedToBranchName only</span>
+                                </div>
+                            }
                             @if (!string.IsNullOrEmpty(p.GymClassName) &&
-                                 (p.PackageTypeCode == "SESSION" || p.PackageTypeCode == "COMBINED"))
+                                 p.PackageTypeCode == "SESSION")
                             {
                                 <div class="pc-info-row">
                                     <i class="bi bi-calendar2-week"></i>
                                     <span>@p.GymClassName</span>
                                 </div>
                             }
+                            @if (p.IsPersonalTraining && p.CoachCommissionPercent.HasValue)
+                            {
+                                <div class="pc-info-row">
+                                    <i class="bi bi-percent"></i>
+                                    <span>@p.CoachCommissionPercent.Value.ToString("0.##")% coach commission</span>
+                                </div>
+                            }
                             @{
                                 var perks = new List<(string icon, string label, string color)>();
                                 if (p.InvitationCount > 0)    perks.Add(("bi-ticket-detailed",  $"{p.InvitationCount} Invitation{(p.InvitationCount != 1 ? "s" : "")}", "var(--fire)"));
                                 if (p.InBodyCount > 0)        perks.Add(("bi-activity",          $"{p.InBodyCount} InBody",                                                   "var(--blue)"));
-                                if (p.PtSessionCount > 0)     perks.Add(("bi-person-arms-up",    $"{p.PtSessionCount} PT Session{(p.PtSessionCount != 1 ? "s" : "")}",        "var(--green)"));
                                 if (p.FreezeAllowanceDays > 0) perks.Add(("bi-snow",             $"{p.FreezeAllowanceDays}d Freeze",                                          "var(--blue)"));
                             }
                             @if (perks.Any())

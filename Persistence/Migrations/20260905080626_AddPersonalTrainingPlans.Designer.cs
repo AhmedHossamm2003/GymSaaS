@@ -4,6 +4,7 @@ using GymSaaS.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace GymSaaS.Persistence.Migrations
 {
     [DbContext(typeof(GymDbContext))]
-    partial class GymDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260905080626_AddPersonalTrainingPlans")]
+    partial class AddPersonalTrainingPlans
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -142,9 +145,6 @@ namespace GymSaaS.Persistence.Migrations
                         .HasColumnType("datetime2(0)")
                         .HasDefaultValueSql("(sysutcdatetime())");
 
-                    b.Property<Guid?>("GymClassId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<bool>("IsCrossBranchVisit")
                         .HasColumnType("bit");
 
@@ -197,8 +197,6 @@ namespace GymSaaS.Persistence.Migrations
                     b.HasIndex("AttendanceStatusId");
 
                     b.HasIndex("BranchQrcodeId");
-
-                    b.HasIndex("GymClassId");
 
                     b.HasIndex("MemberPackageId");
 
@@ -783,12 +781,6 @@ namespace GymSaaS.Persistence.Migrations
                     b.Property<decimal>("Amount")
                         .HasColumnType("decimal(12, 2)");
 
-                    b.Property<Guid?>("AttendanceRecordId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<decimal?>("BaseAmount")
-                        .HasColumnType("decimal(12, 2)");
-
                     b.Property<Guid?>("BranchId")
                         .HasColumnType("uniqueidentifier");
 
@@ -809,31 +801,17 @@ namespace GymSaaS.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
-                    b.Property<Guid?>("GymClassId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<DateOnly>("IncomeDate")
                         .HasColumnType("date");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
-                    b.Property<Guid?>("MemberId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<string>("Notes")
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
 
                     b.Property<string>("PaymentMethod")
-                        .HasMaxLength(40)
-                        .HasColumnType("nvarchar(40)");
-
-                    b.Property<string>("PriceOverrideReason")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<string>("SourceCode")
                         .HasMaxLength(40)
                         .HasColumnType("nvarchar(40)");
 
@@ -846,20 +824,6 @@ namespace GymSaaS.Persistence.Migrations
 
                     b.Property<Guid?>("UpdatedByUserId")
                         .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("VoidReason")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<DateTime?>("VoidedAtUtc")
-                        .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
-
-                    b.Property<Guid?>("VoidedByUserId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<bool>("WasMemberCreated")
-                        .HasColumnType("bit");
 
                     b.HasKey("IncomeEntryId");
 
@@ -1833,16 +1797,6 @@ namespace GymSaaS.Persistence.Migrations
                         .HasMaxLength(250)
                         .HasColumnType("nvarchar(250)");
 
-                    b.Property<decimal>("OneClassPassPrice")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("decimal(10, 2)")
-                        .HasDefaultValue(450m);
-
-                    b.Property<decimal>("OpenGymDropInPrice")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("decimal(10, 2)")
-                        .HasDefaultValue(550m);
-
                     b.Property<string>("TenantCode")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -2377,12 +2331,6 @@ namespace GymSaaS.Persistence.Migrations
                         .HasForeignKey("BranchQrcodeId")
                         .HasConstraintName("FK_AttendanceRecords_BranchQRCodes");
 
-                    b.HasOne("GymSaaS.Persistence.Entities.GymClass", "GymClass")
-                        .WithMany()
-                        .HasForeignKey("GymClassId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .HasConstraintName("FK_AttendanceRecords_GymClasses");
-
                     b.HasOne("GymSaaS.Persistence.Entities.Member", "Member")
                         .WithMany("AttendanceRecords")
                         .HasForeignKey("MemberId")
@@ -2415,8 +2363,6 @@ namespace GymSaaS.Persistence.Migrations
                     b.Navigation("Branch");
 
                     b.Navigation("BranchQrcode");
-
-                    b.Navigation("GymClass");
 
                     b.Navigation("Member");
 

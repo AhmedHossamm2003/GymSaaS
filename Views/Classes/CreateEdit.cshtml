@@ -46,7 +46,7 @@
                         <option value="">— No Coach —</option>
                         @foreach (var c in Model.Coaches)
                         {
-                            <option value="@c.CoachId" data-branch="@c.BranchId">
+                            <option value="@c.CoachId" data-branches="@string.Join(",", c.BranchIds)">
                                 @c.FullName (@c.Specialty)
                             </option>
                         }
@@ -172,9 +172,10 @@
 
         function filterCoaches() {
             const selectedBranch = branchSelect.value;
-            const options = coachSelect.querySelectorAll('option[data-branch]');
+            const options = coachSelect.querySelectorAll('option[data-branches]');
             options.forEach(opt => {
-                opt.hidden = selectedBranch && opt.dataset.branch !== selectedBranch;
+                const branches = (opt.dataset.branches || '').split(',');
+                opt.hidden = selectedBranch && !branches.includes(selectedBranch);
             });
             // Clear selected coach if it's now hidden
             const selected = coachSelect.options[coachSelect.selectedIndex];

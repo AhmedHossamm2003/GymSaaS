@@ -9,7 +9,7 @@ using System.Security.Claims;
 
 namespace GymSaaS.Controllers
 {
-    [Authorize]
+    [GymSaaS.Authorization.ViewPermissionAuthorize]
     public class MembersController : Controller
     {
         private readonly GymDbContext _db;
@@ -30,7 +30,6 @@ namespace GymSaaS.Controllers
         // ─────────────────────────────────────────────
         // GET /Members
         // ─────────────────────────────────────────────
-        [Authorize(Policy = "StaffExceptCoach")]
         public async Task<IActionResult> Index(string? search, string? status, Guid? branchId, int page = 1)
         {
             const int pageSize = 20;
@@ -125,8 +124,6 @@ namespace GymSaaS.Controllers
                     // Perks
                     InvitationsRemaining = x.p.InvitationsRemaining,
                     InvitationsTotal     = x.p.InvitationsTotal,
-                    PtSessionsRemaining  = x.p.PtSessionsRemaining,
-                    PtSessionsTotal      = x.p.PtSessionsTotal,
                     InBodyRemaining      = x.p.InBodyRemaining,
                     InBodyTotal          = x.p.InBodyTotal,
                     FreezeRemainingDays  = x.p.FreezeRemainingDays,
@@ -169,7 +166,6 @@ namespace GymSaaS.Controllers
         // GET /Members/QuickSearch?q=…  (AJAX)
         // ─────────────────────────────────────────────
         [HttpGet]
-        [Authorize(Policy = "StaffExceptCoach")]
         public async Task<IActionResult> QuickSearch(string? q)
         {
             if (string.IsNullOrWhiteSpace(q) || q.Trim().Length < 2)
@@ -259,8 +255,6 @@ namespace GymSaaS.Controllers
                     InvitationsRemaining = x.p.InvitationsRemaining,
                     InBodyTotal          = x.p.InBodyTotal,
                     InBodyRemaining      = x.p.InBodyRemaining,
-                    PtSessionsTotal      = x.p.PtSessionsTotal,
-                    PtSessionsRemaining  = x.p.PtSessionsRemaining,
                     FreezeAllowanceDays  = x.p.FreezeAllowanceDays,
                     FreezeRemainingDays  = x.p.FreezeRemainingDays,
                     IsFrozen             = x.p.IsFrozen,
@@ -360,7 +354,6 @@ namespace GymSaaS.Controllers
         // ─────────────────────────────────────────────
         // GET /Members/Create
         // ─────────────────────────────────────────────
-        [Authorize(Policy = "AnyStaff")]
         public async Task<IActionResult> Create()
         {
             var vm = new MemberFormViewModel
@@ -377,7 +370,6 @@ namespace GymSaaS.Controllers
         // ─────────────────────────────────────────────
         [HttpPost]
         [ValidateAntiForgeryToken]
-        [Authorize(Policy = "AnyStaff")]
         public async Task<IActionResult> Create(MemberFormViewModel model)
         {
             await ValidateUniqueFields(model, null);
@@ -440,7 +432,6 @@ namespace GymSaaS.Controllers
         // ─────────────────────────────────────────────
         // GET /Members/Edit/id
         // ─────────────────────────────────────────────
-        [Authorize(Policy = "AnyStaff")]
         public async Task<IActionResult> Edit(Guid id)
         {
             var m = await _db.Members
@@ -475,7 +466,6 @@ namespace GymSaaS.Controllers
         // ─────────────────────────────────────────────
         [HttpPost]
         [ValidateAntiForgeryToken]
-        [Authorize(Policy = "AnyStaff")]
         public async Task<IActionResult> Edit(Guid id, MemberFormViewModel model)
         {
             var m = await _db.Members
@@ -513,6 +503,13 @@ namespace GymSaaS.Controllers
             m.EmergencyContactName = model.EmergencyContactName?.Trim();
             m.EmergencyContactPhone = model.EmergencyContactPhone?.Trim();
             m.Notes = model.Notes?.Trim();
+            if (!string.IsNullOrWhiteSpace(model.Password))
+            {
+                // Keep the current authentication storage format so existing member login remains compatible.
+                m.PasswordHash = model.Password;
+                m.PasswordSalt = null;
+                m.MustChangePassword = false;
+            }
             m.UpdatedAtUtc = DateTime.UtcNow;
             m.UpdatedByUserId = UserId;
 
@@ -562,7 +559,6 @@ namespace GymSaaS.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        [Authorize(Policy = "AnyStaff")]
         public async Task<IActionResult> ResetPassword(Guid id)
         {
             var m = await _db.Members
@@ -613,7 +609,6 @@ namespace GymSaaS.Controllers
         // ─────────────────────────────────────────────
         [HttpPost]
         [ValidateAntiForgeryToken]
-        [Authorize(Policy = "AnyStaff")]
         public async Task<IActionResult> AddPartnership(Guid memberId, Guid partnershipId)
         {
             var member = await _db.Members
@@ -656,7 +651,6 @@ namespace GymSaaS.Controllers
         // ─────────────────────────────────────────────
         [HttpPost]
         [ValidateAntiForgeryToken]
-        [Authorize(Policy = "AnyStaff")]
         public async Task<IActionResult> RemovePartnership(Guid memberPartnershipId)
         {
             var mp = await _db.MemberPartnerships

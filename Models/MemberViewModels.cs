@@ -30,12 +30,10 @@ namespace GymSaaS.Models
 
         // Perk totals across all active packages
         public int TotalInvitationsRemaining => ActivePackages.Sum(p => p.InvitationsRemaining ?? 0);
-        public int TotalPtSessionsRemaining  => ActivePackages.Sum(p => p.PtSessionsRemaining ?? 0);
         public int TotalInBodyRemaining      => ActivePackages.Sum(p => p.InBodyRemaining ?? 0);
         public int TotalFreezeRemainingDays  => ActivePackages.Sum(p => p.FreezeRemainingDays ?? 0);
         public bool HasAnyPerks =>
             TotalInvitationsRemaining > 0 ||
-            TotalPtSessionsRemaining  > 0 ||
             TotalInBodyRemaining      > 0 ||
             TotalFreezeRemainingDays  > 0;
 
@@ -77,14 +75,12 @@ namespace GymSaaS.Models
         // Perks
         public int? InvitationsRemaining { get; set; }
         public int? InvitationsTotal { get; set; }
-        public int? PtSessionsRemaining { get; set; }
-        public int? PtSessionsTotal { get; set; }
         public int? InBodyRemaining { get; set; }
         public int? InBodyTotal { get; set; }
         public int? FreezeRemainingDays { get; set; }
         public int? FreezeAllowanceDays { get; set; }
 
-        public bool IsSessionBased => ComponentRole == "SESSION" || PackageTypeCode == "SESSION";
+        public bool IsSessionBased => ComponentRole == "SESSION" || PackageTypeCode is "SESSION" or "PERSONAL_TRAINING";
         public bool IsOpenGym => ComponentRole == "OPEN_GYM" || PackageTypeCode == "OPEN_GYM";
 
         public bool IsExpired =>
@@ -144,8 +140,14 @@ namespace GymSaaS.Models
         [MaxLength(1000)]
         public string? Notes { get; set; }
 
-        // Password — only on create
+        // Optional on create (uses the temporary default when blank) and edit (keeps current when blank).
+        [StringLength(100, MinimumLength = 6, ErrorMessage = "Password must be at least 6 characters.")]
+        [DataType(DataType.Password)]
         public string? Password { get; set; }
+
+        [DataType(DataType.Password)]
+        [Compare(nameof(Password), ErrorMessage = "Passwords do not match.")]
+        public string? ConfirmPassword { get; set; }
 
         // Profile image upload
         public IFormFile? ProfileImage { get; set; }
@@ -188,7 +190,8 @@ namespace GymSaaS.Models
             PackageGroups
                 .SelectMany(g => g.Components)
                 .Where(c => c.IsActive &&
-                       (c.PackageComponentRole == "SESSION" || c.PackageTypeCode == "SESSION"))
+                       (c.PackageComponentRole == "SESSION"
+                        || c.PackageTypeCode is "SESSION" or "PERSONAL_TRAINING"))
                 .Sum(c => c.SessionCountRemaining);
 
         // Attendance summary

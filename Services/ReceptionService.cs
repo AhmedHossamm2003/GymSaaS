@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using GymSaaS.Persistence;
 using GymSaaS.Persistence.Entities;
+using GymSaaS.Models;
 
 namespace GymSaaS.Services.Reception
 {
@@ -219,25 +220,35 @@ namespace GymSaaS.Services.Reception
                             && validStatusIds.Contains(a.AttendanceStatusId)
                             && a.CheckInAtUtc > cooldownStart);
 
-            // 6. Class-linked vs open access.
-            //    A package counts as class-linked if it has a specific GymClassId
-            //    OR the type code itself is CLASS. This catches:
-            //      - CLASS-only packages (type CLASS, with GymClassId)
-            //      - COMBINED package's SESSION row (type SESSION, with GymClassId)
-            //    Everything else (OPEN_GYM, SUBSCRIPTION, BUNDLE, COMBINED's open-gym row) is open access.
-            var classPackages    = accessiblePackages
+            // 6. Split ordinary entry choices from PT plans. A PT visit must
+            //    always go through RecordPtSessionAsync so reception confirms
+            //    the actual coach and the balance is deducted only once.
+            var ptPlanPackages = accessiblePackages
+                .Where(p => p.PackageType.PackageTypeCode == "PERSONAL_TRAINING"
+                         && p.SessionCountRemaining > 0)
+                .ToList();
+            var standardPackages = accessiblePackages
+                .Where(p => p.PackageType.PackageTypeCode != "PERSONAL_TRAINING")
+                .Where(p => !p.SessionCountRemaining.HasValue
+                         || p.SessionCountRemaining.Value > 0)
+                .ToList();
+
+            var classPackages    = standardPackages
                 .Where(p => p.GymClassId.HasValue || p.PackageType.PackageTypeCode == "CLASS")
                 .ToList();
-            var nonClassPackages = accessiblePackages
+            var nonClassPackages = standardPackages
                 .Where(p => !p.GymClassId.HasValue && p.PackageType.PackageTypeCode != "CLASS")
                 .ToList();
 
-            // Conflict = the receptionist must choose. True whenever there's both a
-            // class-linked option and an open-gym option (e.g. COMBINED package).
-            bool hasConflict = classPackages.Any() && nonClassPackages.Any();
+            bool hasPtBalance = ptPlanPackages.Any();
+            if (!standardPackages.Any() && !hasPtBalance)
+                return Fail("NO_AVAILABLE_VISITS", "No gym or personal-training sessions remain.");
+
+            bool hasConflict = (classPackages.Any() && nonClassPackages.Any())
+                || (hasPtBalance && standardPackages.Any());
 
             // 7. Build package options for popup
-            var options = accessiblePackages.Select(p =>
+            var options = standardPackages.Select(p =>
             {
                 bool isClassLinked = p.GymClassId.HasValue || p.PackageType.PackageTypeCode == "CLASS";
                 string label = isClassLinked
@@ -315,7 +326,7 @@ namespace GymSaaS.Services.Reception
             }
 
             // 8. If no conflict — auto check-in immediately (skip if class is full — needs override)
-            if (!hasConflict && !alreadyInside && !result.ClassIsFull)
+            if (!hasConflict && !alreadyInside && !result.ClassIsFull && standardPackages.Any())
             {
                 var autoPackage = nonClassPackages.FirstOrDefault() ?? classPackages.First();
                 var markResult  = await MarkAttendanceAsync(new MarkAttendanceRequest
@@ -330,18 +341,23 @@ namespace GymSaaS.Services.Reception
                 result.AutoCheckedInPackageName = autoPackage.PackageNameSnapshot;
             }
 
-            // 9. Non-attendance perks — surface PT sessions / InBody scans the member
-            //    still has, so reception can record them (independent of gym entry).
-            var ptPackage = activePackages
-                .Where(p => p.PtSessionsRemaining.HasValue && p.PtSessionsRemaining.Value > 0)
-                .OrderByDescending(p => p.PtSessionsRemaining)
-                .FirstOrDefault();
-            if (ptPackage != null)
-            {
-                result.PtSessionsRemaining = ptPackage.PtSessionsRemaining;
-                result.PtPackageId         = ptPackage.MemberPackageId;
-                result.PtAssignedCoachId   = ptPackage.CoachId?.ToString();
-            }
+            // 9. Surface standalone Personal Training plans only.
+            result.PtPackageOptions = accessiblePackages
+                .Where(p => p.PackageType.PackageTypeCode == "PERSONAL_TRAINING"
+                         && p.SessionCountRemaining > 0)
+                .Select(p =>
+                {
+                    return new PtPackageOptionDto
+                    {
+                        MemberPackageId = p.MemberPackageId,
+                        PackageName = p.PackageNameSnapshot,
+                        SourceLabel = "Personal Training plan",
+                        SessionsRemaining = p.SessionCountRemaining!.Value,
+                        AssignedCoachId = p.CoachId,
+                    };
+                })
+                .OrderByDescending(p => p.SessionsRemaining)
+                .ToList();
 
             var inBodyPackage = activePackages
                 .Where(p => p.InBodyRemaining.HasValue && p.InBodyRemaining.Value > 0)
@@ -354,10 +370,13 @@ namespace GymSaaS.Services.Reception
             }
 
             // Coach picker (only needed when PT sessions are available).
-            if (result.PtSessionsRemaining.HasValue)
+            if (result.PtPackageOptions.Any())
             {
                 result.CoachOptions = await _db.Coaches
-                    .Where(c => c.TenantId == tenantId && c.BranchId == branchId
+                    .Where(c => c.TenantId == tenantId
+                             && (c.BranchId == branchId
+                                 || (c.UserId.HasValue && _db.UserBranches.Any(ub =>
+                                     ub.UserId == c.UserId.Value && ub.BranchId == branchId && ub.IsActive)))
                              && c.IsActive && !c.IsDeleted)
                     .OrderBy(c => c.FirstName).ThenBy(c => c.LastName)
                     .Select(c => new CoachOptionDto
@@ -405,6 +424,8 @@ namespace GymSaaS.Services.Reception
         private async Task<int> CountClassAttendeesAsync(GymClass cls, Guid tenantId, List<Guid> validStatusIds)
         {
             var localDateNow = DateTime.Now;
+            var dayStart = localDateNow.Date.ToUniversalTime();
+            var dayEnd = localDateNow.Date.AddDays(1).ToUniversalTime();
             var classStart = new DateTime(localDateNow.Year, localDateNow.Month, localDateNow.Day,
                                           cls.StartTime.Hour, cls.StartTime.Minute, 0).ToUniversalTime();
             var classEnd   = new DateTime(localDateNow.Year, localDateNow.Month, localDateNow.Day,
@@ -414,10 +435,13 @@ namespace GymSaaS.Services.Reception
                 .Where(a => a.TenantId == tenantId
                          && a.BranchId == cls.BranchId
                          && validStatusIds.Contains(a.AttendanceStatusId)
-                         && a.CheckInAtUtc >= classStart
-                         && a.CheckInAtUtc <= classEnd
-                         && a.MemberPackage != null
-                         && a.MemberPackage.GymClassId == cls.GymClassId)
+                         && ((a.GymClassId == cls.GymClassId
+                              && a.CheckInAtUtc >= dayStart && a.CheckInAtUtc < dayEnd)
+                             || (a.GymClassId == null
+                                 && a.MemberPackage != null
+                                 && a.MemberPackage.GymClassId == cls.GymClassId
+                                 && a.CheckInAtUtc >= classStart
+                                 && a.CheckInAtUtc <= classEnd)))
                 .Select(a => a.MemberId)
                 .Distinct()
                 .CountAsync();
@@ -441,15 +465,25 @@ namespace GymSaaS.Services.Reception
                     ErrorMessage = "Package not found."
                 };
 
+            if (package.PackageType.PackageTypeCode == "PERSONAL_TRAINING")
+                return new MarkAttendanceResult
+                {
+                    Success = false,
+                    ErrorMessage = "Select the coach and use Record PT for a personal-training visit."
+                };
+
             // CLASS check: enforce class capacity unless receptionist overrides.
-            // Triggered for any class-linked package — including COMBINED's SESSION row.
+            // Triggered for any class-linked session package.
             bool isClassLinked = package.GymClassId.HasValue
                               || package.PackageType.PackageTypeCode == "CLASS";
 
-            if (isClassLinked && !request.OverrideClassCapacity)
+            var targetClass = isClassLinked
+                ? await ResolveTargetClassAsync(package, request.BranchId, tenantId)
+                : null;
+
+            if (targetClass != null && !request.OverrideClassCapacity)
             {
-                var targetClass = await ResolveTargetClassAsync(package, request.BranchId, tenantId);
-                if (targetClass != null && targetClass.Capacity.HasValue)
+                if (targetClass.Capacity.HasValue)
                 {
                     var validStatusIds = await _db.AttendanceStatuses
                         .Where(s => new[] { "SUCCESS", "OVERRIDE_APPROVED", "MANUAL" }.Contains(s.StatusCode))
@@ -502,6 +536,13 @@ namespace GymSaaS.Services.Reception
                               && package.PackageType.PackageTypeCode is "SESSION" or "CLASS";
             int deductedCount  = deductSession ? 1 : 0;
 
+            if (deductSession && package.SessionCountRemaining <= 0)
+                return new MarkAttendanceResult
+                {
+                    Success = false,
+                    ErrorMessage = "No sessions remaining on the selected package."
+                };
+
             var record = new AttendanceRecord
             {
                 AttendanceRecordId       = Guid.NewGuid(),
@@ -509,6 +550,7 @@ namespace GymSaaS.Services.Reception
                 MemberId                 = request.MemberId,
                 BranchId                 = request.BranchId,
                 MemberPackageId          = request.SelectedMemberPackageId,
+                GymClassId               = targetClass?.GymClassId,
                 AttendanceStatusId       = statusId,
                 CheckInAtUtc             = now,
                 PresenceUntilUtc         = now.AddMinutes(branch.MemberPresenceWindowMinutes),
@@ -689,7 +731,9 @@ namespace GymSaaS.Services.Reception
                         : null,
                     Label = label
                 };
-            }).ToList();
+            })
+            .Where(p => p.PackageTypeCode != "PERSONAL_TRAINING")
+            .ToList();
         }
 
         // ── ConfirmPendingAsync ───────────────────────────────────
@@ -719,6 +763,13 @@ namespace GymSaaS.Services.Reception
 
             if (package == null)
                 return new ConfirmPendingResult { Success = false, ErrorMessage = "Package not found." };
+
+            if (package.PackageType.PackageTypeCode == "PERSONAL_TRAINING")
+                return new ConfirmPendingResult
+                {
+                    Success = false,
+                    ErrorMessage = "Personal-training visits must be confirmed with a coach."
+                };
 
             var manualStatusId = await _db.AttendanceStatuses
                 .Where(s => s.StatusCode == "MANUAL")
@@ -771,23 +822,136 @@ namespace GymSaaS.Services.Reception
             Guid memberId, Guid memberPackageId, Guid coachId, Guid branchId,
             Guid receptionistUserId, Guid tenantId)
         {
+            await using var transaction = await _db.Database.BeginTransactionAsync(
+                System.Data.IsolationLevel.Serializable);
+
+            var now = DateTime.UtcNow;
+            var today = DateOnly.FromDateTime(now);
             var package = await _db.MemberPackages
+                .Include(p => p.PackageType)
                 .FirstOrDefaultAsync(p => p.MemberPackageId == memberPackageId
                                        && p.MemberId == memberId
-                                       && p.TenantId == tenantId);
+                                       && p.TenantId == tenantId
+                                       && p.Status == "ACTIVE"
+                                       && p.ValidFromDate <= today
+                                       && (p.ValidToDate == null || p.ValidToDate >= today));
 
             if (package == null)
-                return new PerkUsageResult { Success = false, ErrorMessage = "Package not found." };
+                return new PerkUsageResult { Success = false, ErrorMessage = "No active PT package was found." };
 
-            if (!package.PtSessionsRemaining.HasValue || package.PtSessionsRemaining.Value <= 0)
+            var branch = await _db.Branches
+                .FirstOrDefaultAsync(b => b.BranchId == branchId
+                                       && b.TenantId == tenantId
+                                       && b.IsActive);
+            if (branch == null)
+                return new PerkUsageResult { Success = false, ErrorMessage = "Branch not found." };
+
+            if (package.PackageType.PackageTypeCode != "PERSONAL_TRAINING")
+                return new PerkUsageResult
+                {
+                    Success = false,
+                    ErrorMessage = "Select an active Personal Training plan."
+                };
+
+            var remaining = package.SessionCountRemaining;
+
+            if (!remaining.HasValue || remaining.Value <= 0)
                 return new PerkUsageResult { Success = false, ErrorMessage = "No PT sessions remaining." };
 
             var coachExists = await _db.Coaches.AnyAsync(c => c.CoachId == coachId
-                                                           && c.TenantId == tenantId);
+                                                           && c.TenantId == tenantId
+                                                           && (c.BranchId == branchId
+                                                               || (c.UserId.HasValue && _db.UserBranches.Any(ub =>
+                                                                   ub.UserId == c.UserId.Value
+                                                                   && ub.BranchId == branchId
+                                                                   && ub.IsActive)))
+                                                           && c.IsActive
+                                                           && !c.IsDeleted);
             if (!coachExists)
                 return new PerkUsageResult { Success = false, ErrorMessage = "Please select a valid coach." };
 
-            package.PtSessionsRemaining -= 1;
+            var policyCode = await _db.BranchAccessPolicyTypes
+                .Where(p => p.BranchAccessPolicyTypeId == package.BranchAccessPolicyTypeId)
+                .Select(p => p.PolicyCode)
+                .FirstOrDefaultAsync();
+            bool branchAllowed = policyCode switch
+            {
+                "ALL_BRANCHES" => true,
+                "HOME_ONLY" => package.HomeBranchId == branchId,
+                "SELECTED_BRANCHES" or "HOME_PLUS_LIMITED" or "CROSS_BRANCH_LIMITED" =>
+                    package.HomeBranchId == branchId
+                    || package.CrossBranchVisitsUsed < (package.CrossBranchVisitLimit ?? 0),
+                "CUSTOM" => true,
+                _ => false,
+            };
+            if (!branchAllowed)
+                return new PerkUsageResult
+                {
+                    Success = false,
+                    ErrorMessage = "This package does not allow access to the selected branch."
+                };
+
+            package.SessionCountRemaining -= 1;
+
+            var commissionSessionCount =
+                (package.SessionCountOriginal ?? 0) + package.CarryOverSessionsAdded;
+            decimal? commissionAmount = null;
+            if (package.PriceSnapshot.HasValue
+                && package.CoachCommissionPercent.HasValue
+                && commissionSessionCount > 0)
+            {
+                commissionAmount = Math.Round(
+                    package.PriceSnapshot.Value
+                    * package.CoachCommissionPercent.Value / 100m
+                    / commissionSessionCount,
+                    2);
+            }
+
+            Guid? attendanceRecordId = null;
+            var validStatusIds = await _db.AttendanceStatuses
+                .Where(s => new[] { "SUCCESS", "OVERRIDE_APPROVED", "MANUAL" }.Contains(s.StatusCode))
+                .Select(s => s.AttendanceStatusId)
+                .ToListAsync();
+            var alreadyInside = await _db.AttendanceRecords.AnyAsync(a =>
+                a.MemberId == memberId
+                && a.BranchId == branchId
+                && a.TenantId == tenantId
+                && validStatusIds.Contains(a.AttendanceStatusId)
+                && a.CheckInAtUtc > now.AddHours(-ReentryCooldownHours));
+
+            if (!alreadyInside)
+            {
+                var statusCode = receptionistUserId == Guid.Empty ? "SUCCESS" : "MANUAL";
+                var statusId = await _db.AttendanceStatuses
+                    .Where(s => s.StatusCode == statusCode)
+                    .Select(s => s.AttendanceStatusId)
+                    .FirstAsync();
+                attendanceRecordId = Guid.NewGuid();
+                var isCrossBranch = package.HomeBranchId != branchId;
+
+                _db.AttendanceRecords.Add(new AttendanceRecord
+                {
+                    AttendanceRecordId = attendanceRecordId.Value,
+                    TenantId = tenantId,
+                    MemberId = memberId,
+                    BranchId = branchId,
+                    MemberPackageId = memberPackageId,
+                    AttendanceStatusId = statusId,
+                    CheckInAtUtc = now,
+                    PresenceUntilUtc = now.AddMinutes(branch.MemberPresenceWindowMinutes),
+                    IsCrossBranchVisit = isCrossBranch,
+                    SessionDeducted = true,
+                    SessionsDeductedCount = 1,
+                    OverrideApplied = false,
+                    ReceptionistDecisionUserId =
+                        receptionistUserId == Guid.Empty ? null : receptionistUserId,
+                    CreatedAtUtc = now,
+                    Notes = "Personal training visit",
+                });
+
+                if (isCrossBranch)
+                    package.CrossBranchVisitsUsed += 1;
+            }
 
             _db.MemberPerkUsages.Add(new MemberPerkUsage
             {
@@ -797,14 +961,24 @@ namespace GymSaaS.Services.Reception
                 MemberPackageId  = memberPackageId,
                 PerkType         = "PT",
                 CoachId          = coachId,
+                AttendanceRecordId = attendanceRecordId,
+                CommissionPercentSnapshot = package.CoachCommissionPercent,
+                CommissionAmount = commissionAmount,
                 BranchId         = branchId,
-                UsedAtUtc        = DateTime.UtcNow,
+                UsedAtUtc        = now,
                 RecordedByUserId = receptionistUserId == Guid.Empty ? null : receptionistUserId,
             });
 
             await _db.SaveChangesAsync();
+            await transaction.CommitAsync();
 
-            return new PerkUsageResult { Success = true, Remaining = package.PtSessionsRemaining };
+            return new PerkUsageResult
+            {
+                Success = true,
+                Remaining = package.SessionCountRemaining,
+                AttendanceRecordId = attendanceRecordId,
+                CommissionAmount = commissionAmount,
+            };
         }
 
         // ── RecordInBodyAsync ─────────────────────────────────────
@@ -842,6 +1016,528 @@ namespace GymSaaS.Services.Reception
 
             return new PerkUsageResult { Success = true, Remaining = package.InBodyRemaining };
         }
+
+        // ── Paid drop-ins ─────────────────────────────────────────
+        public async Task<DropInPageViewModel?> BuildDropInPageAsync(
+            Guid branchId, Guid tenantId, string? phone, bool canEditPrices)
+        {
+            var branch = await _db.Branches
+                .FirstOrDefaultAsync(b => b.BranchId == branchId
+                                       && b.TenantId == tenantId
+                                       && b.IsActive);
+            if (branch == null) return null;
+
+            var tenant = await _db.Tenants
+                .Where(t => t.TenantId == tenantId && t.IsActive)
+                .Select(t => new { t.OpenGymDropInPrice, t.OneClassPassPrice })
+                .FirstOrDefaultAsync();
+            if (tenant == null) return null;
+
+            var vm = new DropInPageViewModel
+            {
+                BranchId = branchId,
+                BranchName = branch.BranchName,
+                PhoneSearch = phone?.Trim(),
+                SearchPerformed = !string.IsNullOrWhiteSpace(phone),
+                OpenGymPrice = tenant.OpenGymDropInPrice,
+                ClassPassPrice = tenant.OneClassPassPrice,
+                CanEditPrices = canEditPrices,
+                Branches = await GetBranchesAsync(tenantId),
+            };
+
+            var validStatusIds = await _db.AttendanceStatuses
+                .Where(s => new[] { "SUCCESS", "OVERRIDE_APPROVED", "MANUAL" }.Contains(s.StatusCode))
+                .Select(s => s.AttendanceStatusId)
+                .ToListAsync();
+
+            var todayDow = (int)DateTime.Today.DayOfWeek;
+            var classes = await _db.GymClasses
+                .Where(g => g.TenantId == tenantId
+                         && g.BranchId == branchId
+                         && g.DayOfWeek == todayDow
+                         && g.IsActive
+                         && !g.IsDeleted)
+                .OrderBy(g => g.StartTime)
+                .Select(g => new
+                {
+                    Entity = g,
+                    CoachName = g.Coach == null
+                        ? null
+                        : (g.Coach.FirstName + " " + g.Coach.LastName).Trim()
+                })
+                .ToListAsync();
+
+            foreach (var row in classes)
+            {
+                vm.TodayClasses.Add(new DropInClassOption
+                {
+                    GymClassId = row.Entity.GymClassId,
+                    ClassName = row.Entity.ClassName,
+                    TimeDisplay = $"{row.Entity.StartTime:HH:mm}–{row.Entity.EndTime:HH:mm}",
+                    CoachName = row.CoachName,
+                    Capacity = row.Entity.Capacity,
+                    AttendeeCount = await CountClassAttendeesAsync(row.Entity, tenantId, validStatusIds),
+                });
+            }
+
+            if (vm.SearchPerformed)
+            {
+                var normalizedPhone = NormalizePhone(phone!);
+                var member = await _db.Members
+                    .FirstOrDefaultAsync(m => m.TenantId == tenantId
+                                           && !m.IsDeleted
+                                           && m.PhoneNumber.Replace(" ", "")
+                                                .Replace("-", "")
+                                                .Replace("(", "")
+                                                .Replace(")", "") == normalizedPhone);
+
+                if (member != null)
+                {
+                    var coverage = await GetDropInCoverageAsync(member.MemberId, branchId, tenantId);
+                    vm.ExistingMember = new DropInMemberLookup
+                    {
+                        MemberId = member.MemberId,
+                        MembershipNumber = member.MembershipNumber,
+                        FullName = member.FullName ?? $"{member.FirstName} {member.LastName}".Trim(),
+                        PhoneNumber = member.PhoneNumber,
+                        Email = member.Email,
+                        ProfileImageUrl = member.ProfileImageUrl,
+                        HasOpenGymCoverage = coverage.OpenGym,
+                        HasClassCoverage = coverage.ClassPass,
+                        CoverageSummary = coverage.Summary,
+                    };
+                }
+            }
+
+            vm.Checkout = new DropInCheckoutViewModel
+            {
+                BranchId = branchId,
+                MemberId = vm.ExistingMember?.MemberId,
+                PhoneNumber = vm.ExistingMember?.PhoneNumber ?? vm.PhoneSearch ?? string.Empty,
+                ProductCode = DropInProductCodes.OpenGym,
+                FinalPrice = tenant.OpenGymDropInPrice,
+                PaymentMethod = "CASH",
+            };
+
+            var recentEntries = await _db.ManualIncomeEntries
+                .Where(i => i.TenantId == tenantId
+                         && i.BranchId == branchId
+                         && !i.IsDeleted
+                         && (i.SourceCode == DropInProductCodes.OpenGym
+                             || i.SourceCode == DropInProductCodes.ClassPass))
+                .OrderByDescending(i => i.CreatedAtUtc)
+                .Take(8)
+                .Select(i => new
+                {
+                    i.IncomeEntryId,
+                    i.SourceCode,
+                    i.MemberId,
+                    i.Amount,
+                    i.PaymentMethod,
+                    i.CreatedAtUtc,
+                })
+                .ToListAsync();
+
+            var recentMemberIds = recentEntries.Where(x => x.MemberId.HasValue)
+                .Select(x => x.MemberId!.Value).Distinct().ToList();
+            var recentMembers = await _db.Members
+                .Where(m => recentMemberIds.Contains(m.MemberId))
+                .Select(m => new
+                {
+                    m.MemberId,
+                    Name = m.FullName ?? (m.FirstName + " " + m.LastName).Trim(),
+                    m.MembershipNumber,
+                })
+                .ToDictionaryAsync(m => m.MemberId);
+
+            vm.RecentSales = recentEntries.Select(i =>
+            {
+                var member = i.MemberId.HasValue
+                    ? recentMembers.GetValueOrDefault(i.MemberId.Value)
+                    : null;
+                return new DropInRecentSale
+                {
+                    IncomeEntryId = i.IncomeEntryId,
+                    ProductName = i.SourceCode == DropInProductCodes.ClassPass
+                        ? "One Class Pass"
+                        : "Open Gym Drop-In",
+                    MemberName = member?.Name ?? "Unknown member",
+                    MembershipNumber = member?.MembershipNumber ?? "—",
+                    Amount = i.Amount,
+                    PaymentMethod = i.PaymentMethod,
+                    CreatedAtUtc = i.CreatedAtUtc,
+                };
+            }).ToList();
+
+            return vm;
+        }
+
+        public async Task<DropInCheckoutResult> CheckoutDropInAsync(
+            DropInCheckoutViewModel request, Guid receptionistUserId, Guid tenantId)
+        {
+            await using var transaction = await _db.Database.BeginTransactionAsync(
+                System.Data.IsolationLevel.Serializable);
+
+            var branch = await _db.Branches.FirstOrDefaultAsync(b =>
+                b.BranchId == request.BranchId
+                && b.TenantId == tenantId
+                && b.IsActive);
+            if (branch == null) return DropInFail("The selected branch is not available.");
+
+            var tenant = await _db.Tenants.FirstOrDefaultAsync(t =>
+                t.TenantId == tenantId && t.IsActive);
+            if (tenant == null) return DropInFail("Business settings were not found.");
+
+            var productCode = (request.ProductCode ?? "").Trim().ToUpperInvariant();
+            if (productCode is not (DropInProductCodes.OpenGym or DropInProductCodes.ClassPass))
+                return DropInFail("Select a valid drop-in type.");
+
+            if (request.FinalPrice is null || request.FinalPrice <= 0)
+                return DropInFail("The final price must be greater than zero.");
+
+            var allowedPaymentMethods = new[] { "CASH", "CARD", "BANK", "OTHER" };
+            var paymentMethod = (request.PaymentMethod ?? "").Trim().ToUpperInvariant();
+            if (!allowedPaymentMethods.Contains(paymentMethod))
+                return DropInFail("Select a valid payment method.");
+
+            var basePrice = productCode == DropInProductCodes.ClassPass
+                ? tenant.OneClassPassPrice
+                : tenant.OpenGymDropInPrice;
+            if (request.FinalPrice.Value != basePrice
+                && string.IsNullOrWhiteSpace(request.PriceOverrideReason))
+                return DropInFail("Enter a reason for changing the standard price.");
+
+            Member? member = null;
+            var memberCreated = false;
+            if (request.MemberId.HasValue)
+            {
+                member = await _db.Members.FirstOrDefaultAsync(m =>
+                    m.MemberId == request.MemberId.Value
+                    && m.TenantId == tenantId
+                    && !m.IsDeleted);
+                if (member == null) return DropInFail("The selected member was not found.");
+            }
+            else
+            {
+                var normalizedPhone = NormalizePhone(request.PhoneNumber);
+                member = await _db.Members.FirstOrDefaultAsync(m =>
+                    m.TenantId == tenantId
+                    && !m.IsDeleted
+                    && m.PhoneNumber.Replace(" ", "")
+                        .Replace("-", "")
+                        .Replace("(", "")
+                        .Replace(")", "") == normalizedPhone);
+
+                if (member == null)
+                {
+                    if (string.IsNullOrWhiteSpace(request.FirstName)
+                        || string.IsNullOrWhiteSpace(request.LastName)
+                        || string.IsNullOrWhiteSpace(request.Email)
+                        || string.IsNullOrWhiteSpace(request.PhoneNumber))
+                        return DropInFail("First name, last name, email, and phone are required for a new member.");
+
+                    var normalizedEmail = request.Email.Trim().ToUpperInvariant();
+                    if (await _db.Members.AnyAsync(m => m.TenantId == tenantId
+                                                     && !m.IsDeleted
+                                                     && m.NormalizedEmail == normalizedEmail))
+                        return DropInFail("A member with this email already exists. Search for the existing member first.");
+
+                    var activeStatusId = await _db.MemberStatuses
+                        .Where(s => s.StatusCode == "ACTIVE")
+                        .Select(s => s.MemberStatusId)
+                        .FirstOrDefaultAsync();
+                    if (activeStatusId == Guid.Empty)
+                        return DropInFail("The active member status is not configured.");
+
+                    var password = string.IsNullOrWhiteSpace(request.Password)
+                        ? "demopassword"
+                        : request.Password;
+                    member = new Member
+                    {
+                        MemberId = Guid.NewGuid(),
+                        TenantId = tenantId,
+                        MembershipNumber = await GenerateMembershipNumberAsync(tenantId),
+                        Email = request.Email.Trim().ToLowerInvariant(),
+                        NormalizedEmail = normalizedEmail,
+                        PasswordHash = password,
+                        PasswordSalt = null,
+                        FirstName = request.FirstName.Trim(),
+                        LastName = request.LastName.Trim(),
+                        PhoneNumber = request.PhoneNumber.Trim(),
+                        DateOfBirth = request.DateOfBirth,
+                        Gender = string.IsNullOrWhiteSpace(request.Gender) ? null : request.Gender.Trim(),
+                        HomeBranchId = request.BranchId,
+                        MemberStatusId = activeStatusId,
+                        MustChangePassword = password == "demopassword",
+                        IsActive = true,
+                        IsDeleted = false,
+                        Notes = "Created at reception during a paid drop-in sale.",
+                        CreatedAtUtc = DateTime.UtcNow,
+                        CreatedByUserId = receptionistUserId,
+                    };
+                    _db.Members.Add(member);
+                    memberCreated = true;
+                }
+            }
+
+            var coverage = await GetDropInCoverageAsync(member.MemberId, request.BranchId, tenantId);
+            var hasCoverage = productCode == DropInProductCodes.ClassPass
+                ? coverage.ClassPass
+                : coverage.OpenGym;
+            if (hasCoverage && !request.ConfirmPaidDropIn)
+                return DropInFail(
+                    $"{coverage.Summary ?? "This member has an active package that may cover this visit."} Confirm that they still want a paid drop-in.");
+
+            var now = DateTime.UtcNow;
+            GymClass? selectedClass = null;
+            if (productCode == DropInProductCodes.ClassPass)
+            {
+                if (!request.GymClassId.HasValue)
+                    return DropInFail("Select today's class for the one-class pass.");
+
+                var todayDow = (int)DateTime.Today.DayOfWeek;
+                selectedClass = await _db.GymClasses.FirstOrDefaultAsync(g =>
+                    g.GymClassId == request.GymClassId.Value
+                    && g.TenantId == tenantId
+                    && g.BranchId == request.BranchId
+                    && g.DayOfWeek == todayDow
+                    && g.IsActive
+                    && !g.IsDeleted);
+                if (selectedClass == null)
+                    return DropInFail("The selected class is not scheduled at this branch today.");
+
+                var validStatuses = await _db.AttendanceStatuses
+                    .Where(s => new[] { "SUCCESS", "OVERRIDE_APPROVED", "MANUAL" }.Contains(s.StatusCode))
+                    .Select(s => s.AttendanceStatusId)
+                    .ToListAsync();
+                if (selectedClass.Capacity.HasValue
+                    && await CountClassAttendeesAsync(selectedClass, tenantId, validStatuses) >= selectedClass.Capacity.Value)
+                    return DropInFail($"{selectedClass.ClassName} is full.");
+
+                var alreadyInClass = await _db.AttendanceRecords.AnyAsync(a =>
+                    a.TenantId == tenantId
+                    && a.MemberId == member.MemberId
+                    && a.GymClassId == selectedClass.GymClassId
+                    && a.CheckInAtUtc >= now.Date);
+                if (alreadyInClass)
+                    return DropInFail("This member is already recorded for the selected class today.");
+            }
+            else
+            {
+                var validStatuses = await _db.AttendanceStatuses
+                    .Where(s => new[] { "SUCCESS", "OVERRIDE_APPROVED", "MANUAL" }.Contains(s.StatusCode))
+                    .Select(s => s.AttendanceStatusId)
+                    .ToListAsync();
+                var alreadyInside = await _db.AttendanceRecords.AnyAsync(a =>
+                    a.TenantId == tenantId
+                    && a.MemberId == member.MemberId
+                    && a.BranchId == request.BranchId
+                    && validStatuses.Contains(a.AttendanceStatusId)
+                    && a.PresenceUntilUtc > now);
+                if (alreadyInside)
+                    return DropInFail("This member is already checked in at this branch.");
+            }
+
+            var manualStatusId = await _db.AttendanceStatuses
+                .Where(s => s.StatusCode == "MANUAL")
+                .Select(s => s.AttendanceStatusId)
+                .FirstOrDefaultAsync();
+            if (manualStatusId == Guid.Empty)
+                return DropInFail("The manual attendance status is not configured.");
+
+            var attendanceId = Guid.NewGuid();
+            var presenceUntil = now.AddMinutes(branch.MemberPresenceWindowMinutes);
+            if (selectedClass != null)
+            {
+                var localEnd = new DateTime(DateTime.Today.Year, DateTime.Today.Month, DateTime.Today.Day,
+                    selectedClass.EndTime.Hour, selectedClass.EndTime.Minute, 0, DateTimeKind.Local).ToUniversalTime();
+                if (localEnd > presenceUntil) presenceUntil = localEnd;
+            }
+
+            _db.AttendanceRecords.Add(new AttendanceRecord
+            {
+                AttendanceRecordId = attendanceId,
+                TenantId = tenantId,
+                MemberId = member.MemberId,
+                BranchId = request.BranchId,
+                MemberPackageId = null,
+                GymClassId = selectedClass?.GymClassId,
+                AttendanceStatusId = manualStatusId,
+                CheckInAtUtc = now,
+                PresenceUntilUtc = presenceUntil,
+                IsCrossBranchVisit = member.HomeBranchId != request.BranchId,
+                SessionDeducted = false,
+                SessionsDeductedCount = 0,
+                OverrideApplied = request.FinalPrice.Value != basePrice,
+                ReceptionistDecisionUserId = receptionistUserId,
+                Notes = productCode == DropInProductCodes.ClassPass
+                    ? $"Paid one-class pass · {selectedClass!.ClassName}"
+                    : "Paid open gym drop-in",
+                CreatedAtUtc = now,
+            });
+
+            var incomeId = Guid.NewGuid();
+            _db.ManualIncomeEntries.Add(new ManualIncomeEntry
+            {
+                IncomeEntryId = incomeId,
+                TenantId = tenantId,
+                BranchId = request.BranchId,
+                CategoryCode = productCode == DropInProductCodes.ClassPass
+                    ? "CLASS_PASS"
+                    : "DROP_IN",
+                Description = productCode == DropInProductCodes.ClassPass
+                    ? $"One Class Pass · {selectedClass!.ClassName} · {member.FullName ?? member.FirstName + " " + member.LastName}"
+                    : $"Open Gym Drop-In · {member.FullName ?? member.FirstName + " " + member.LastName}",
+                Amount = request.FinalPrice.Value,
+                BaseAmount = basePrice,
+                IncomeDate = DateOnly.FromDateTime(DateTime.Today),
+                PaymentMethod = paymentMethod,
+                Notes = memberCreated ? "New member created during checkout." : null,
+                SourceCode = productCode,
+                MemberId = member.MemberId,
+                AttendanceRecordId = attendanceId,
+                GymClassId = selectedClass?.GymClassId,
+                PriceOverrideReason = request.FinalPrice.Value != basePrice
+                    ? request.PriceOverrideReason!.Trim()
+                    : null,
+                WasMemberCreated = memberCreated,
+                CreatedAtUtc = now,
+                CreatedByUserId = receptionistUserId,
+            });
+
+            await _db.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            return new DropInCheckoutResult
+            {
+                Success = true,
+                MemberId = member.MemberId,
+                MemberName = member.FullName ?? $"{member.FirstName} {member.LastName}".Trim(),
+                MembershipNumber = member.MembershipNumber,
+                AttendanceRecordId = attendanceId,
+                IncomeEntryId = incomeId,
+                Amount = request.FinalPrice.Value,
+                MemberCreated = memberCreated,
+            };
+        }
+
+        public async Task<(bool Success, string? Error)> VoidDropInAsync(
+            Guid incomeEntryId, Guid branchId, string reason, Guid userId, Guid tenantId)
+        {
+            if (string.IsNullOrWhiteSpace(reason))
+                return (false, "A cancellation reason is required.");
+
+            await using var transaction = await _db.Database.BeginTransactionAsync(
+                System.Data.IsolationLevel.Serializable);
+            var entry = await _db.ManualIncomeEntries.FirstOrDefaultAsync(i =>
+                i.IncomeEntryId == incomeEntryId
+                && i.TenantId == tenantId
+                && i.BranchId == branchId
+                && !i.IsDeleted
+                && (i.SourceCode == DropInProductCodes.OpenGym
+                    || i.SourceCode == DropInProductCodes.ClassPass));
+            if (entry == null) return (false, "Drop-in sale not found or already cancelled.");
+
+            if (entry.AttendanceRecordId.HasValue)
+            {
+                var attendance = await _db.AttendanceRecords.FirstOrDefaultAsync(a =>
+                    a.AttendanceRecordId == entry.AttendanceRecordId.Value
+                    && a.TenantId == tenantId);
+                if (attendance != null) _db.AttendanceRecords.Remove(attendance);
+            }
+
+            entry.IsDeleted = true;
+            entry.VoidedAtUtc = DateTime.UtcNow;
+            entry.VoidedByUserId = userId;
+            entry.VoidReason = reason.Trim();
+            entry.UpdatedAtUtc = DateTime.UtcNow;
+            entry.UpdatedByUserId = userId;
+
+            await _db.SaveChangesAsync();
+            await transaction.CommitAsync();
+            return (true, null);
+        }
+
+        public async Task<(bool Success, string? Error)> UpdateDropInPricesAsync(
+            DropInPriceSettingsViewModel model, Guid tenantId)
+        {
+            if (model.OpenGymPrice <= 0 || model.ClassPassPrice <= 0)
+                return (false, "Both prices must be greater than zero.");
+
+            var tenant = await _db.Tenants.FirstOrDefaultAsync(t => t.TenantId == tenantId);
+            if (tenant == null) return (false, "Business settings were not found.");
+
+            tenant.OpenGymDropInPrice = model.OpenGymPrice;
+            tenant.OneClassPassPrice = model.ClassPassPrice;
+            tenant.UpdatedAtUtc = DateTime.UtcNow;
+            await _db.SaveChangesAsync();
+            return (true, null);
+        }
+
+        private async Task<(bool OpenGym, bool ClassPass, string? Summary)> GetDropInCoverageAsync(
+            Guid memberId, Guid branchId, Guid tenantId)
+        {
+            var today = DateOnly.FromDateTime(DateTime.Today);
+            var packages = await _db.MemberPackages
+                .Include(p => p.PackageType)
+                .Include(p => p.BranchAccessPolicyType)
+                .Include(p => p.MemberPackageAllowedBranches)
+                .Where(p => p.MemberId == memberId
+                         && p.TenantId == tenantId
+                         && p.Status == "ACTIVE"
+                         && p.ValidFromDate <= today
+                         && (p.ValidToDate == null || p.ValidToDate >= today))
+                .ToListAsync();
+
+            var accessible = packages.Where(p => PackageAllowsBranch(p, branchId)).ToList();
+            var openGym = accessible.Any(p => p.PackageType.PackageTypeCode is "OPEN_GYM" or "SUBSCRIPTION" or "BUNDLE");
+            var classPass = accessible.Any(p =>
+                (p.PackageType.PackageTypeCode is "SESSION" or "CLASS")
+                && (!p.SessionCountRemaining.HasValue || p.SessionCountRemaining > 0));
+            var labels = new List<string>();
+            if (openGym) labels.Add("active open-gym access");
+            if (classPass) labels.Add("remaining class sessions");
+            return (openGym, classPass,
+                labels.Count == 0 ? null : "Member already has " + string.Join(" and ", labels) + ".");
+        }
+
+        private static bool PackageAllowsBranch(MemberPackage package, Guid branchId)
+        {
+            var policy = package.BranchAccessPolicyType?.PolicyCode;
+            return policy switch
+            {
+                "ALL_BRANCHES" => true,
+                "HOME_ONLY" => package.HomeBranchId == branchId,
+                "SELECTED_BRANCHES" or "HOME_PLUS_LIMITED" or "CROSS_BRANCH_LIMITED" =>
+                    package.HomeBranchId == branchId
+                    || package.MemberPackageAllowedBranches.Any(x => x.BranchId == branchId),
+                "CUSTOM" => true,
+                _ => package.HomeBranchId == branchId,
+            };
+        }
+
+        private async Task<string> GenerateMembershipNumberAsync(Guid tenantId)
+        {
+            var existing = await _db.Members
+                .Where(m => m.TenantId == tenantId)
+                .Select(m => m.MembershipNumber)
+                .ToListAsync();
+            var next = 1000;
+            foreach (var value in existing)
+                if (int.TryParse(value, out var number) && number >= next)
+                    next = number + 1;
+            return next.ToString();
+        }
+
+        private static string NormalizePhone(string phone) =>
+            (phone ?? string.Empty).Trim()
+                .Replace(" ", string.Empty)
+                .Replace("-", string.Empty)
+                .Replace("(", string.Empty)
+                .Replace(")", string.Empty);
+
+        private static DropInCheckoutResult DropInFail(string message) =>
+            new() { Success = false, ErrorMessage = message };
 
         // ── GetBranchesAsync ──────────────────────────────────────
         public async Task<List<BranchOptionDto>> GetBranchesAsync(Guid tenantId)

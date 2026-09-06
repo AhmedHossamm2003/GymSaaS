@@ -9,7 +9,7 @@ using System.Security.Claims;
 
 namespace GymSaaS.Controllers
 {
-    [Authorize]
+    [GymSaaS.Authorization.ViewPermissionAuthorize]
     public class BranchesController : Controller
     {
         private readonly GymDbContext _db;

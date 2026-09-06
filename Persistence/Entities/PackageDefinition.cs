@@ -30,15 +30,13 @@ public partial class PackageDefinition
 
     public int? SessionCount { get; set; }
 
-    // Linked gym class — set only for SESSION / COMBINED packages
+    // Linked gym class — set only for SESSION packages
     public Guid? GymClassId { get; set; }
 
     // Package perks / add-ons — defaults copied to MemberPackage on assignment
     public int? InvitationCount { get; set; }
 
     public int? InBodyCount { get; set; }
-
-    public int? PtSessionCount { get; set; }
 
     public int? FreezeAllowanceDays { get; set; }
 
@@ -62,8 +60,6 @@ public partial class PackageDefinition
     public bool AllowCustomOverrideDuringAssignment { get; set; }
 
     public bool IsCustomTemplate { get; set; }
-
-    public bool IsPrivateTraining { get; set; }
 
     public bool IsActive { get; set; }
 
@@ -92,7 +88,8 @@ public partial class PackageDefinition
     public decimal? MaxDiscountedPrice { get; set; }
 
     // Percentage of package price paid to the coach (0-100).
-    // Only meaningful when IsPrivateTraining = true. Snapshotted to MemberPackage on assignment.
+    // Used by PERSONAL_TRAINING plans.
+    // Snapshotted to MemberPackage on assignment.
     [Column(TypeName = "decimal(5, 2)")]
     public decimal? CoachCommissionPercent { get; set; }
 

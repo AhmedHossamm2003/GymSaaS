@@ -445,22 +445,34 @@
             <p class="reception-subtitle">Scan members, check branch access, and manage live attendance.</p>
         </div>
 
-        @if (isAdmin && branches.Count > 0)
-        {
-            <select id="branchSelector" class="branch-select">
-                @foreach (var b in branches)
-                {
-                    if (b.BranchId == selectedBranchId)
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end;">
+            <a asp-action="DropIn" asp-route-branchId="@selectedBranchId" class="orange-btn"
+               style="min-height:40px;padding:0 16px;text-decoration:none;display:inline-flex;align-items:center;gap:7px;">
+                <i class="bi bi-person-plus-fill"></i> Paid Drop-In
+            </a>
+            @if (isAdmin)
+            {
+                <a asp-action="DropInSettings" class="btn btn-secondary" title="Drop-in prices">
+                    <i class="bi bi-gear"></i>
+                </a>
+            }
+            @if (isAdmin && branches.Count > 0)
+            {
+                <select id="branchSelector" class="branch-select">
+                    @foreach (var b in branches)
                     {
-                        <option value="@b.BranchId" selected>@b.BranchName</option>
+                        if (b.BranchId == selectedBranchId)
+                        {
+                            <option value="@b.BranchId" selected>@b.BranchName</option>
+                        }
+                        else
+                        {
+                            <option value="@b.BranchId">@b.BranchName</option>
+                        }
                     }
-                    else
-                    {
-                        <option value="@b.BranchId">@b.BranchName</option>
-                    }
-                }
-            </select>
-        }
+                </select>
+            }
+        </div>
     </div>
 
     @Html.AntiForgeryToken()
@@ -846,6 +858,8 @@
                         </div>
                     </div>
                 </div>
+                <select id="ptPackageSelect" class="scan-input"
+                        style="width:100%;min-height:38px;font-size:13px;margin-bottom:8px;"></select>
                 <div style="display:flex;gap:8px;align-items:center;">
                     <select id="ptCoachSelect" class="scan-input"
                             style="flex:1;min-height:38px;font-size:13px;"></select>
@@ -1286,29 +1300,54 @@
             // ── PT / InBody perk panels ───────────────────────────────
             function showPerkPanels(data) {
                 // PT sessions
-                if (typeof data.ptSessionsRemaining === 'number' && data.ptSessionsRemaining > 0) {
-                    document.getElementById('ptRemainingNum').textContent = data.ptSessionsRemaining;
+                const ptPackages = data.ptPackageOptions || [];
+                if (ptPackages.length) {
+                    const packageSel = document.getElementById('ptPackageSelect');
+                    const coachSel = document.getElementById('ptCoachSelect');
 
-                    const sel = document.getElementById('ptCoachSelect');
-                    sel.innerHTML = '';
+                    const renderPackageOptions = function () {
+                        packageSel.innerHTML = '';
+                        ptPackages.forEach(function (p) {
+                            const opt = document.createElement('option');
+                            opt.value = p.memberPackageId;
+                            opt.textContent = p.packageName + ' · ' + p.sourceLabel + ' · ' + p.sessionsRemaining + ' left';
+                            packageSel.appendChild(opt);
+                        });
+                    };
+
+                    coachSel.innerHTML = '';
                     (data.coachOptions || []).forEach(function (c) {
                         const opt = document.createElement('option');
                         opt.value = c.coachId;
                         opt.textContent = c.name;
-                        if (data.ptAssignedCoachId && c.coachId === data.ptAssignedCoachId)
-                            opt.selected = true;
-                        sel.appendChild(opt);
+                        coachSel.appendChild(opt);
                     });
-                    if (!sel.options.length) {
+                    if (!coachSel.options.length) {
                         const opt = document.createElement('option');
                         opt.value = '';
                         opt.textContent = 'No coaches at this branch';
-                        sel.appendChild(opt);
+                        coachSel.appendChild(opt);
                     }
+
+                    const syncSelectedPackage = function () {
+                        const selected = ptPackages.find(p => p.memberPackageId === packageSel.value)
+                            || ptPackages[0];
+                        document.getElementById('ptRemainingNum').textContent =
+                            selected?.sessionsRemaining ?? 0;
+                        if (selected?.assignedCoachId) {
+                            const coachExists = Array.from(coachSel.options)
+                                .some(o => o.value === selected.assignedCoachId);
+                            if (coachExists) coachSel.value = selected.assignedCoachId;
+                        }
+                    };
+
+                    renderPackageOptions();
+                    syncSelectedPackage();
+                    packageSel.onchange = syncSelectedPackage;
 
                     const btn = document.getElementById('btnRecordPt');
                     btn.onclick = function () {
-                        recordPt(data.memberId, data.ptPackageId, sel.value);
+                        recordPt(data.memberId, packageSel.value, coachSel.value, ptPackages, renderPackageOptions, syncSelectedPackage);
                     };
                     document.getElementById('ptPerkPanel').classList.remove('d-none');
                 }
@@ -1324,7 +1363,7 @@
                 }
             }
 
-            async function recordPt(memberId, memberPackageId, coachId) {
+            async function recordPt(memberId, memberPackageId, coachId, ptPackages, renderPackageOptions, syncSelectedPackage) {
                 const fb = document.getElementById('ptFeedback');
                 if (!coachId) { fb.innerHTML = '<span style="color:#b42318;">Select a coach first.</span>'; return; }
                 const btn = document.getElementById('btnRecordPt');
@@ -1339,9 +1378,29 @@
                     const data = await res.json();
                     if (data.success) {
                         document.getElementById('ptRemainingNum').textContent = data.remaining;
-                        fb.innerHTML = `<span style="color:#16a34a;font-weight:700;"><i class="bi bi-check-circle-fill"></i> PT session recorded. ${data.remaining} left.</span>`;
+                        const selected = ptPackages.find(p => p.memberPackageId === memberPackageId);
+                        if (selected) selected.sessionsRemaining = data.remaining;
+                        const action = data.attendanceRecordId
+                            ? 'Checked in and PT session recorded.'
+                            : 'PT session recorded; member was already checked in.';
+                        fb.innerHTML = '<span style="color:#16a34a;font-weight:700;"><i class="bi bi-check-circle-fill"></i> '
+                            + action + ' ' + data.remaining + ' left.</span>';
+                        refreshStats();
+                        if (window.advancePollerCursor) {
+                            window.advancePollerCursor(new Date().toISOString());
+                        }
                         if (data.remaining <= 0) {
-                            setTimeout(() => document.getElementById('ptPerkPanel').classList.add('d-none'), 1200);
+                            const index = ptPackages.findIndex(p => p.memberPackageId === memberPackageId);
+                            if (index >= 0) ptPackages.splice(index, 1);
+                            if (ptPackages.length) {
+                                renderPackageOptions();
+                                syncSelectedPackage();
+                            } else {
+                                setTimeout(() => document.getElementById('ptPerkPanel').classList.add('d-none'), 1200);
+                            }
+                        } else {
+                            renderPackageOptions();
+                            document.getElementById('ptPackageSelect').value = memberPackageId;
                         }
                     } else {
                         fb.innerHTML = `<span style="color:#b42318;">${data.errorMessage ?? 'Failed.'}</span>`;
@@ -1466,6 +1525,7 @@
                     MEMBER_NOT_FOUND: 'Member Not Found',
                     MEMBER_INACTIVE: 'Inactive Account',
                     NO_ACTIVE_PACKAGE: 'No Active Package',
+                    NO_AVAILABLE_VISITS: 'No Sessions Remaining',
                     BRANCH_ACCESS_DENIED: 'Access Denied',
                     BRANCH_NOT_FOUND: 'Branch Not Found'
                 })[code] ?? 'Entry Denied';
