@@ -929,11 +929,34 @@
             </div>
 
             <div id="conflictSection" class="d-none">
-                <div class="stat-note">
+                <div class="stat-note" id="conflictNote">
                     This member has multiple active packages. Please select how to check them in:
                 </div>
 
                 <div id="packageButtons" class="package-buttons"></div>
+
+                <!-- Class picker shown when checking in on a session package -->
+                <div id="classPickerSection" class="d-none" style="margin-top:14px;">
+                    <div class="stat-note" id="classPickerNote">Which class is the member attending?</div>
+                    <select id="classPickerSelect"
+                            style="margin-top:8px;width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;background:#fff;"></select>
+                    <div id="classPickerFullWarn" class="d-none" style="margin-top:8px;">
+                        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12.5px;color:#b42318;">
+                            <input type="checkbox" id="classPickerOverride" style="width:15px;height:15px;" />
+                            This class is full — allow entry anyway (override capacity).
+                        </label>
+                    </div>
+                    <div style="margin-top:12px;display:flex;gap:8px;">
+                        <button type="button" id="btnConfirmClass" class="orange-btn"
+                                style="min-height:38px;padding:0 16px;font-size:13px;">
+                            Confirm Check-In
+                        </button>
+                        <button type="button" id="btnCancelClass"
+                                style="min-height:38px;padding:0 14px;font-size:13px;background:#f3f4f6;border:1px solid #d1d5db;border-radius:8px;cursor:pointer;">
+                            Back
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -1115,8 +1138,12 @@
                     }
                 }
 
-                if (data.hasConflict && !data.alreadyInsideGym && data.packageOptions) {
+                if ((data.hasConflict || data.requiresClassChoice) && !data.alreadyInsideGym && data.packageOptions) {
                     conflictSection.classList.remove('d-none');
+
+                    document.getElementById('conflictNote').textContent = data.hasConflict
+                        ? 'This member has multiple active packages. Please select how to check them in:'
+                        : 'Select how to check this member in:';
 
                     data.packageOptions.forEach(function (opt) {
                         const btn = document.createElement('button');
@@ -1128,7 +1155,12 @@
                             + (opt.sessionsRemaining ? ` <small style="color:#6b7280;">(${opt.sessionsRemaining})</small>` : '');
 
                         btn.addEventListener('click', function () {
-                            markAttendance(data.memberId, opt.memberPackageId, opt.label);
+                            // Session packages must be tied to a class — open the class picker.
+                            if (opt.packageTypeCode === 'SESSION') {
+                                openClassPicker(data, opt);
+                            } else {
+                                markAttendance(data.memberId, opt.memberPackageId, opt.label);
+                            }
                         });
 
                         packageButtons.appendChild(btn);
@@ -1151,12 +1183,73 @@
                 openModal();
             }
 
-            async function markAttendance(memberId, memberPackageId, label, overrideClassCapacity) {
+            // Show the class picker for a session-package check-in.
+            function openClassPicker(data, opt) {
+                const section      = document.getElementById('classPickerSection');
+                const select       = document.getElementById('classPickerSelect');
+                const fullWarn     = document.getElementById('classPickerFullWarn');
+                const overrideChk  = document.getElementById('classPickerOverride');
+                const classes      = data.classOptions || [];
+
+                packageButtons.classList.add('d-none');
+                section.classList.remove('d-none');
+
+                select.innerHTML = '';
+                if (!classes.length) {
+                    const o = document.createElement('option');
+                    o.value = '';
+                    o.textContent = 'No classes scheduled today';
+                    select.appendChild(o);
+                } else {
+                    classes.forEach(function (c) {
+                        const o = document.createElement('option');
+                        o.value = c.gymClassId;
+                        const cap = (c.capacity != null) ? ` (${c.attendeeCount}/${c.capacity})` : '';
+                        const coach = c.coachName ? ` · ${c.coachName}` : '';
+                        o.textContent = `${c.className} · ${c.timeDisplay}${coach}${cap}${c.isFull ? ' — FULL' : ''}`;
+                        o.dataset.full = c.isFull ? '1' : '0';
+                        select.appendChild(o);
+                    });
+                }
+
+                function syncFull() {
+                    const sel = select.options[select.selectedIndex];
+                    const isFull = sel && sel.dataset.full === '1';
+                    if (isFull) {
+                        fullWarn.classList.remove('d-none');
+                    } else {
+                        fullWarn.classList.add('d-none');
+                        overrideChk.checked = false;
+                    }
+                }
+                overrideChk.checked = false;
+                select.onchange = syncFull;
+                syncFull();
+
+                document.getElementById('btnConfirmClass').onclick = function () {
+                    if (!classes.length || !select.value) {
+                        showModalError('No Class Selected', 'Select the class the member is attending.');
+                        return;
+                    }
+                    const sel = select.options[select.selectedIndex];
+                    const isFull = sel && sel.dataset.full === '1';
+                    markAttendance(data.memberId, opt.memberPackageId, opt.label,
+                                   isFull && overrideChk.checked, select.value);
+                };
+                document.getElementById('btnCancelClass').onclick = function () {
+                    section.classList.add('d-none');
+                    packageButtons.classList.remove('d-none');
+                };
+            }
+
+            async function markAttendance(memberId, memberPackageId, label, overrideClassCapacity, selectedGymClassId) {
                 packageButtons.querySelectorAll('button').forEach(function (b) {
                     b.disabled = true;
                 });
                 const overrideBtn = document.getElementById('btnOverrideClassFull');
                 if (overrideBtn) overrideBtn.disabled = true;
+                const confirmClassBtn = document.getElementById('btnConfirmClass');
+                if (confirmClassBtn) confirmClassBtn.disabled = true;
 
                 try {
                     const res = await fetch('/Reception/MarkAttendance', {
@@ -1169,6 +1262,7 @@
                             memberId: memberId,
                             branchId: branchId,
                             selectedMemberPackageId: memberPackageId,
+                            selectedGymClassId: selectedGymClassId || null,
                             overrideClassCapacity: overrideClassCapacity === true
                         })
                     });
@@ -1177,6 +1271,7 @@
 
                     conflictSection.classList.add('d-none');
                     document.getElementById('classFullAlert').classList.add('d-none');
+                    document.getElementById('classPickerSection').classList.add('d-none');
 
                     if (data.success) {
                         autoAlert.classList.remove('d-none');
@@ -1196,6 +1291,7 @@
                 }
                 finally {
                     if (overrideBtn) overrideBtn.disabled = false;
+                    if (confirmClassBtn) confirmClassBtn.disabled = false;
                 }
             }
 
@@ -1281,6 +1377,10 @@
                 autoAlert.classList.add('d-none');
                 conflictSection.classList.add('d-none');
                 packageButtons.innerHTML = '';
+                packageButtons.classList.remove('d-none');
+                document.getElementById('classPickerSection').classList.add('d-none');
+                document.getElementById('classPickerFullWarn').classList.add('d-none');
+                document.getElementById('classPickerOverride').checked = false;
                 document.getElementById('memberPhone').classList.add('d-none');
                 document.getElementById('memberPhoneVal').textContent = '';
                 document.getElementById('memberPackageInfo').classList.add('d-none');

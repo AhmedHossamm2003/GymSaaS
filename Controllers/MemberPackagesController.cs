@@ -141,8 +141,10 @@ namespace GymSaaS.Controllers
             // Use the staff-entered FinalPrice (after any discount) if provided;
             // otherwise fall back to the package's catalog price.
             decimal? priceSnap = model.FinalPrice ?? pkgDef.Price;
+            // Coach cut can differ per member, so honour the staff-entered value when
+            // provided and fall back to the package catalog rate otherwise.
             decimal? commissionPct = isPersonalTraining
-                ? pkgDef.CoachCommissionPercent
+                ? (model.CustomCoachCommissionPercent ?? pkgDef.CoachCommissionPercent)
                 : null;
 
             // Resolve perks — use override if provided, else use catalog defaults

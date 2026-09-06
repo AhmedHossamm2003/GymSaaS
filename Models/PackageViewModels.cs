@@ -263,6 +263,11 @@ namespace GymSaaS.Models
         // Individual PT sessions may still be delivered by another coach.
         public Guid? CoachId { get; set; }
 
+        // Coach commission (%) for this PT package. Defaults to the package catalog
+        // rate but is editable per assignment because the cut can differ per member.
+        [Range(0, 100, ErrorMessage = "Coach cut must be between 0 and 100%.")]
+        public decimal? CustomCoachCommissionPercent { get; set; }
+
         // For the coach picker (loaded for the home branch)
         public List<CoachDropdownItem> AvailableCoaches { get; set; } = new();
     }

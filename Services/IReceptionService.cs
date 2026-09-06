@@ -80,6 +80,13 @@ namespace GymSaaS.Services.Reception
         // Packages available for check-in
         public List<PackageOptionDto> PackageOptions { get; set; } = new();
 
+        // True when a session-based package is in play: reception must pick which
+        // class the member is attending before the session is deducted.
+        public bool RequiresClassChoice { get; set; }
+
+        // Today's classes at the branch — shown in the session-package class picker.
+        public List<ClassOptionDto> ClassOptions { get; set; } = new();
+
         // If no conflict — auto check-in was done, return the record id
         public Guid? AutoCheckedInRecordId { get; set; }
         public string? AutoCheckedInPackageName { get; set; }
@@ -125,6 +132,20 @@ namespace GymSaaS.Services.Reception
     }
 
     /// <summary>
+    /// One class shown in the session-package class picker.
+    /// </summary>
+    public class ClassOptionDto
+    {
+        public Guid GymClassId { get; set; }
+        public string ClassName { get; set; } = null!;
+        public string TimeDisplay { get; set; } = null!;   // "HH:mm–HH:mm"
+        public string? CoachName { get; set; }
+        public int? Capacity { get; set; }
+        public int AttendeeCount { get; set; }
+        public bool IsFull { get; set; }
+    }
+
+    /// <summary>
     /// One package option shown in the conflict popup.
     /// </summary>
     public class PackageOptionDto
@@ -146,6 +167,10 @@ namespace GymSaaS.Services.Reception
         public Guid SelectedMemberPackageId { get; set; }
         public Guid ReceptionistUserId { get; set; }
         public bool OverrideClassCapacity { get; set; }
+
+        // Required when the chosen package is a session package: the class the
+        // member is attending. Ignored for open-gym / class-linked packages.
+        public Guid? SelectedGymClassId { get; set; }
     }
 
     /// <summary>

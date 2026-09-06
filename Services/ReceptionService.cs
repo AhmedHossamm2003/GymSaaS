@@ -240,11 +240,33 @@ namespace GymSaaS.Services.Reception
                 .Where(p => !p.GymClassId.HasValue && p.PackageType.PackageTypeCode != "CLASS")
                 .ToList();
 
+            // A package "consumes a session" on check-in when it is session-based
+            // (a SESSION or CLASS package carrying a remaining-session count). Open-gym,
+            // subscription and bundle packages grant entry without deducting anything.
+            // Mirrors the deduction rule in MarkAttendanceAsync.
+            static bool DeductsSession(MemberPackage p) =>
+                p.SessionCountRemaining.HasValue
+                && p.PackageType.PackageTypeCode is "SESSION" or "CLASS";
+
+            var deductingPackages    = standardPackages.Where(DeductsSession).ToList();
+            var nonDeductingPackages = standardPackages.Where(p => !DeductsSession(p)).ToList();
+
+            // Session packages (SESSION type with a remaining count, not tied to a
+            // specific class): checking in on one requires reception to say which
+            // class the member is attending.
+            var sessionPackages = nonClassPackages.Where(DeductsSession).ToList();
+
             bool hasPtBalance = ptPlanPackages.Any();
             if (!standardPackages.Any() && !hasPtBalance)
                 return Fail("NO_AVAILABLE_VISITS", "No gym or personal-training sessions remain.");
 
+            // Ask reception to choose whenever the visit is ambiguous, so a session is
+            // never silently deducted when the member may be here for open-gym access:
+            //   • a class package alongside a non-class one, OR
+            //   • a session-deducting package alongside a non-deducting (open-gym) one, OR
+            //   • any PT balance alongside a standard package.
             bool hasConflict = (classPackages.Any() && nonClassPackages.Any())
+                || (deductingPackages.Any() && nonDeductingPackages.Any())
                 || (hasPtBalance && standardPackages.Any());
 
             // 7. Build package options for popup
@@ -291,8 +313,14 @@ namespace GymSaaS.Services.Reception
                 ActivePackageExpiry   = expiryDisplay,
                 HasConflict           = hasConflict,
                 AlreadyInsideGym      = alreadyInside,
-                PackageOptions        = options
+                PackageOptions        = options,
+                RequiresClassChoice   = sessionPackages.Any(),
             };
+
+            // Session-package check-ins need the class picker populated with today's
+            // classes at this branch (with live attendee counts / full flags).
+            if (sessionPackages.Any())
+                result.ClassOptions = await BuildTodayClassOptionsAsync(branchId, tenantId, validStatusIds);
 
             // 7b. For CLASS packages: locate the relevant class (linked or currently live)
             //     and verify capacity before any auto check-in.
@@ -325,8 +353,9 @@ namespace GymSaaS.Services.Reception
                 result.ClassIsFull          = targetClass.Capacity.HasValue && classCounts >= targetClass.Capacity.Value;
             }
 
-            // 8. If no conflict — auto check-in immediately (skip if class is full — needs override)
-            if (!hasConflict && !alreadyInside && !result.ClassIsFull && standardPackages.Any())
+            // 8. If no conflict — auto check-in immediately (skip if class is full — needs override).
+            //    Session packages always go through the popup so reception can pick the class.
+            if (!hasConflict && !sessionPackages.Any() && !alreadyInside && !result.ClassIsFull && standardPackages.Any())
             {
                 var autoPackage = nonClassPackages.FirstOrDefault() ?? classPackages.First();
                 var markResult  = await MarkAttendanceAsync(new MarkAttendanceRequest
@@ -447,6 +476,48 @@ namespace GymSaaS.Services.Reception
                 .CountAsync();
         }
 
+        // ── Build the list of today's classes at a branch for the session-package
+        //    class picker, with live attendee counts and full flags.
+        private async Task<List<ClassOptionDto>> BuildTodayClassOptionsAsync(
+            Guid branchId, Guid tenantId, List<Guid> validStatusIds)
+        {
+            var todayDow = (int)DateTime.Now.DayOfWeek;
+
+            var classes = await _db.GymClasses
+                .Where(g => g.TenantId == tenantId
+                         && g.BranchId == branchId
+                         && g.IsActive && !g.IsDeleted
+                         && g.DayOfWeek == todayDow)
+                .OrderBy(g => g.StartTime)
+                .ToListAsync();
+
+            var coachIds = classes.Where(c => c.CoachId.HasValue).Select(c => c.CoachId!.Value).Distinct().ToList();
+            var coachMap = coachIds.Count > 0
+                ? await _db.Coaches
+                    .Where(c => coachIds.Contains(c.CoachId))
+                    .Select(c => new { c.CoachId, Name = c.FirstName + " " + c.LastName })
+                    .ToDictionaryAsync(c => c.CoachId, c => c.Name.Trim())
+                : new Dictionary<Guid, string>();
+
+            var options = new List<ClassOptionDto>();
+            foreach (var g in classes)
+            {
+                var attendees = await CountClassAttendeesAsync(g, tenantId, validStatusIds);
+                options.Add(new ClassOptionDto
+                {
+                    GymClassId    = g.GymClassId,
+                    ClassName     = g.ClassName,
+                    TimeDisplay   = $"{g.StartTime:HH:mm}–{g.EndTime:HH:mm}",
+                    CoachName     = g.CoachId.HasValue && coachMap.TryGetValue(g.CoachId.Value, out var cn) ? cn : null,
+                    Capacity      = g.Capacity,
+                    AttendeeCount = attendees,
+                    IsFull        = g.Capacity.HasValue && attendees >= g.Capacity.Value,
+                });
+            }
+
+            return options;
+        }
+
         // ── MarkAttendanceAsync ───────────────────────────────────
         public async Task<MarkAttendanceResult> MarkAttendanceAsync(
             MarkAttendanceRequest request, Guid tenantId)
@@ -477,9 +548,50 @@ namespace GymSaaS.Services.Reception
             bool isClassLinked = package.GymClassId.HasValue
                               || package.PackageType.PackageTypeCode == "CLASS";
 
-            var targetClass = isClassLinked
-                ? await ResolveTargetClassAsync(package, request.BranchId, tenantId)
-                : null;
+            // A plain session package (SESSION type with a remaining count) is not tied
+            // to a class, so reception must pick which class the member is attending.
+            bool isSessionPackage = package.SessionCountRemaining.HasValue
+                                 && package.PackageType.PackageTypeCode == "SESSION";
+
+            GymClass? targetClass;
+            if (isClassLinked)
+            {
+                targetClass = await ResolveTargetClassAsync(package, request.BranchId, tenantId);
+            }
+            else if (isSessionPackage)
+            {
+                if (!request.SelectedGymClassId.HasValue)
+                    return new MarkAttendanceResult
+                    {
+                        Success = false,
+                        ErrorMessage = "Select the class the member is attending."
+                    };
+
+                var todayDow = (int)DateTime.Now.DayOfWeek;
+                targetClass = await _db.GymClasses.FirstOrDefaultAsync(g =>
+                    g.GymClassId == request.SelectedGymClassId.Value
+                    && g.TenantId == tenantId
+                    && g.BranchId == request.BranchId
+                    && g.IsActive && !g.IsDeleted);
+
+                if (targetClass == null)
+                    return new MarkAttendanceResult
+                    {
+                        Success = false,
+                        ErrorMessage = "The selected class was not found at this branch."
+                    };
+
+                if (targetClass.DayOfWeek != todayDow)
+                    return new MarkAttendanceResult
+                    {
+                        Success = false,
+                        ErrorMessage = "The selected class is not scheduled today."
+                    };
+            }
+            else
+            {
+                targetClass = null;
+            }
 
             if (targetClass != null && !request.OverrideClassCapacity)
             {

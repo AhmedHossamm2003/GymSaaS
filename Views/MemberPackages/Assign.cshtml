@@ -488,7 +488,8 @@
                                data-inbody="@(pkg.InBodyCount?.ToString() ?? "")"
                                data-freeze="@(pkg.FreezeAllowanceDays?.ToString() ?? "")"
                                data-price="@(pkg.Price?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "")"
-                               data-min-price="@(pkg.MaxDiscountedPrice?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "")">
+                               data-min-price="@(pkg.MaxDiscountedPrice?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "")"
+                               data-commission="@(pkg.CoachCommissionPercent?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "")">
                             <input type="radio" name="PackageDefinitionId" value="@pkg.PackageDefinitionId" />
                             <div class="pkg-opt-icon @pkg.PackageTypeCode">
                                 @if (pkg.IsPersonalTraining)
@@ -648,6 +649,20 @@
                 @if (!ViewData.ModelState.IsValid && ViewData.ModelState["CoachId"]?.Errors.Count > 0)
                 {
                     <div class="field-error" style="display:block; color:var(--red); margin-top:6px;">@ViewData.ModelState["CoachId"]!.Errors[0].ErrorMessage</div>
+                }
+            </div>
+
+            <div class="field" style="max-width:220px; margin-top:16px;">
+                <label class="field-label" asp-for="CustomCoachCommissionPercent">Coach cut (%)</label>
+                <input asp-for="CustomCoachCommissionPercent" type="number" min="0" max="100" step="0.01"
+                       id="coachCutInput" placeholder="e.g. 30" />
+                <div class="field-hint">
+                    <i class="bi bi-info-circle"></i>
+                    Share of this package's price the coach earns per delivered session. Defaults to the package rate — change it for this member if needed.
+                </div>
+                @if (!ViewData.ModelState.IsValid && ViewData.ModelState["CustomCoachCommissionPercent"]?.Errors.Count > 0)
+                {
+                    <div class="field-error" style="display:block; color:var(--red); margin-top:6px;">@ViewData.ModelState["CustomCoachCommissionPercent"]!.Errors[0].ErrorMessage</div>
                 }
             </div>
         </div>
@@ -854,6 +869,27 @@
                     if (exists) coachSel.value = presetCoachId;
                 } else if (!hasPtService) {
                     coachSel.value = '';
+                }
+            }
+
+            // Default the coach cut to the selected package's rate, but never clobber a
+            // value the receptionist typed (or a posted value redisplayed after an error).
+            const coachCutInput = document.getElementById('coachCutInput');
+            if (coachCutInput) {
+                if (!coachCutInput.dataset.bound) {
+                    coachCutInput.dataset.bound = '1';
+                    if (coachCutInput.value) coachCutInput.dataset.touched = '1';
+                    coachCutInput.addEventListener('input', function () {
+                        coachCutInput.dataset.touched = '1';
+                    });
+                }
+                if (hasPtService) {
+                    if (coachCutInput.dataset.touched !== '1' && el.dataset.commission) {
+                        coachCutInput.value = el.dataset.commission;
+                    }
+                } else {
+                    coachCutInput.value = '';
+                    coachCutInput.dataset.touched = '';
                 }
             }
 

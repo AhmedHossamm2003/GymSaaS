@@ -1,5 +1,20 @@
 @model GymSaaS.Models.CoachFormViewModel
 
+<style>
+    .coach-validation-summary {
+        background: rgba(220,38,38,.06);
+        border: 1px solid rgba(220,38,38,.20);
+        border-radius: 8px;
+        color: #dc2626;
+        font-size: 13px;
+        padding: 12px 14px;
+        margin-bottom: 16px;
+    }
+    /* MVC adds this class when there are no model errors — keep the box hidden then. */
+    .coach-validation-summary.validation-summary-valid { display: none; }
+    .coach-validation-summary ul { margin: 0; padding-left: 18px; }
+</style>
+
 <div class="page-header">
     <div>
         <div class="page-title">Coaches</div>
@@ -14,6 +29,8 @@
     <form asp-controller="Coaches" asp-action="@(Model.IsEdit ? "Edit" : "Create")"
           asp-route-id="@Model.CoachId" method="post" enctype="multipart/form-data">
         @Html.AntiForgeryToken()
+
+        <div asp-validation-summary="ModelOnly" class="coach-validation-summary"></div>
 
         <!-- Basic info -->
         <div class="card" style="margin-bottom:20px">
