@@ -307,6 +307,41 @@ namespace GymSaaS.Controllers
             return Ok(result);
         }
 
+        // ── GET /Reception/PendingOptions  (AJAX) ─────────────────
+        /// <summary>
+        /// Returns the class/open-gym options for a single PENDING mobile scan by
+        /// its record id — so the confirm popup can be re-opened from the
+        /// notifications list or the attendance log, not only the live poll.
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> PendingOptions(Guid attendanceRecordId)
+        {
+            if (attendanceRecordId == Guid.Empty)
+                return BadRequest(new { found = false });
+
+            var result = await _receptionService.GetPendingOptionsAsync(
+                attendanceRecordId, CurrentTenantId);
+
+            if (!result.Found)
+                return Ok(new { found = false });
+
+            return Ok(new
+            {
+                found        = true,
+                stillPending = result.StillPending,
+                memberName   = result.MemberName,
+                branchName   = result.BranchName,
+                options      = result.Options.Select(o => new
+                {
+                    memberPackageId   = o.MemberPackageId,
+                    packageName       = o.PackageName,
+                    packageTypeCode   = o.PackageTypeCode,
+                    sessionsRemaining = o.SessionsRemaining,
+                    label             = o.Label,
+                }),
+            });
+        }
+
         // ── POST /Reception/RecordPtSession  (AJAX) ───────────────
         /// <summary>
         /// Records that a member attended a PT session with a chosen coach.

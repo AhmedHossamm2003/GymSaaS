@@ -232,6 +232,17 @@
     .att-badge.success   { background: rgba(22,163,74,.08);  color: #15803d; border-color: rgba(22,163,74,.20); }
     .att-badge.override  { background: rgba(202,138,4,.08);  color: #92400e; border-color: rgba(202,138,4,.20); }
     .att-badge.manual    { background: rgba(59,130,246,.08); color: #1d4ed8; border-color: rgba(59,130,246,.20); }
+    .att-badge.pending   { background: rgba(249,115,22,.10); color: #c2410c; border-color: rgba(249,115,22,.25); }
+
+    /* Confirm button on pending rows */
+    .att-confirm-btn {
+        border: none; background: #f97316; color: #fff;
+        font-weight: 700; font-size: 11.5px;
+        padding: 6px 12px; border-radius: 9px; cursor: pointer;
+        white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;
+        transition: background .13s ease;
+    }
+    .att-confirm-btn:hover { background: #ea6a0c; }
 
     /* Indicators */
     .tag {
@@ -538,12 +549,21 @@
                                         "SUCCESS"           => "success",
                                         "OVERRIDE_APPROVED" => "override",
                                         "MANUAL"            => "manual",
+                                        "PENDING"           => "pending",
                                         _                   => "success"
                                     };
                                 }
                                 <span class="att-badge @badgeCls">
                                     @r.StatusName
                                 </span>
+                                @if (r.StatusCode == "PENDING")
+                                {
+                                    <button type="button" class="att-confirm-btn" style="margin-top:6px;"
+                                            onclick="event.stopPropagation(); openPendingConfirm('@r.AttendanceRecordId', function(){ location.reload(); });"
+                                            title="Confirm this pending mobile scan">
+                                        <i class="bi bi-check-lg"></i> Confirm
+                                    </button>
+                                }
                             </td>
 
                             <!-- Tags row -->
@@ -641,3 +661,5 @@
     </div>
 
 </div>
+
+<partial name="_PendingConfirm" />

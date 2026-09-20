@@ -1,4 +1,4 @@
-@using GymSaaS.Services.Reception
+﻿@using GymSaaS.Services.Reception
 
 @{
     ViewData["Title"] = "Reception";
@@ -961,6 +961,9 @@
         </div>
     </div>
 </div>
+
+@* Shared confirm dialog — also used to (re)open a pending scan via ?confirmRecordId= *@
+<partial name="_PendingConfirm" />
 
 @section Scripts {
     <script>
@@ -1932,4 +1935,18 @@
             }
         })();
     </script>
+
+    <script>
+        // Targeted confirm: open the pending popup for a specific scan when the page
+        // is reached via a deep-link (e.g. from the notifications list).
+        (function () {
+            const recordId = new URLSearchParams(window.location.search).get('confirmRecordId');
+            if (recordId && typeof window.openPendingConfirm === 'function') {
+                window.openPendingConfirm(recordId, function () {
+                    if (window.refreshStats) window.refreshStats();
+                });
+            }
+        })();
+    </script>
 }
+

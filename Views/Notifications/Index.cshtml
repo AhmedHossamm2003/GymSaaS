@@ -45,24 +45,58 @@
         <div style="display:flex;flex-direction:column;gap:10px;">
             @foreach (var n in Model.Items)
             {
-                <a href="@(n.MemberId.HasValue ? Url.Action("Details", "Members", new { id = n.MemberId }) : "#")"
-                   style="display:flex;align-items:flex-start;gap:14px;padding:14px 16px;background:#fff;border:1px solid #eceff3;border-radius:14px;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(16,24,40,.04);">
-                    <div style="width:40px;height:40px;border-radius:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:@SevBg(n.Severity);">
-                        <i class="bi @n.Icon" style="font-size:18px;color:@SevColor(n.Severity);"></i>
+                if (n.Category == "PENDING_SCAN" && n.AttendanceRecordId.HasValue)
+                {
+                    <!-- Pending mobile scan: not a plain link — offers an inline Confirm action. -->
+                    <div style="display:flex;align-items:flex-start;gap:14px;padding:14px 16px;background:#fff;border:1px solid #eceff3;border-radius:14px;color:inherit;box-shadow:0 1px 2px rgba(16,24,40,.04);">
+                        <div style="width:40px;height:40px;border-radius:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:@SevBg(n.Severity);">
+                            <i class="bi @n.Icon" style="font-size:18px;color:@SevColor(n.Severity);"></i>
+                        </div>
+                        <div style="flex:1;min-width:0;">
+                            <div style="font-weight:700;font-size:14px;color:#111827;">@n.Title</div>
+                            <div style="font-size:12.5px;color:#6b7280;margin-top:2px;">@n.Detail</div>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+                            <button type="button"
+                                    onclick="openPendingConfirm('@n.AttendanceRecordId', function(){ location.reload(); })"
+                                    style="border:none;background:#f97316;color:#fff;font-weight:700;font-size:12.5px;
+                                           padding:8px 14px;border-radius:10px;cursor:pointer;white-space:nowrap;">
+                                <i class="bi bi-check-lg"></i> Confirm
+                            </button>
+                            @if (n.MemberId.HasValue)
+                            {
+                                <a href="@Url.Action("Details", "Members", new { id = n.MemberId })"
+                                   title="View member profile"
+                                   style="color:#9ca3af;font-size:14px;text-decoration:none;display:inline-flex;align-items:center;">
+                                    <i class="bi bi-person-lines-fill"></i>
+                                </a>
+                            }
+                        </div>
                     </div>
-                    <div style="flex:1;min-width:0;">
-                        <div style="font-weight:700;font-size:14px;color:#111827;">@n.Title</div>
-                        <div style="font-size:12.5px;color:#6b7280;margin-top:2px;">@n.Detail</div>
-                    </div>
-                    @if (n.MemberId.HasValue)
-                    {
-                        <i class="bi bi-chevron-right" style="color:#cbd5e1;font-size:14px;margin-top:4px;"></i>
-                    }
-                </a>
+                }
+                else
+                {
+                    <a href="@(n.MemberId.HasValue ? Url.Action("Details", "Members", new { id = n.MemberId }) : "#")"
+                       style="display:flex;align-items:flex-start;gap:14px;padding:14px 16px;background:#fff;border:1px solid #eceff3;border-radius:14px;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(16,24,40,.04);">
+                        <div style="width:40px;height:40px;border-radius:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:@SevBg(n.Severity);">
+                            <i class="bi @n.Icon" style="font-size:18px;color:@SevColor(n.Severity);"></i>
+                        </div>
+                        <div style="flex:1;min-width:0;">
+                            <div style="font-weight:700;font-size:14px;color:#111827;">@n.Title</div>
+                            <div style="font-size:12.5px;color:#6b7280;margin-top:2px;">@n.Detail</div>
+                        </div>
+                        @if (n.MemberId.HasValue)
+                        {
+                            <i class="bi bi-chevron-right" style="color:#cbd5e1;font-size:14px;margin-top:4px;"></i>
+                        }
+                    </a>
+                }
             }
         </div>
     }
 </div>
+
+<partial name="_PendingConfirm" />
 
 <style>
     .notif-chip {

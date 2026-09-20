@@ -162,6 +162,7 @@ namespace GymSaaS.Controllers
                     .OrderByDescending(a => a.CheckInAtUtc)
                     .Select(a => new
                     {
+                        a.AttendanceRecordId,
                         a.MemberId,
                         a.CheckInAtUtc,
                         MemberName = a.Member.FirstName + " " + a.Member.LastName,
@@ -180,6 +181,7 @@ namespace GymSaaS.Controllers
                         Title = $"{p.MemberName} — awaiting check-in choice",
                         Detail = $"Scanned at {p.BranchName}, needs class/open-gym confirmation",
                         MemberId = p.MemberId,
+                        AttendanceRecordId = p.AttendanceRecordId,
                         WhenUtc = p.CheckInAtUtc,
                     });
                 }

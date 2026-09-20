@@ -8,6 +8,7 @@ namespace GymSaaS.Models
         public string Title { get; set; } = "";
         public string Detail { get; set; } = "";
         public Guid? MemberId { get; set; }            // for click-through
+        public Guid? AttendanceRecordId { get; set; }  // set for PENDING_SCAN — enables inline confirm
         public DateTime WhenUtc { get; set; }
     }
 

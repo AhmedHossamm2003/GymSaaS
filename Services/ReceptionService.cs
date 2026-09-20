@@ -929,6 +929,45 @@ namespace GymSaaS.Services.Reception
             };
         }
 
+        // ── GetPendingOptionsAsync ────────────────────────────────
+        public async Task<PendingOptionsDto> GetPendingOptionsAsync(
+            Guid attendanceRecordId, Guid tenantId)
+        {
+            var record = await _db.AttendanceRecords
+                .Where(a => a.AttendanceRecordId == attendanceRecordId
+                         && a.TenantId == tenantId)
+                .Select(a => new
+                {
+                    a.MemberId,
+                    a.BranchId,
+                    a.AttendanceStatusId,
+                    MemberName = a.Member.FullName ?? (a.Member.FirstName + " " + a.Member.LastName),
+                    BranchName = a.Branch.BranchName,
+                })
+                .FirstOrDefaultAsync();
+
+            if (record == null)
+                return new PendingOptionsDto { Found = false };
+
+            var pendingId = await _db.AttendanceStatuses
+                .Where(s => s.StatusCode == "PENDING")
+                .Select(s => s.AttendanceStatusId)
+                .FirstOrDefaultAsync();
+
+            var stillPending = record.AttendanceStatusId == pendingId;
+
+            return new PendingOptionsDto
+            {
+                Found        = true,
+                StillPending = stillPending,
+                MemberName   = record.MemberName,
+                BranchName   = record.BranchName,
+                Options      = stillPending
+                    ? await BuildPackageOptionsForMemberAsync(record.MemberId, record.BranchId, tenantId)
+                    : new List<PackageOptionDto>(),
+            };
+        }
+
         // ── RecordPtSessionAsync ──────────────────────────────────
         public async Task<PerkUsageResult> RecordPtSessionAsync(
             Guid memberId, Guid memberPackageId, Guid coachId, Guid branchId,

@@ -1,4 +1,4 @@
-// ================================================================
+﻿// ================================================================
 // Services/Reception/IReceptionService.cs
 // ================================================================
 
@@ -217,6 +217,20 @@ namespace GymSaaS.Services.Reception
         public string? PackageName { get; set; }
     }
 
+    /// <summary>
+    /// The class/open-gym options for a single PENDING mobile scan, looked up by
+    /// the attendance record id. Lets any page (notifications, attendance log,
+    /// reception) open the confirm popup for a scan that missed the live popup.
+    /// </summary>
+    public class PendingOptionsDto
+    {
+        public bool Found { get; set; }
+        public bool StillPending { get; set; }   // false = already confirmed
+        public string MemberName { get; set; } = "";
+        public string BranchName { get; set; } = "";
+        public List<PackageOptionDto> Options { get; set; } = new();
+    }
+
     // ── Interface ─────────────────────────────────────────────────
 
     public interface IReceptionService
@@ -253,6 +267,13 @@ namespace GymSaaS.Services.Reception
         /// </summary>
         Task<ConfirmPendingResult> ConfirmPendingAsync(
             Guid attendanceRecordId, Guid selectedMemberPackageId, Guid receptionistUserId, Guid tenantId);
+
+        /// <summary>
+        /// Loads the class/open-gym options for a single PENDING mobile scan by its
+        /// attendance record id. Used to (re)open the confirm popup from the
+        /// notifications list, the attendance log, or a reception deep-link.
+        /// </summary>
+        Task<PendingOptionsDto> GetPendingOptionsAsync(Guid attendanceRecordId, Guid tenantId);
 
         /// <summary>
         /// Records a PT visit atomically: consumes the selected PT balance, logs

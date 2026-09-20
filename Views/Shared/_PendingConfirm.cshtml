@@ -1,0 +1,130 @@
+@*
+    Reusable confirm dialog for a PENDING mobile QR scan.
+
+    Include once per page:  <partial name="_PendingConfirm" />
+    Then open it with:      window.openPendingConfirm(attendanceRecordId, onDone?)
+
+    It fetches the member's class/open-gym options from /Reception/PendingOptions
+    and finalizes the choice via /Reception/ConfirmPending — the same endpoints the
+    live reception popup uses. All element ids are pc-prefixed to avoid collisions.
+*@
+@Html.AntiForgeryToken()
+
+<div id="pc-overlay"
+     style="display:none;position:fixed;inset:0;z-index:1080;background:rgba(15,23,42,.5);
+            backdrop-filter:blur(2px);align-items:center;justify-content:center;padding:20px;">
+    <div style="background:#fff;border-radius:18px;max-width:420px;width:100%;
+                box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden;">
+        <div style="padding:20px 22px 14px;border-bottom:1px solid #eef0f3;display:flex;align-items:center;gap:12px;">
+            <div style="width:40px;height:40px;border-radius:11px;background:rgba(249,115,22,.10);
+                        display:flex;align-items:center;justify-content:center;color:#f97316;flex-shrink:0;">
+                <i class="bi bi-qr-code-scan" style="font-size:18px;"></i>
+            </div>
+            <div style="flex:1;min-width:0;">
+                <div id="pc-member" style="font-weight:800;font-size:15px;color:#111827;">Member</div>
+                <div id="pc-branch" style="font-size:12px;color:#6b7280;"></div>
+            </div>
+            <button type="button" onclick="pcClose()"
+                    style="border:none;background:none;font-size:22px;color:#9ca3af;cursor:pointer;line-height:1;">&times;</button>
+        </div>
+        <div style="padding:18px 22px 22px;">
+            <div id="pc-body">
+                <div style="font-size:12.5px;color:#6b7280;margin-bottom:12px;">
+                    Choose which package this member is attending under:
+                </div>
+                <div id="pc-options" style="display:flex;flex-direction:column;gap:8px;"></div>
+            </div>
+            <div id="pc-msg" style="display:none;text-align:center;padding:10px 0;font-size:13.5px;"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    const overlay = document.getElementById('pc-overlay');
+    const optsBox = document.getElementById('pc-options');
+    const bodyBox = document.getElementById('pc-body');
+    const msgBox  = document.getElementById('pc-msg');
+    let   onDoneCb = null;
+
+    function token() {
+        return document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '';
+    }
+    function showMsg(html) { bodyBox.style.display = 'none'; msgBox.style.display = 'block'; msgBox.innerHTML = html; }
+
+    window.pcClose = function () { overlay.style.display = 'none'; };
+    overlay.addEventListener('click', e => { if (e.target === overlay) pcClose(); });
+
+    window.openPendingConfirm = async function (attendanceRecordId, onDone) {
+        onDoneCb = typeof onDone === 'function' ? onDone : null;
+        bodyBox.style.display = 'block';
+        msgBox.style.display = 'none';
+        optsBox.innerHTML = '<div style="color:#6b7280;font-size:13px;">Loading…</div>';
+        document.getElementById('pc-member').textContent = 'Member';
+        document.getElementById('pc-branch').textContent = '';
+        overlay.style.display = 'flex';
+
+        try {
+            const res  = await fetch('/Reception/PendingOptions?attendanceRecordId=' + encodeURIComponent(attendanceRecordId));
+            const data = await res.json();
+
+            if (!data.found) { showMsg('<div style="color:#b91c1c;font-weight:600;">Scan record not found.</div>'); return; }
+
+            document.getElementById('pc-member').textContent = data.memberName || 'Member';
+            document.getElementById('pc-branch').textContent = data.branchName || '';
+
+            if (!data.stillPending) {
+                showMsg('<div style="color:#15803d;font-weight:600;"><i class="bi bi-check-circle"></i> This scan was already confirmed.</div>');
+                if (onDoneCb) setTimeout(onDoneCb, 1100);
+                return;
+            }
+
+            const opts = data.options || [];
+            if (opts.length === 0) { showMsg('<div style="color:#b91c1c;font-weight:600;">No eligible packages to confirm.</div>'); return; }
+
+            optsBox.innerHTML = '';
+            opts.forEach(function (opt) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;'
+                    + 'padding:12px 14px;border:1px solid #e5e7eb;border-radius:12px;background:#fff;cursor:pointer;'
+                    + 'font-size:13.5px;font-weight:600;color:#111827;transition:border-color .13s,background .13s;';
+                btn.onmouseover = () => { btn.style.borderColor = '#f97316'; btn.style.background = 'rgba(249,115,22,.05)'; };
+                btn.onmouseout  = () => { btn.style.borderColor = '#e5e7eb'; btn.style.background = '#fff'; };
+                btn.innerHTML = '<span>' + opt.label + '</span>'
+                    + (opt.sessionsRemaining ? '<small style="color:#6b7280;font-weight:500;">' + opt.sessionsRemaining + '</small>' : '');
+                btn.addEventListener('click', function () { pcConfirm(attendanceRecordId, opt.memberPackageId, opt.label); });
+                optsBox.appendChild(btn);
+            });
+        } catch {
+            showMsg('<div style="color:#b91c1c;font-weight:600;">Could not load options. Please try again.</div>');
+        }
+    };
+
+    async function pcConfirm(recordId, packageId, label) {
+        optsBox.querySelectorAll('button').forEach(b => b.disabled = true);
+        try {
+            const res = await fetch('/Reception/ConfirmPending', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token() },
+                body: JSON.stringify({ attendanceRecordId: recordId, selectedMemberPackageId: packageId })
+            });
+            const data = await res.json();
+            if (data.success) {
+                let extra = '';
+                if (typeof data.sessionsRemaining === 'number') {
+                    extra = '<div style="font-size:12.5px;color:#6b7280;margin-top:4px;">'
+                          + data.sessionsRemaining + ' session(s) remaining</div>';
+                }
+                showMsg('<div style="color:#15803d;font-weight:700;"><i class="bi bi-check-circle-fill"></i> Confirmed — '
+                        + (data.packageName || label) + '</div>' + extra);
+                if (onDoneCb) setTimeout(onDoneCb, 1000);
+            } else {
+                showMsg('<div style="color:#b91c1c;font-weight:600;">' + (data.errorMessage || 'Confirm failed.') + '</div>');
+            }
+        } catch {
+            showMsg('<div style="color:#b91c1c;font-weight:600;">Network error. Please try again.</div>');
+        }
+    }
+})();
+</script>
