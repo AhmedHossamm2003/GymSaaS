@@ -338,12 +338,16 @@ namespace GymSaaS.Controllers
                 return View(redo);
             }
 
+            // Past validation newDef is always set — a null one added a model error
+            // above. Stated outright so the rest of the method is null-clean.
+            if (newDef == null) return NotFound();
+
             var now       = DateTime.UtcNow;
             var startDate = model.CustomStartDate ?? DateOnly.FromDateTime(now);
             var isPersonalTraining = newTypeCode == "PERSONAL_TRAINING";
 
             var expiry = model.CustomExpiryDate
-                      ?? startDate.AddDays(newDef!.DurationDays ?? 30);
+                      ?? startDate.AddDays(newDef.DurationDays ?? 30);
 
             var sessions = newTypeCode is "SESSION" or "PERSONAL_TRAINING"
                 ? (model.CustomSessionCount ?? newDef.SessionCount ?? 0)
