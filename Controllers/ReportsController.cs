@@ -1,4 +1,4 @@
-using GymSaaS.Models;
+﻿using GymSaaS.Models;
 using GymSaaS.Persistence;
 using GymSaaS.Services;
 using GymSaaS.Services.Exports;
@@ -113,6 +113,34 @@ namespace GymSaaS.Controllers
 
             switch (preset)
             {
+                case "today":
+                    from = to = today;
+                    label = $"Today · {today:MMM d, yyyy}";
+                    break;
+
+                case "yesterday":
+                    from = to = today.AddDays(-1);
+                    label = $"Yesterday · {from:MMM d, yyyy}";
+                    break;
+
+                // A specific day the user picked from the date box.
+                case "day":
+                    from = to = fromDate ?? today;
+                    label = from.ToString("dddd, MMM d, yyyy");
+                    break;
+
+                case "this_week":
+                    from = StartOfWeek(today);
+                    to   = today;
+                    label = $"This Week · {from:MMM d} – {from.AddDays(6):MMM d}";
+                    break;
+
+                case "last_week":
+                    from = StartOfWeek(today).AddDays(-7);
+                    to   = from.AddDays(6);
+                    label = $"Last Week · {from:MMM d} – {to:MMM d, yyyy}";
+                    break;
+
                 case "last_month":
                     var firstOfThisMonth = new DateOnly(today.Year, today.Month, 1);
                     to   = firstOfThisMonth.AddDays(-1);
@@ -147,7 +175,11 @@ namespace GymSaaS.Controllers
                 case "custom":
                     from = fromDate ?? new DateOnly(today.Year, today.Month, 1);
                     to   = toDate   ?? today;
-                    label = $"{from:MMM d, yyyy} – {to:MMM d, yyyy}";
+                    // Tolerate a backwards range rather than reporting on nothing.
+                    if (from > to) (from, to) = (to, from);
+                    label = from == to
+                        ? from.ToString("dddd, MMM d, yyyy")
+                        : $"{from:MMM d, yyyy} – {to:MMM d, yyyy}";
                     break;
 
                 case "this_month":
@@ -159,6 +191,16 @@ namespace GymSaaS.Controllers
             }
 
             return (from, to, label);
+        }
+
+        // Gyms here run a Saturday-start week, so weekly reports line up with how
+        // staff already think about the week. Change this one constant to shift it.
+        private const DayOfWeek WeekStartsOn = DayOfWeek.Saturday;
+
+        private static DateOnly StartOfWeek(DateOnly date)
+        {
+            int delta = ((int)date.DayOfWeek - (int)WeekStartsOn + 7) % 7;
+            return date.AddDays(-delta);
         }
 
         private async Task<List<BranchDropdownItem>> GetBranchesAsync()

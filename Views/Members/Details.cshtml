@@ -1,4 +1,4 @@
-@model GymSaaS.Models.MemberDetailsViewModel
+﻿@model GymSaaS.Models.MemberDetailsViewModel
 @{
     ViewData["Title"] = Model.FullName;
     ViewData["Subtitle"] = "Member Profile";
@@ -550,6 +550,15 @@
                                         <i class="bi bi-infinity" style="font-size:10px;"></i> Daily Access
                                     </span>
                                 }
+
+                                @* Move this member up or down a plan, settling the difference. *@
+                                <a asp-controller="MemberPackages" asp-action="ChangePlan"
+                                   asp-route-memberPackageId="@comp.MemberPackageId"
+                                   class="btn btn-secondary"
+                                   style="font-size:11.5px;padding:5px 12px;flex-shrink:0;"
+                                   title="Upgrade or downgrade this plan">
+                                    <i class="bi bi-arrow-left-right"></i> Change Plan
+                                </a>
 
                             </div>
 

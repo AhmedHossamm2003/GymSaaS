@@ -1,4 +1,4 @@
-@model GymSaaS.Models.ReportsViewModel
+﻿@model GymSaaS.Models.ReportsViewModel
 @using GymSaaS.Models
 @{
     ViewData["Title"] = "Reports";
@@ -7,6 +7,10 @@
 
     var presets = new[]
     {
+        ("today",        "Today"),
+        ("yesterday",    "Yesterday"),
+        ("this_week",    "This Week"),
+        ("last_week",    "Last Week"),
         ("this_month",   "This Month"),
         ("last_month",   "Last Month"),
         ("last_3_months","Last 3 Months"),
@@ -14,6 +18,9 @@
         ("this_year",    "This Year"),
         ("last_year",    "Last Year"),
     };
+
+    // Pre-fill the date box with the day being viewed, so re-picking is obvious.
+    var pickedDate = Model.RangePreset == "day" ? Model.RangeStart : DateOnly.FromDateTime(DateTime.Today);
 
     string ChangeBadge(decimal pct, bool inverted = false)
     {
@@ -55,6 +62,7 @@
         text-decoration: none;
         transition: all .18s ease;
     }
+    button.preset-pill { font-family: inherit; line-height: 1.5; }
     .preset-pill:hover { border-color: rgba(249,115,22,0.40); color: var(--fire); }
     .preset-pill.active {
         background: linear-gradient(135deg, var(--fire-soft), rgba(249,115,22,0.10));
@@ -310,7 +318,19 @@
                class="preset-pill @(Model.RangePreset == code ? "active" : "")">@name</a>
         }
 
+        <button type="button" class="preset-pill @(Model.RangePreset == "custom" ? "active" : "")"
+                onclick="toggleCustomRange()" title="Pick your own start and end dates">
+            <i class="bi bi-calendar-range"></i> Custom
+        </button>
+
         <div style="display:flex;align-items:center;gap:8px;margin-left:auto;">
+            <label for="reportDate" style="font-size:12px;font-weight:700;color:var(--t3);white-space:nowrap;">
+                <i class="bi bi-calendar-event"></i> Pick a day
+            </label>
+            <input type="date" id="reportDate" value="@pickedDate.ToString("yyyy-MM-dd")"
+                   class="form-control" style="max-width:160px;font-size:12.5px;"
+                   onchange="goToDay(this.value)" />
+
             <select name="branchId" class="form-control" style="max-width:170px;font-size:12.5px;" onchange="this.form.submit()">
                 <option value="">All Branches</option>
                 @foreach (var b in branches)
@@ -325,7 +345,27 @@
                     }
                 }
             </select>
-            <input type="hidden" name="preset" value="@Model.RangePreset" />
+            <input type="hidden" name="preset" id="presetInput" value="@Model.RangePreset" />
+        </div>
+
+        @* Full-width break so the custom range sits on its own line. *@
+        <div style="flex-basis:100%;height:0;"></div>
+
+        <div id="customRangeRow"
+             style="display:@(Model.RangePreset == "custom" ? "flex" : "none");align-items:center;gap:8px;
+                    width:100%;flex-wrap:wrap;padding-top:12px;border-top:1px solid rgba(15,23,42,0.06);">
+            <span style="font-size:12px;font-weight:700;color:var(--t3);white-space:nowrap;">
+                <i class="bi bi-calendar-range"></i> Custom range
+            </span>
+            <input type="date" name="fromDate" value="@Model.RangeStart.ToString("yyyy-MM-dd")"
+                   class="form-control" style="max-width:160px;font-size:12.5px;" />
+            <span style="font-size:12px;color:var(--t3);">to</span>
+            <input type="date" name="toDate" value="@Model.RangeEnd.ToString("yyyy-MM-dd")"
+                   class="form-control" style="max-width:160px;font-size:12.5px;" />
+            <button type="submit" class="btn btn-primary" style="font-size:12.5px;padding:7px 18px;"
+                    onclick="document.getElementById('presetInput').value = 'custom';">
+                Apply
+            </button>
         </div>
     </form>
 
@@ -377,7 +417,7 @@
         </div>
     </div>
 
-    <!-- 6-Month Trend Chart -->
+    <!-- Trend chart — granularity follows the selected preset -->
     @{
         var maxVal = Model.MonthlyTrend.Any() ? (decimal)Math.Max(1, (double)Math.Max(Model.MonthlyTrend.Max(m => m.Income), Model.MonthlyTrend.Max(m => m.Expenses))) : 1m;
     }
@@ -385,8 +425,8 @@
     {
         <div class="rpt-section">
             <div class="rpt-head">
-                <span class="rpt-title">6-Month Income vs Expenses</span>
-                <span style="font-size:11px;color:var(--t3);font-weight:600;">trend (last 6 months ending @Model.RangeEnd.ToString("MMM yyyy"))</span>
+                <span class="rpt-title">@Model.TrendTitle</span>
+                <span style="font-size:11px;color:var(--t3);font-weight:600;">@Model.TrendCaption</span>
             </div>
             <div class="rpt-body">
                 <div class="chart-grid">
@@ -399,7 +439,7 @@
                                 <div class="chart-bar" style="height:@(incomeH)px;" title="Income: @m.Income.ToString("N2")"></div>
                                 <div class="chart-bar expense" style="height:@(expenseH)px;" title="Expenses: @m.Expenses.ToString("N2")"></div>
                             </div>
-                            <div class="chart-label">@m.MonthLabel.Substring(0, 3)</div>
+                            <div class="chart-label" title="@m.MonthLabel">@m.ShortLabel</div>
                             <div class="chart-vals">
                                 <div class="income-val">@m.Income.ToString("N0")</div>
                                 <div class="expense-val">@m.Expenses.ToString("N0")</div>
@@ -490,6 +530,64 @@
         </div>
     }
 
+    <!-- Plan Changes — who moved plan, to what, and which staff member did it -->
+    @if (Model.PlanChanges.Any())
+    {
+        <div class="rpt-section">
+            <div class="rpt-head">
+                <span class="rpt-title">Plan Changes</span>
+                <span style="font-size:11px;color:var(--t3);font-weight:600;">
+                    @Model.PlanChanges.Count change@(Model.PlanChanges.Count == 1 ? "" : "s") ·
+                    collected @Model.PlanChangeCollected.ToString("N2") ·
+                    refunded @Model.PlanChangeRefunded.ToString("N2")
+                </span>
+            </div>
+            <table class="rpt-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Member</th>
+                        <th>From → To</th>
+                        <th style="text-align:right;">Difference</th>
+                        <th>Changed by</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var pc in Model.PlanChanges)
+                    {
+                        <tr>
+                            <td style="white-space:nowrap;color:var(--t2);">@pc.WhenUtc.ToString("MMM d, yyyy")</td>
+                            <td style="font-weight:600;color:var(--t1);">
+                                <a asp-controller="Members" asp-action="Details" asp-route-id="@pc.MemberId"
+                                   style="color:inherit;text-decoration:none;">@pc.MemberName.Trim()</a>
+                            </td>
+                            <td style="color:var(--t2);">
+                                @pc.FromPackageName
+                                <span style="color:var(--t4);">&#8594;</span>
+                                <strong style="color:var(--t1);">@pc.ToPackageName</strong>
+                            </td>
+                            <td class="num @(pc.IsRefund ? "red" : pc.IsUpgrade ? "green" : "")">
+                                @if (pc.IsRefund)
+                                {
+                                    <text>&minus; @Math.Abs(pc.Amount).ToString("N2")</text>
+                                }
+                                else if (pc.IsUpgrade)
+                                {
+                                    <text>+ @pc.Amount.ToString("N2")</text>
+                                }
+                                else
+                                {
+                                    <text>0.00</text>
+                                }
+                            </td>
+                            <td style="color:var(--t2);">@pc.ChangedByUserName.Trim()</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
     <!-- Branch Performance -->
     @if (Model.BranchPerformance.Any())
     {
@@ -527,3 +625,25 @@
     }
 
 </div>
+
+@section Scripts {
+    <script>
+        // Show/hide the custom range row. It starts open when a custom range
+        // is already being viewed, so Apply is always one click away.
+        function toggleCustomRange() {
+            const row = document.getElementById('customRangeRow');
+            row.style.display = row.style.display === 'flex' ? 'none' : 'flex';
+        }
+
+        // Jump straight to one day's report. Keeps the branch filter in place.
+        function goToDay(value) {
+            if (!value) return;
+            const url = new URL('@Url.Action("Index", "Reports")', window.location.origin);
+            url.searchParams.set('preset', 'day');
+            url.searchParams.set('fromDate', value);
+            const branchId = '@(Model.BranchFilterId?.ToString() ?? "")';
+            if (branchId) url.searchParams.set('branchId', branchId);
+            window.location.href = url.toString();
+        }
+    </script>
+}

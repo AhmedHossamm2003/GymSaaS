@@ -1,4 +1,4 @@
-using GymSaaS.Models;
+﻿using GymSaaS.Models;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
@@ -58,6 +58,10 @@ namespace GymSaaS.Services.Exports
                         // Top selling packages
                         if (r.TopSellingPackages.Any())
                             col.Item().Element(c => BuildTopPackages(c, r));
+
+                        // Upgrades and downgrades
+                        if (r.PlanChanges.Any())
+                            col.Item().Element(c => BuildPlanChanges(c, r));
 
                         // Per-branch breakdown
                         if (r.BranchPerformance.Any())
@@ -281,6 +285,41 @@ namespace GymSaaS.Services.Exports
             });
         }
 
+        private void BuildPlanChanges(IContainer c, ReportsViewModel r)
+        {
+            c.Column(col =>
+            {
+                col.Item().Element(SectionTitle(
+                    $"Plan Changes (collected {r.PlanChangeCollected:N2} · refunded {r.PlanChangeRefunded:N2})"));
+
+                col.Item().PaddingTop(6).Table(table =>
+                {
+                    table.ColumnsDefinition(cols =>
+                    {
+                        cols.RelativeColumn(2);
+                        cols.RelativeColumn(3);
+                        cols.RelativeColumn(3);
+                        cols.RelativeColumn(3);
+                        cols.RelativeColumn(2);
+                        cols.RelativeColumn(3);
+                    });
+
+                    TableHeader(table, "Date", "Member", "From", "To", "Difference", "Changed By");
+
+                    foreach (var pc in r.PlanChanges)
+                    {
+                        TableRow(table,
+                            pc.WhenUtc.ToString("MMM d, yyyy"),
+                            pc.MemberName.Trim(),
+                            pc.FromPackageName,
+                            pc.ToPackageName,
+                            pc.Amount.ToString("N2"),
+                            pc.ChangedByUserName.Trim());
+                    }
+                });
+            });
+        }
+
         private void BuildBranchTable(IContainer c, ReportsViewModel r)
         {
             c.Column(col =>
@@ -319,7 +358,7 @@ namespace GymSaaS.Services.Exports
         {
             c.Column(col =>
             {
-                col.Item().Element(SectionTitle("Monthly Trend (last 6 months)"));
+                col.Item().Element(SectionTitle($"{r.TrendTitle} ({r.TrendCaption})"));
 
                 col.Item().PaddingTop(6).Table(table =>
                 {
@@ -332,7 +371,7 @@ namespace GymSaaS.Services.Exports
                         cols.RelativeColumn(1);
                     });
 
-                    TableHeader(table, "Month", "Income", "Expenses", "Net", "New Members");
+                    TableHeader(table, "Period", "Income", "Expenses", "Net", "New Members");
 
                     foreach (var m in r.MonthlyTrend)
                     {

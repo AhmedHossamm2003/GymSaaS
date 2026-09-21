@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 
 namespace GymSaaS.Models
 {
@@ -279,5 +279,80 @@ namespace GymSaaS.Models
         public string TimeDisplay { get; set; } = string.Empty;
         public string? CoachName { get; set; }
         public Guid? CoachId { get; set; }
+    }
+
+    /// <summary>
+    /// Upgrade or downgrade a member's existing package. The member keeps credit for
+    /// what they already paid on the old plan; only the difference changes hands.
+    /// </summary>
+    public class ChangePlanViewModel
+    {
+        public Guid MemberId { get; set; }
+        public string MemberName { get; set; } = "";
+
+        // The package being replaced.
+        public Guid CurrentMemberPackageId { get; set; }
+        public Guid? CurrentPackageDefinitionId { get; set; }
+        public string CurrentPackageName { get; set; } = "";
+        public string CurrentPackageTypeName { get; set; } = "";
+        public int? CurrentSessionsRemaining { get; set; }
+        public DateOnly? CurrentValidTo { get; set; }
+
+        // What the member actually paid for the current plan — the credit they carry
+        // into the new one. Falls back to the catalog price for legacy rows.
+        public decimal CurrentPaidAmount { get; set; }
+
+        // The plan they are moving to.
+        [Required(ErrorMessage = "Pick the plan to move to.")]
+        public Guid? NewPackageDefinitionId { get; set; }
+
+        /// <summary>
+        /// Money changing hands now: positive = member pays, negative = member is
+        /// refunded. Pre-filled with (new plan price − what they already paid) and
+        /// editable, but the resulting total is held to the new plan's price floor.
+        /// </summary>
+        public decimal? AmountDifference { get; set; }
+
+        [StringLength(40)]
+        public string PaymentMethod { get; set; } = "CASH";
+
+        // The same manual overrides the assign screen offers, so a changed plan can
+        // be shaped per member rather than always taking catalog defaults.
+        public int? CustomSessionCount { get; set; }
+        public int CarryOverSessions { get; set; } = 0;
+        public DateOnly? CustomStartDate { get; set; }
+        public DateOnly? CustomExpiryDate { get; set; }
+        public int? CustomInvitationCount { get; set; }
+        public int? CustomInBodyCount { get; set; }
+        public int? CustomFreezeAllowanceDays { get; set; }
+
+        public Guid? GymClassId { get; set; }
+        public Guid? CoachId { get; set; }
+
+        [Range(0, 100, ErrorMessage = "Coach cut must be between 0 and 100%.")]
+        public decimal? CustomCoachCommissionPercent { get; set; }
+
+        [MaxLength(1000)]
+        public string? Reason { get; set; }
+
+        public List<PackageDefinitionListItem> AvailablePackages { get; set; } = new();
+        public List<ClassDropdownItem> AvailableClasses { get; set; } = new();
+        public List<CoachDropdownItem> AvailableCoaches { get; set; } = new();
+    }
+
+    /// <summary>One upgrade/downgrade, for the reports listing.</summary>
+    public class PlanChangeItem
+    {
+        public DateTime WhenUtc { get; set; }
+        public Guid MemberId { get; set; }
+        public string MemberName { get; set; } = "";
+        public string FromPackageName { get; set; } = "";
+        public string ToPackageName { get; set; } = "";
+        public decimal Amount { get; set; }          // + collected, − refunded
+        public string ChangedByUserName { get; set; } = "";
+        public string BranchName { get; set; } = "";
+
+        public bool IsUpgrade => Amount > 0;
+        public bool IsRefund  => Amount < 0;
     }
 }

@@ -1,0 +1,476 @@
+@model GymSaaS.Models.ChangePlanViewModel
+@{
+    ViewData["Title"] = Model.MemberName;
+    ViewData["Subtitle"] = "Change Plan";
+}
+
+@section Styles {
+<style>
+    .cp-shell { max-width: 880px; }
+
+    .form-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--r-lg);
+        box-shadow: var(--sh-sm);
+        overflow: hidden;
+        margin-bottom: 16px;
+    }
+
+    .form-section-head {
+        display: flex; align-items: center; gap: 10px;
+        padding: 14px 22px;
+        border-bottom: 1px solid var(--border);
+        background: var(--surface-2);
+    }
+
+    .form-section-icon {
+        width: 30px; height: 30px;
+        border-radius: var(--r-xs);
+        background: var(--fire-soft);
+        border: 1px solid var(--fire-border);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 14px; color: var(--fire); flex-shrink: 0;
+    }
+
+    .form-section-title {
+        font-family: var(--font-display);
+        font-size: 12px; font-weight: 700;
+        letter-spacing: .08em; text-transform: uppercase;
+        color: var(--t1);
+    }
+
+    .form-body { padding: 22px; }
+
+    .form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @@media (max-width: 600px) { .form-grid-2 { grid-template-columns: 1fr; } }
+
+    .field-hint  { font-size: 11.5px; color: var(--t3); margin-top: 5px; }
+    .field-error { font-size: 11.5px; color: var(--red); margin-top: 5px; }
+
+    /* Current plan banner */
+    .cp-current {
+        display: flex; align-items: center; gap: 14px;
+        padding: 16px 20px;
+        background: linear-gradient(90deg, rgba(249,115,22,.06), transparent);
+        border: 1px solid var(--fire-border);
+        border-radius: var(--r-lg);
+        margin-bottom: 16px;
+    }
+    .cp-current-icon {
+        width: 42px; height: 42px; border-radius: var(--r-sm);
+        background: var(--fire-soft); border: 1px solid var(--fire-border);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 18px; color: var(--fire); flex-shrink: 0;
+    }
+
+    /* Plan picker */
+    .pkg-selector { display: flex; flex-direction: column; gap: 8px; }
+
+    .pkg-option {
+        display: flex; align-items: center; gap: 12px;
+        padding: 12px 14px;
+        border: 1.5px solid var(--border);
+        border-radius: var(--r-md);
+        cursor: pointer; transition: all .15s;
+        background: var(--surface);
+    }
+    .pkg-option:hover    { border-color: var(--border-strong); background: var(--canvas); }
+    .pkg-option.selected { border-color: var(--fire); background: var(--fire-soft); }
+    .pkg-option input[type=radio] { display: none; }
+
+    .pkg-opt-icon {
+        width: 34px; height: 34px; border-radius: var(--r-sm);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 16px; flex-shrink: 0;
+        background: var(--fire-soft); color: var(--fire); border: 1px solid var(--fire-border);
+    }
+    .pkg-opt-icon.OPEN_GYM          { background: var(--blue-bg); color: var(--blue); border-color: var(--blue-border); }
+    .pkg-opt-icon.PERSONAL_TRAINING { background: #f5f3ff; color: #7c3aed; border-color: #ddd6fe; }
+
+    .pkg-opt-info { flex: 1; min-width: 0; }
+    .pkg-opt-name { font-size: 13.5px; font-weight: 700; color: var(--t1); }
+    .pkg-opt-meta { font-size: 11.5px; color: var(--t2); margin-top: 2px; display: flex; gap: 10px; flex-wrap: wrap; }
+
+    .pkg-opt-badge {
+        display: inline-flex; align-items: center; gap: 3px;
+        font-size: 10px; font-weight: 700;
+        padding: 1px 7px; border-radius: 20px;
+        border: 1px solid var(--fire-border);
+        background: var(--fire-soft); color: var(--fire-text);
+    }
+    .pkg-opt-badge.OPEN_GYM          { background: var(--blue-bg); color: var(--blue-text); border-color: var(--blue-border); }
+    .pkg-opt-badge.PERSONAL_TRAINING { background: #f5f3ff; color: #6d28d9; border-color: #ddd6fe; }
+
+    /* Money summary */
+    .cp-math {
+        display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+        margin-bottom: 18px;
+    }
+    @@media (max-width: 640px) { .cp-math { grid-template-columns: 1fr; } }
+
+    .cp-math-cell {
+        padding: 14px 16px;
+        border: 1px solid var(--border);
+        border-radius: var(--r-md);
+        background: var(--surface-2);
+    }
+    .cp-math-lbl { font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--t3); }
+    .cp-math-val { font-size: 19px; font-weight: 800; color: var(--t1); margin-top: 4px; }
+    .cp-math-cell.result { background: var(--fire-soft); border-color: var(--fire-border); }
+    .cp-math-val.pay     { color: var(--fire); }
+    .cp-math-val.refund  { color: #dc2626; }
+    .cp-math-val.even    { color: var(--t3); }
+</style>
+}
+
+<div class="cp-shell">
+
+    @* Where the member stands today. *@
+    <div class="cp-current">
+        <div class="cp-current-icon"><i class="bi bi-arrow-left-right"></i></div>
+        <div style="flex:1;min-width:0;">
+            <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);">
+                Current plan
+            </div>
+            <div style="font-size:15px;font-weight:800;color:var(--t1);margin-top:2px;">
+                @Model.CurrentPackageName
+                <span class="pkg-opt-badge" style="margin-left:6px;">@Model.CurrentPackageTypeName</span>
+            </div>
+            <div style="font-size:12px;color:var(--t2);margin-top:3px;display:flex;gap:12px;flex-wrap:wrap;">
+                @if (Model.CurrentSessionsRemaining.HasValue)
+                {
+                    <span><i class="bi bi-ticket-perforated"></i> @Model.CurrentSessionsRemaining sessions left</span>
+                }
+                @if (Model.CurrentValidTo.HasValue)
+                {
+                    <span><i class="bi bi-calendar-check"></i> valid to @Model.CurrentValidTo.Value.ToString("MMM d, yyyy")</span>
+                }
+                <span><i class="bi bi-cash"></i> paid @Model.CurrentPaidAmount.ToString("N2") EGP</span>
+            </div>
+        </div>
+        <a asp-controller="Members" asp-action="Details" asp-route-id="@Model.MemberId"
+           class="btn btn-secondary" style="flex-shrink:0;">Cancel</a>
+    </div>
+
+    <form asp-action="ChangePlan" method="post" id="changePlanForm">
+        @Html.AntiForgeryToken()
+        <input type="hidden" asp-for="MemberId" />
+        <input type="hidden" asp-for="MemberName" />
+        <input type="hidden" asp-for="CurrentMemberPackageId" />
+        <input type="hidden" asp-for="CurrentPaidAmount" id="paidSoFar" />
+
+        @if (!ViewData.ModelState.IsValid && ViewData.ModelState.ErrorCount > 0)
+        {
+            <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:flex-start;gap:10px;">
+                <i class="bi bi-exclamation-circle" style="color:#dc2626;font-size:16px;flex-shrink:0;margin-top:1px;"></i>
+                <div>
+                    <div style="font-size:13px;font-weight:700;color:#991b1b;margin-bottom:4px;">Please fix the following:</div>
+                    <ul style="list-style:none;padding:0;margin:0;">
+                        @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors).Where(e => !string.IsNullOrEmpty(e.ErrorMessage)))
+                        {
+                            <li style="font-size:12.5px;color:#991b1b;">· @error.ErrorMessage</li>
+                        }
+                    </ul>
+                </div>
+            </div>
+        }
+
+        <!-- 1. Pick the new plan -->
+        <div class="form-card">
+            <div class="form-section-head">
+                <div class="form-section-icon"><i class="bi bi-box-seam"></i></div>
+                <span class="form-section-title">Move To</span>
+            </div>
+            <div class="form-body">
+                @if (!Model.AvailablePackages.Any())
+                {
+                    <div style="font-size:13px;color:var(--t3);font-style:italic;">
+                        No other plans available for this branch.
+                    </div>
+                }
+                else
+                {
+                    <div class="pkg-selector">
+                        @foreach (var pkg in Model.AvailablePackages.Where(p => p.PackageDefinitionId != Model.CurrentPackageDefinitionId))
+                        {
+                            var meta = pkg.SessionLabel;
+                            <label class="pkg-option @(Model.NewPackageDefinitionId == pkg.PackageDefinitionId ? "selected" : "")"
+                                   onclick="selectPlan(this)"
+                                   data-type="@pkg.PackageTypeCode"
+                                   data-sessions="@(pkg.SessionCount?.ToString() ?? "")"
+                                   data-invitations="@(pkg.InvitationCount?.ToString() ?? "")"
+                                   data-inbody="@(pkg.InBodyCount?.ToString() ?? "")"
+                                   data-freeze="@(pkg.FreezeAllowanceDays?.ToString() ?? "")"
+                                   data-commission="@(pkg.CoachCommissionPercent?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "")"
+                                   data-price="@(pkg.Price?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "")"
+                                   data-min-price="@(pkg.MaxDiscountedPrice?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "")">
+                                <input type="radio" name="NewPackageDefinitionId" value="@pkg.PackageDefinitionId"
+                                       @(Model.NewPackageDefinitionId == pkg.PackageDefinitionId ? "checked" : "") />
+                                <div class="pkg-opt-icon @pkg.PackageTypeCode">
+                                    @if (pkg.IsPersonalTraining)
+                                    {
+                                        <i class="bi bi-person-arms-up"></i>
+                                    }
+                                    else if (pkg.PackageTypeCode == "OPEN_GYM")
+                                    {
+                                        <i class="bi bi-door-open"></i>
+                                    }
+                                    else
+                                    {
+                                        <i class="bi bi-ticket-perforated"></i>
+                                    }
+                                </div>
+                                <div class="pkg-opt-info">
+                                    <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
+                                        <span class="pkg-opt-name">@pkg.PackageName</span>
+                                        <span class="pkg-opt-badge @pkg.PackageTypeCode">@pkg.PackageTypeName</span>
+                                    </div>
+                                    <div class="pkg-opt-meta">
+                                        <span>@meta</span>
+                                        @if (pkg.Price.HasValue)
+                                        {
+                                            <span style="color:var(--fire);font-weight:700;">@pkg.Price.Value.ToString("N0") EGP</span>
+                                        }
+                                        @if (pkg.MaxDiscountedPrice.HasValue)
+                                        {
+                                            <span style="color:var(--t3);font-weight:600;">· min @pkg.MaxDiscountedPrice.Value.ToString("N0") after discount</span>
+                                        }
+                                    </div>
+                                </div>
+                            </label>
+                        }
+                    </div>
+                }
+                @if (ViewData.ModelState["NewPackageDefinitionId"]?.Errors.Count > 0)
+                {
+                    <div class="field-error" style="display:block;">
+                        @ViewData.ModelState["NewPackageDefinitionId"]!.Errors[0].ErrorMessage
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- 2. The money -->
+        <div class="form-card">
+            <div class="form-section-head">
+                <div class="form-section-icon"><i class="bi bi-cash-coin"></i></div>
+                <span class="form-section-title">Price Difference</span>
+            </div>
+            <div class="form-body">
+                <div class="cp-math">
+                    <div class="cp-math-cell">
+                        <div class="cp-math-lbl">Already paid</div>
+                        <div class="cp-math-val">@Model.CurrentPaidAmount.ToString("N2")</div>
+                    </div>
+                    <div class="cp-math-cell">
+                        <div class="cp-math-lbl">New plan price</div>
+                        <div class="cp-math-val" id="newPlanPrice">—</div>
+                    </div>
+                    <div class="cp-math-cell result">
+                        <div class="cp-math-lbl" id="diffLabel">Difference</div>
+                        <div class="cp-math-val even" id="diffDisplay">—</div>
+                    </div>
+                </div>
+
+                <div class="form-grid-2">
+                    <div class="field">
+                        <label class="field-label" asp-for="AmountDifference">Amount collected now (EGP)</label>
+                        <input asp-for="AmountDifference" id="amountInput" type="number" step="0.01"
+                               placeholder="Pick a plan first" oninput="renderDifference()" />
+                        <div class="field-hint" id="amountHint">
+                            Pre-filled with the difference. Edit it if you are giving a discount —
+                            a negative number means money goes back to the member.
+                        </div>
+                        @if (ViewData.ModelState["AmountDifference"]?.Errors.Count > 0)
+                        {
+                            <div class="field-error" style="display:block;">
+                                @ViewData.ModelState["AmountDifference"]!.Errors[0].ErrorMessage
+                            </div>
+                        }
+                    </div>
+                    <div class="field">
+                        <label class="field-label" asp-for="PaymentMethod">Payment method</label>
+                        <select asp-for="PaymentMethod" class="form-select">
+                            @foreach (var pm in GymSaaS.Models.PaymentMethods.All)
+                            {
+                                <option value="@pm.Key">@pm.Value</option>
+                            }
+                        </select>
+                        <div class="field-hint">Used for the income entry, or the refund if they are downgrading.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. Shape the new plan -->
+        <div class="form-card">
+            <div class="form-section-head">
+                <div class="form-section-icon"><i class="bi bi-sliders"></i></div>
+                <span class="form-section-title">New Plan Setup</span>
+            </div>
+            <div class="form-body">
+                <div class="form-grid-2">
+                    <div class="field">
+                        <label class="field-label" asp-for="CustomStartDate">Starts on</label>
+                        <input asp-for="CustomStartDate" type="date" />
+                        <div class="field-hint">Defaults to today.</div>
+                    </div>
+                    <div class="field">
+                        <label class="field-label" asp-for="CustomExpiryDate">Expires on</label>
+                        <input asp-for="CustomExpiryDate" type="date" />
+                        <div class="field-hint">Leave blank to use the plan's own duration.</div>
+                    </div>
+                    <div class="field">
+                        <label class="field-label" asp-for="CustomSessionCount">Session count</label>
+                        <input asp-for="CustomSessionCount" id="sessionCountInput" type="number" min="1"
+                               placeholder="Leave blank to use default" />
+                        <div class="field-hint">Override the new plan's session count for this member.</div>
+                    </div>
+                    <div class="field">
+                        <label class="field-label" asp-for="CarryOverSessions">Carry-over sessions</label>
+                        <input asp-for="CarryOverSessions" type="number" min="0" value="@Model.CarryOverSessions" />
+                        <div class="field-hint">
+                            Add leftover sessions from the old plan on top
+                            @if (Model.CurrentSessionsRemaining.HasValue)
+                            {
+                                <text>(@Model.CurrentSessionsRemaining remaining).</text>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-grid-2" style="margin-top:16px;">
+                    <div class="field">
+                        <label class="field-label" asp-for="CustomInvitationCount">Invitations</label>
+                        <input asp-for="CustomInvitationCount" id="customInvitations" type="number" min="0" />
+                    </div>
+                    <div class="field">
+                        <label class="field-label" asp-for="CustomInBodyCount">InBody scans</label>
+                        <input asp-for="CustomInBodyCount" id="customInBody" type="number" min="0" />
+                    </div>
+                    <div class="field">
+                        <label class="field-label" asp-for="CustomFreezeAllowanceDays">Freeze days</label>
+                        <input asp-for="CustomFreezeAllowanceDays" id="customFreeze" type="number" min="0" />
+                    </div>
+                    <div class="field" id="coachCutField">
+                        <label class="field-label" asp-for="CustomCoachCommissionPercent">Coach cut (%)</label>
+                        <input asp-for="CustomCoachCommissionPercent" id="coachCutInput" type="number" min="0" max="100" step="0.01" />
+                        <div class="field-hint">Personal training plans only.</div>
+                    </div>
+                </div>
+
+                <div class="field" id="coachField" style="margin-top:16px;">
+                    <label class="field-label" asp-for="CoachId">Assigned coach</label>
+                    @if (!Model.AvailableCoaches.Any())
+                    {
+                        <div style="font-size:13px;color:var(--t3);font-style:italic;padding:10px 0;">
+                            No active coaches in this branch.
+                        </div>
+                    }
+                    else
+                    {
+                        <select asp-for="CoachId" class="form-select">
+                            <option value="">— Shared plan / no assigned coach —</option>
+                            @foreach (var c in Model.AvailableCoaches)
+                            {
+                                <option value="@c.CoachId">@c.FullName@(string.IsNullOrEmpty(c.Specialty) ? "" : $" · {c.Specialty}")</option>
+                            }
+                        </select>
+                    }
+                    @if (ViewData.ModelState["CoachId"]?.Errors.Count > 0)
+                    {
+                        <div class="field-error" style="display:block;">
+                            @ViewData.ModelState["CoachId"]!.Errors[0].ErrorMessage
+                        </div>
+                    }
+                </div>
+
+                <div class="field" style="margin-top:16px;">
+                    <label class="field-label" asp-for="Reason">Reason / note</label>
+                    <textarea asp-for="Reason" rows="2" placeholder="e.g. member asked to move up to unlimited"></textarea>
+                    <div class="field-hint">Stored on the new plan and on the income or refund entry.</div>
+                </div>
+            </div>
+        </div>
+
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-bottom:28px;">
+            <a asp-controller="Members" asp-action="Details" asp-route-id="@Model.MemberId" class="btn btn-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-arrow-left-right"></i> Confirm Plan Change
+            </button>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+<script>
+    const paidSoFar = parseFloat(document.getElementById('paidSoFar').value) || 0;
+
+    // Plan picked — highlight it, prefill the difference, and mirror the plan's
+    // defaults into the override boxes so staff can see what they are changing.
+    function selectPlan(el, prefillAmount = true) {
+        document.querySelectorAll('.pkg-option').forEach(o => o.classList.remove('selected'));
+        el.classList.add('selected');
+        el.querySelector('input[type=radio]').checked = true;
+
+        const price = parseFloat(el.dataset.price) || 0;
+        document.getElementById('newPlanPrice').textContent =
+            price ? price.toLocaleString(undefined, { minimumFractionDigits: 2 }) : 'no set price';
+
+        // Default to the plain difference: new plan price minus what they already paid.
+        // Skipped on a validation re-render so the staffer's own figure survives.
+        if (prefillAmount) {
+            document.getElementById('amountInput').value = (price - paidSoFar).toFixed(2);
+        }
+
+        const setPlaceholder = (id, val) => {
+            const box = document.getElementById(id);
+            if (!box) return;
+            box.placeholder = val ? `Default: ${val}` : 'Not included';
+        };
+        setPlaceholder('sessionCountInput', el.dataset.sessions);
+        setPlaceholder('customInvitations', el.dataset.invitations);
+        setPlaceholder('customInBody', el.dataset.inbody);
+        setPlaceholder('customFreeze', el.dataset.freeze);
+
+        const isPt = el.dataset.type === 'PERSONAL_TRAINING';
+        document.getElementById('coachField').style.display = isPt ? '' : 'none';
+        document.getElementById('coachCutField').style.display = isPt ? '' : 'none';
+        if (isPt && el.dataset.commission) {
+            document.getElementById('coachCutInput').placeholder = `Default: ${el.dataset.commission}`;
+        }
+
+        renderDifference();
+    }
+
+    // Restate the amount in plain language so nobody misreads a refund as a charge.
+    function renderDifference() {
+        const amount  = parseFloat(document.getElementById('amountInput').value);
+        const display = document.getElementById('diffDisplay');
+        const label   = document.getElementById('diffLabel');
+
+        if (isNaN(amount)) {
+            display.textContent = '—';
+            display.className = 'cp-math-val even';
+            label.textContent = 'Difference';
+            return;
+        }
+
+        display.className = 'cp-math-val ' + (amount > 0 ? 'pay' : amount < 0 ? 'refund' : 'even');
+        label.textContent = amount > 0 ? 'Member pays' : amount < 0 ? 'Refund to member' : 'Nothing to pay';
+        display.textContent = Math.abs(amount).toLocaleString(undefined, { minimumFractionDigits: 2 });
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const selected = document.querySelector('.pkg-option.selected');
+        if (selected) {
+            selectPlan(selected, false);
+        } else {
+            document.getElementById('coachField').style.display = 'none';
+            document.getElementById('coachCutField').style.display = 'none';
+        }
+        renderDifference();
+    });
+</script>
+}

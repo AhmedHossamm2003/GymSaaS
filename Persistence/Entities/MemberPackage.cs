@@ -128,6 +128,17 @@ public partial class MemberPackage
     [Column(TypeName = "decimal(5, 2)")]
     public decimal? CoachCommissionPercent { get; set; }
 
+    // ── Plan change (upgrade / downgrade) ─────────────────────────────────────
+    // Set on the NEW row when this package replaced an existing one. The old row
+    // keeps Status "REPLACED" so the original sale still counts toward the period
+    // it was sold in — only the member's current entitlement moves.
+    public Guid? PlanChangedFromMemberPackageId { get; set; }
+
+    // Money moved at the moment of the change: positive = collected from the
+    // member (upgrade), negative = refunded to them (downgrade).
+    [Column(TypeName = "decimal(10, 2)")]
+    public decimal? PlanChangeAmount { get; set; }
+
     [ForeignKey("GymClassId")]
     public virtual GymClass? GymClass { get; set; }
 
@@ -158,6 +169,13 @@ public partial class MemberPackage
 
     [InverseProperty("RenewalOfMemberPackage")]
     public virtual ICollection<MemberPackage> InverseRenewalOfMemberPackage { get; set; } = new List<MemberPackage>();
+
+    [ForeignKey("PlanChangedFromMemberPackageId")]
+    [InverseProperty("InversePlanChangedFromMemberPackage")]
+    public virtual MemberPackage? PlanChangedFromMemberPackage { get; set; }
+
+    [InverseProperty("PlanChangedFromMemberPackage")]
+    public virtual ICollection<MemberPackage> InversePlanChangedFromMemberPackage { get; set; } = new List<MemberPackage>();
 
     [ForeignKey("MemberId")]
     [InverseProperty("MemberPackages")]

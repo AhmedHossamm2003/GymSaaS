@@ -1,4 +1,4 @@
-using GymSaaS.Models;
+﻿using GymSaaS.Models;
 using GymSaaS.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -55,9 +55,14 @@ namespace GymSaaS.Services
 
             // ─── INCOME ────────────────────────────────────────────────
             // Auto income from package assignments (PackageDefinition.Price × count)
+            // REPLACED rows are packages a member later upgraded or downgraded away
+            // from. They stay in the income for the period they were sold, otherwise a
+            // plan change would rewrite past reports. The replacement row is skipped —
+            // its money is the original sale plus the plan-change difference entry.
             var packageIncomeQuery = _db.MemberPackages
                 .Where(mp => mp.TenantId == tenantId
-                          && mp.Status == "ACTIVE"
+                          && (mp.Status == "ACTIVE" || mp.Status == "REPLACED")
+                          && mp.PlanChangedFromMemberPackageId == null
                           && mp.CreatedAtUtc >= fromDt
                           && mp.CreatedAtUtc <= toDt)
                 .Join(_db.PackageDefinitions, mp => mp.PackageDefinitionId, pd => pd.PackageDefinitionId, (mp, pd) => new { mp, pd });
@@ -365,21 +370,57 @@ namespace GymSaaS.Services
                 .Take(5)
                 .ToList();
 
-            // ─── MONTHLY TREND (last 6 months ending at RangeEnd) ──────
-            var monthlyTrend = new List<MonthlyDataPoint>();
-            var trendMonthStart = new DateOnly(toDate.Year, toDate.Month, 1).AddMonths(-5);
+            // ─── PLAN CHANGES (upgrades / downgrades) ──────────────────
+            // Read straight off the replacement rows: each one records the plan it
+            // came from, the money that moved, and the staff member who did it.
+            var planChangeQuery = _db.MemberPackages
+                .Where(mp => mp.TenantId == tenantId
+                          && mp.PlanChangedFromMemberPackageId != null
+                          && mp.CreatedAtUtc >= fromDt
+                          && mp.CreatedAtUtc <= toDt);
 
-            for (int i = 0; i < 6; i++)
+            if (branchFilterId.HasValue)
+                planChangeQuery = planChangeQuery.Where(mp => mp.HomeBranchId == branchFilterId.Value);
+
+            vm.PlanChanges = await planChangeQuery
+                .OrderByDescending(mp => mp.CreatedAtUtc)
+                .Select(mp => new PlanChangeItem
+                {
+                    WhenUtc         = mp.CreatedAtUtc,
+                    MemberId        = mp.MemberId,
+                    MemberName      = mp.Member.FirstName + " " + mp.Member.LastName,
+                    FromPackageName = mp.PlanChangedFromMemberPackage!.PackageNameSnapshot,
+                    ToPackageName   = mp.PackageNameSnapshot,
+                    Amount          = mp.PlanChangeAmount ?? 0m,
+                    ChangedByUserName = mp.CreatedByUser != null
+                        ? mp.CreatedByUser.FirstName + " " + mp.CreatedByUser.LastName
+                        : "—",
+                    BranchName      = mp.HomeBranch.BranchName,
+                })
+                .ToListAsync();
+
+            // ─── TREND ─────────────────────────────────────────────────
+            // Bucket size follows the report: daily bars for a single-day report,
+            // weekly bars for a week report, monthly otherwise.
+            var plan = BuildTrendPlan(rangePreset, fromDate, toDate);
+            vm.TrendTitle   = plan.Title;
+            vm.TrendCaption = plan.Caption;
+
+            var monthlyTrend = new List<MonthlyDataPoint>();
+
+            foreach (var bucket in plan.Buckets)
             {
-                var mStart = trendMonthStart.AddMonths(i);
-                var mEnd   = mStart.AddMonths(1).AddDays(-1);
+                var mStart = bucket.Start;
+                var mEnd   = bucket.End;
 
                 var mStartDt = mStart.ToDateTime(TimeOnly.MinValue);
                 var mEndDt   = mEnd.ToDateTime(TimeOnly.MaxValue);
 
                 // Package income for month
                 var mPkgQuery = _db.MemberPackages
-                    .Where(mp => mp.TenantId == tenantId && mp.Status == "ACTIVE"
+                    .Where(mp => mp.TenantId == tenantId
+                              && (mp.Status == "ACTIVE" || mp.Status == "REPLACED")
+                              && mp.PlanChangedFromMemberPackageId == null
                               && mp.CreatedAtUtc >= mStartDt && mp.CreatedAtUtc <= mEndDt)
                     .Join(_db.PackageDefinitions, mp => mp.PackageDefinitionId, pd => pd.PackageDefinitionId, (mp, pd) => new { mp, pd });
 
@@ -426,7 +467,8 @@ namespace GymSaaS.Services
 
                 monthlyTrend.Add(new MonthlyDataPoint
                 {
-                    MonthLabel = mStart.ToString("MMM yyyy"),
+                    MonthLabel = bucket.Label,
+                    ShortLabel = bucket.ShortLabel,
                     MonthStart = mStart,
                     Income     = mPkgIncome + mManualIncome,
                     Expenses   = mExp,
@@ -436,6 +478,82 @@ namespace GymSaaS.Services
             vm.MonthlyTrend = monthlyTrend;
 
             return vm;
+        }
+
+        // ─── TREND PLANNING ───────────────────────────────────────────
+        // One bar on the trend chart.
+        private sealed record TrendBucket(
+            DateOnly Start, DateOnly End, string Label, string ShortLabel);
+
+        private sealed record TrendPlan(
+            string Title, string Caption, List<TrendBucket> Buckets);
+
+        private const int DailyBuckets   = 14;
+        private const int WeeklyBuckets  = 8;
+        private const int MonthlyBuckets = 6;
+
+        /// <summary>
+        /// Chooses the trend granularity for a report. A day-scale report is
+        /// meaningless against six monthly bars, so it gets the last two weeks of
+        /// daily bars instead; a week report gets the last eight weeks.
+        /// </summary>
+        private static TrendPlan BuildTrendPlan(
+            string rangePreset, DateOnly fromDate, DateOnly toDate)
+        {
+            int spanDays = toDate.DayNumber - fromDate.DayNumber + 1;
+
+            bool isDayScale = rangePreset is "today" or "yesterday" or "day"
+                           || (rangePreset == "custom" && spanDays <= DailyBuckets);
+            bool isWeekScale = rangePreset is "this_week" or "last_week";
+
+            if (isDayScale)
+            {
+                var days = new List<TrendBucket>();
+                for (int i = DailyBuckets - 1; i >= 0; i--)
+                {
+                    var d = toDate.AddDays(-i);
+                    days.Add(new TrendBucket(d, d, d.ToString("MMM d"), d.ToString("d MMM")));
+                }
+                return new TrendPlan(
+                    $"{DailyBuckets}-Day Income vs Expenses",
+                    $"daily trend (last {DailyBuckets} days ending {toDate:MMM d, yyyy})",
+                    days);
+            }
+
+            if (isWeekScale)
+            {
+                // Anchor on the report's own start day so the bars line up with
+                // whatever weekday the caller treats as the start of a week.
+                var weeks = new List<TrendBucket>();
+                for (int i = WeeklyBuckets - 1; i >= 0; i--)
+                {
+                    var wStart = fromDate.AddDays(-7 * i);
+                    var wEnd   = wStart.AddDays(6);
+                    weeks.Add(new TrendBucket(
+                        wStart, wEnd,
+                        $"{wStart:MMM d} – {wEnd:MMM d}",
+                        wStart.ToString("d MMM")));
+                }
+                return new TrendPlan(
+                    $"{WeeklyBuckets}-Week Income vs Expenses",
+                    $"weekly trend (last {WeeklyBuckets} weeks ending {fromDate.AddDays(6):MMM d, yyyy})",
+                    weeks);
+            }
+
+            var months = new List<TrendBucket>();
+            var firstMonth = new DateOnly(toDate.Year, toDate.Month, 1)
+                .AddMonths(-(MonthlyBuckets - 1));
+            for (int i = 0; i < MonthlyBuckets; i++)
+            {
+                var mStart = firstMonth.AddMonths(i);
+                var mEnd   = mStart.AddMonths(1).AddDays(-1);
+                months.Add(new TrendBucket(
+                    mStart, mEnd, mStart.ToString("MMM yyyy"), mStart.ToString("MMM")));
+            }
+            return new TrendPlan(
+                $"{MonthlyBuckets}-Month Income vs Expenses",
+                $"monthly trend (last {MonthlyBuckets} months ending {toDate:MMM yyyy})",
+                months);
         }
     }
 }

@@ -1,4 +1,4 @@
-using GymSaaS.Models;
+﻿using GymSaaS.Models;
 using GymSaaS.Persistence;
 using GymSaaS.Persistence.Entities;
 using Microsoft.AspNetCore.Authorization;
@@ -228,8 +228,322 @@ namespace GymSaaS.Controllers
         }
 
         // ─────────────────────────────────────────────
+        // GET /MemberPackages/ChangePlan?memberPackageId=xxx
+        // ─────────────────────────────────────────────
+        // Upgrade or downgrade a package the member already holds. What they paid
+        // for the old plan is credited, and only the difference changes hands.
+        public async Task<IActionResult> ChangePlan(Guid memberPackageId)
+        {
+            var current = await LoadChangeablePackageAsync(memberPackageId);
+            if (current == null) return NotFound();
+
+            var vm = await BuildChangePlanViewModelAsync(current);
+            ViewData["Title"] = vm.MemberName;
+            ViewData["Subtitle"] = "Change Plan";
+            return View(vm);
+        }
+
+        // ─────────────────────────────────────────────
+        // POST /MemberPackages/ChangePlan
+        // ─────────────────────────────────────────────
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ChangePlan(ChangePlanViewModel model, List<Guid> selectedBranchIds)
+        {
+            var current = await LoadChangeablePackageAsync(model.CurrentMemberPackageId);
+            if (current == null) return NotFound();
+
+            var member = await _db.Members
+                .FirstOrDefaultAsync(m => m.MemberId == current.MemberId
+                                       && m.TenantId == TenantId
+                                       && !m.IsDeleted);
+            if (member == null) return NotFound();
+
+            var newDef = await _db.PackageDefinitions
+                .Include(p => p.PackageType)
+                .Include(p => p.BranchAccessPolicyType)
+                .FirstOrDefaultAsync(p => p.PackageDefinitionId == model.NewPackageDefinitionId
+                                       && p.TenantId == TenantId);
+
+            if (newDef == null)
+                ModelState.AddModelError(nameof(model.NewPackageDefinitionId),
+                    "The selected plan is no longer available.");
+
+            if (newDef != null && newDef.PackageDefinitionId == current.PackageDefinitionId)
+                ModelState.AddModelError(nameof(model.NewPackageDefinitionId),
+                    "That is the plan the member is already on — pick a different one.");
+
+            var paidSoFar  = current.PriceSnapshot ?? current.CatalogPrice ?? 0m;
+            var difference = model.AmountDifference ?? 0m;
+
+            // The member's total outlay for the new plan is what they already paid
+            // plus (or minus) whatever moves now. Hold that to the same ceiling and
+            // discount floor the assign screen enforces.
+            var effectiveNewPrice = paidSoFar + difference;
+
+            if (newDef != null)
+            {
+                if (effectiveNewPrice < 0)
+                    ModelState.AddModelError(nameof(model.AmountDifference),
+                        "That refund is larger than what the member paid.");
+                else if (newDef.Price.HasValue && effectiveNewPrice > newDef.Price.Value)
+                    ModelState.AddModelError(nameof(model.AmountDifference),
+                        $"Total would be {effectiveNewPrice:N2} EGP, above the plan price of {newDef.Price.Value:N2} EGP.");
+                else if (newDef.MaxDiscountedPrice.HasValue
+                      && effectiveNewPrice < newDef.MaxDiscountedPrice.Value)
+                    ModelState.AddModelError(nameof(model.AmountDifference),
+                        $"Discount limit reached — the member must end up paying at least {newDef.MaxDiscountedPrice.Value:N2} EGP for this plan.");
+            }
+
+            var newTypeCode = newDef?.PackageType?.PackageTypeCode ?? "";
+            if (model.CoachId.HasValue && newTypeCode == "PERSONAL_TRAINING")
+            {
+                var validCoach = await _db.Coaches.AnyAsync(c =>
+                    c.CoachId == model.CoachId.Value
+                    && c.TenantId == TenantId
+                    && (c.BranchId == member.HomeBranchId
+                        || (c.UserId.HasValue && _db.UserBranches.Any(ub =>
+                            ub.UserId == c.UserId.Value
+                            && ub.BranchId == member.HomeBranchId
+                            && ub.IsActive)))
+                    && c.IsActive
+                    && !c.IsDeleted);
+
+                if (!validCoach)
+                    ModelState.AddModelError(nameof(model.CoachId),
+                        "Please select an active coach assigned to the member's home branch.");
+            }
+
+            if (!ModelState.IsValid)
+            {
+                var redo = await BuildChangePlanViewModelAsync(current);
+                // Keep what the staffer typed rather than resetting the form.
+                redo.NewPackageDefinitionId       = model.NewPackageDefinitionId;
+                redo.AmountDifference             = model.AmountDifference;
+                redo.PaymentMethod                = model.PaymentMethod;
+                redo.CustomSessionCount           = model.CustomSessionCount;
+                redo.CarryOverSessions            = model.CarryOverSessions;
+                redo.CustomStartDate              = model.CustomStartDate;
+                redo.CustomExpiryDate             = model.CustomExpiryDate;
+                redo.CustomInvitationCount        = model.CustomInvitationCount;
+                redo.CustomInBodyCount            = model.CustomInBodyCount;
+                redo.CustomFreezeAllowanceDays    = model.CustomFreezeAllowanceDays;
+                redo.GymClassId                   = model.GymClassId;
+                redo.CoachId                      = model.CoachId;
+                redo.CustomCoachCommissionPercent = model.CustomCoachCommissionPercent;
+                redo.Reason                       = model.Reason;
+
+                ViewData["Title"] = redo.MemberName;
+                ViewData["Subtitle"] = "Change Plan";
+                return View(redo);
+            }
+
+            var now       = DateTime.UtcNow;
+            var startDate = model.CustomStartDate ?? DateOnly.FromDateTime(now);
+            var isPersonalTraining = newTypeCode == "PERSONAL_TRAINING";
+
+            var expiry = model.CustomExpiryDate
+                      ?? startDate.AddDays(newDef!.DurationDays ?? 30);
+
+            var sessions = newTypeCode is "SESSION" or "PERSONAL_TRAINING"
+                ? (model.CustomSessionCount ?? newDef.SessionCount ?? 0)
+                : (int?)null;
+
+            int? invitationsTotal = model.CustomInvitationCount ?? newDef.InvitationCount;
+            int? inBodyTotal      = model.CustomInBodyCount ?? newDef.InBodyCount;
+            int? freezeAllowance  = model.CustomFreezeAllowanceDays ?? newDef.FreezeAllowanceDays;
+
+            List<Guid> finalBranchIds = new();
+            if (newDef.BranchAccessPolicyType?.PolicyCode == "SELECTED_BRANCHES")
+            {
+                finalBranchIds.Add(member.HomeBranchId);
+                foreach (var bid in selectedBranchIds)
+                    if (!finalBranchIds.Contains(bid))
+                        finalBranchIds.Add(bid);
+            }
+
+            var oldPackage = await _db.MemberPackages
+                .FirstAsync(mp => mp.MemberPackageId == current.MemberPackageId);
+
+            using var tx = await _db.Database.BeginTransactionAsync();
+
+            // Retire the old plan. REPLACED (not CANCELLED) so reporting still counts
+            // the original sale in the period it happened — see ReportsService.
+            oldPackage.Status            = "REPLACED";
+            oldPackage.CancelledAtUtc    = now;
+            oldPackage.CancelledByUserId = UserId;
+            oldPackage.UpdatedAtUtc      = now;
+            oldPackage.UpdatedByUserId   = UserId;
+
+            var newId = Guid.NewGuid();
+            var newPackage = new MemberPackage
+            {
+                MemberPackageId          = newId,
+                TenantId                 = TenantId,
+                MemberId                 = member.MemberId,
+                PackageDefinitionId      = newDef.PackageDefinitionId,
+                PackageNameSnapshot      = newDef.PackageName,
+                PackageTypeId            = newDef.PackageTypeId,
+                BranchAccessPolicyTypeId = newDef.BranchAccessPolicyTypeId,
+                HomeBranchId             = member.HomeBranchId,
+                CrossBranchVisitLimit    = newDef.CrossBranchVisitLimit,
+                Status                   = "ACTIVE",
+                IsCustomPackage          = model.CustomSessionCount.HasValue || model.CustomExpiryDate.HasValue,
+                SessionCountOriginal     = sessions,
+                SessionCountRemaining    = sessions.HasValue ? sessions + model.CarryOverSessions : null,
+                CarryOverSessionsAdded   = model.CarryOverSessions,
+                DurationDays             = newDef.DurationDays,
+                ValidFromDate            = startDate,
+                ValidToDate              = expiry,
+                Notes                    = model.Reason,
+                OpenGymDailyLimit        = newDef.OpenGymDailyLimit,
+                CoachId                  = isPersonalTraining ? model.CoachId : null,
+                InvitationsTotal         = invitationsTotal,
+                InvitationsRemaining     = invitationsTotal,
+                InBodyTotal              = inBodyTotal,
+                InBodyRemaining          = inBodyTotal,
+                FreezeAllowanceDays      = freezeAllowance,
+                FreezeRemainingDays      = freezeAllowance,
+                GymClassId               = newTypeCode is "SESSION" or "CLASS"
+                    ? (model.GymClassId ?? newDef.GymClassId)
+                    : null,
+                // Full value of the new plan, not just the difference — PT commission
+                // is derived from this snapshot.
+                PriceSnapshot            = effectiveNewPrice,
+                CoachCommissionPercent   = isPersonalTraining
+                    ? (model.CustomCoachCommissionPercent ?? newDef.CoachCommissionPercent)
+                    : null,
+                PlanChangedFromMemberPackageId = oldPackage.MemberPackageId,
+                PlanChangeAmount         = difference,
+                CreatedAtUtc             = now,
+                CreatedByUserId          = UserId,
+            };
+
+            _db.MemberPackages.Add(newPackage);
+            await _db.SaveChangesAsync();
+
+            if (finalBranchIds.Any())
+                await SaveAllowedBranches(newId, finalBranchIds);
+
+            // Move the money. An upgrade is income; a refund on a downgrade leaves the
+            // till, so it is booked as an expense and Net Profit stays truthful.
+            var today = DateOnly.FromDateTime(now);
+            var moneyNote = $"Plan change: {oldPackage.PackageNameSnapshot} → {newDef.PackageName}"
+                          + (string.IsNullOrWhiteSpace(model.Reason) ? "" : $" · {model.Reason}");
+
+            if (difference > 0)
+            {
+                _db.ManualIncomeEntries.Add(new ManualIncomeEntry
+                {
+                    IncomeEntryId   = Guid.NewGuid(),
+                    TenantId        = TenantId,
+                    BranchId        = member.HomeBranchId,
+                    CategoryCode    = "PLAN_CHANGE",
+                    Description     = $"Plan upgrade — {member.FirstName} {member.LastName}".Trim(),
+                    Amount          = difference,
+                    IncomeDate      = today,
+                    Notes           = moneyNote,
+                    PaymentMethod   = model.PaymentMethod,
+                    SourceCode      = "PLAN_CHANGE",
+                    MemberId        = member.MemberId,
+                    CreatedAtUtc    = now,
+                    CreatedByUserId = UserId,
+                });
+            }
+            else if (difference < 0)
+            {
+                _db.Expenses.Add(new Expense
+                {
+                    ExpenseId       = Guid.NewGuid(),
+                    TenantId        = TenantId,
+                    BranchId        = member.HomeBranchId,
+                    CategoryCode    = "PLAN_REFUND",
+                    // Expenses have no description field; the member goes in VendorName
+                    // so the finance list shows who the refund went to.
+                    VendorName      = $"{member.FirstName} {member.LastName}".Trim(),
+                    Amount          = Math.Abs(difference),
+                    ExpenseDate     = today,
+                    Notes           = moneyNote,
+                    PaymentMethod   = model.PaymentMethod,
+                    CreatedAtUtc    = now,
+                    CreatedByUserId = UserId,
+                });
+            }
+
+            await _db.SaveChangesAsync();
+            await tx.CommitAsync();
+
+            var verb = difference > 0 ? $"collected {difference:N2} EGP"
+                     : difference < 0 ? $"refunded {Math.Abs(difference):N2} EGP"
+                     : "no money moved";
+            TempData["Toast"] = $"Plan changed to {newDef.PackageName} — {verb}.";
+            TempData["ToastType"] = "success";
+            return RedirectToAction("Details", "Members", new { id = member.MemberId });
+        }
+
+        // ─────────────────────────────────────────────
         // HELPERS
         // ─────────────────────────────────────────────
+
+        // Shape of the package being replaced, with the price the member actually paid.
+        private sealed class ChangeablePackage
+        {
+            public Guid MemberPackageId { get; init; }
+            public Guid MemberId { get; init; }
+            public Guid HomeBranchId { get; init; }
+            public Guid? PackageDefinitionId { get; init; }
+            public string PackageNameSnapshot { get; init; } = "";
+            public string PackageTypeName { get; init; } = "";
+            public int? SessionCountRemaining { get; init; }
+            public DateOnly? ValidToDate { get; init; }
+            public decimal? PriceSnapshot { get; init; }
+            public decimal? CatalogPrice { get; init; }
+            public string MemberName { get; init; } = "";
+        }
+
+        private async Task<ChangeablePackage?> LoadChangeablePackageAsync(Guid memberPackageId)
+        {
+            return await _db.MemberPackages
+                .Where(mp => mp.MemberPackageId == memberPackageId
+                          && mp.TenantId == TenantId
+                          && mp.Status == "ACTIVE")
+                .Select(mp => new ChangeablePackage
+                {
+                    MemberPackageId       = mp.MemberPackageId,
+                    MemberId              = mp.MemberId,
+                    HomeBranchId          = mp.HomeBranchId,
+                    PackageDefinitionId   = mp.PackageDefinitionId,
+                    PackageNameSnapshot   = mp.PackageNameSnapshot,
+                    PackageTypeName       = mp.PackageType.PackageTypeName,
+                    SessionCountRemaining = mp.SessionCountRemaining,
+                    ValidToDate           = mp.ValidToDate,
+                    PriceSnapshot         = mp.PriceSnapshot,
+                    CatalogPrice          = mp.PackageDefinition != null ? mp.PackageDefinition.Price : null,
+                    MemberName            = (mp.Member.FirstName + " " + mp.Member.LastName).Trim(),
+                })
+                .FirstOrDefaultAsync();
+        }
+
+        private async Task<ChangePlanViewModel> BuildChangePlanViewModelAsync(ChangeablePackage current)
+        {
+            return new ChangePlanViewModel
+            {
+                MemberId                 = current.MemberId,
+                MemberName               = current.MemberName,
+                CurrentMemberPackageId   = current.MemberPackageId,
+                CurrentPackageDefinitionId = current.PackageDefinitionId,
+                CurrentPackageName       = current.PackageNameSnapshot,
+                CurrentPackageTypeName   = current.PackageTypeName,
+                CurrentSessionsRemaining = current.SessionCountRemaining,
+                CurrentValidTo           = current.ValidToDate,
+                CurrentPaidAmount        = current.PriceSnapshot ?? current.CatalogPrice ?? 0m,
+                CustomStartDate          = DateOnly.FromDateTime(DateTime.UtcNow),
+                AvailablePackages        = await GetAvailablePackagesAsync(current.HomeBranchId),
+                AvailableClasses         = await GetClassesAsync(current.HomeBranchId),
+                AvailableCoaches         = await GetAvailableCoachesAsync(current.HomeBranchId),
+            };
+        }
+
         private async Task<List<PackageDefinitionListItem>> GetAvailablePackagesAsync(Guid homeBranchId)
         {
             var items = await _db.PackageDefinitions

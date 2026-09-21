@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 
 namespace GymSaaS.Models
 {
@@ -16,6 +16,7 @@ namespace GymSaaS.Models
             ["INSURANCE"]    = "Insurance",
             ["TAXES"]        = "Taxes & Fees",
             ["SUPPLIES"]     = "Supplies & Consumables",
+            ["PLAN_REFUND"]  = "Plan Change Refund",
             ["OTHER"]        = "Other",
         };
 
@@ -34,6 +35,7 @@ namespace GymSaaS.Models
             ["MERCHANDISE"]      = "Merchandise",
             ["SUPPLEMENT"]       = "Supplements",
             ["INBODY"]           = "InBody Scans",
+            ["PLAN_CHANGE"]      = "Plan Change (Upgrade)",
             ["OTHER"]            = "Other",
         };
 
@@ -199,14 +201,25 @@ namespace GymSaaS.Models
             ? Math.Round((double)TotalCheckInsInPeriod / (RangeEnd.DayNumber - RangeStart.DayNumber + 1), 1)
             : 0;
 
-        // Monthly trend (last 6 months)
+        // Trend buckets. Granularity follows the selected preset: days for a
+        // single-day report, weeks for a week report, months otherwise.
         public List<MonthlyDataPoint> MonthlyTrend { get; set; } = new();
+
+        // Heading + caption for the trend chart, set by the service so the view
+        // and the exports do not have to re-derive the granularity.
+        public string TrendTitle { get; set; } = "6-Month Income vs Expenses";
+        public string TrendCaption { get; set; } = string.Empty;
 
         // Breakdowns
         public List<CategoryBreakdownItem> ExpenseByCategory { get; set; } = new();
         public List<CategoryBreakdownItem> IncomeByCategory { get; set; } = new();
         public List<BranchPerformanceItem> BranchPerformance { get; set; } = new();
         public List<TopPackageItem> TopSellingPackages { get; set; } = new();
+
+        // Upgrades and downgrades made in the period — who changed, to what, by whom.
+        public List<PlanChangeItem> PlanChanges { get; set; } = new();
+        public decimal PlanChangeCollected => PlanChanges.Where(p => p.Amount > 0).Sum(p => p.Amount);
+        public decimal PlanChangeRefunded  => PlanChanges.Where(p => p.Amount < 0).Sum(p => -p.Amount);
 
         // Trend snapshot
         public string TrendIndicator =>
@@ -216,7 +229,11 @@ namespace GymSaaS.Models
 
     public class MonthlyDataPoint
     {
+        // "Month" naming is historical — a bucket is a day, a week or a month
+        // depending on the report's granularity.
         public string MonthLabel { get; set; } = string.Empty;
+        // Compact axis label for the bar chart (e.g. "21", "Sep 21", "Sep").
+        public string ShortLabel { get; set; } = string.Empty;
         public DateOnly MonthStart { get; set; }
         public decimal Income { get; set; }
         public decimal Expenses { get; set; }

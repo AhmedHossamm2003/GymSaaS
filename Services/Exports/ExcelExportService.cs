@@ -1,4 +1,4 @@
-using ClosedXML.Excel;
+﻿using ClosedXML.Excel;
 using GymSaaS.Models;
 
 namespace GymSaaS.Services.Exports
@@ -28,6 +28,7 @@ namespace GymSaaS.Services.Exports
             BuildBranchSheet(wb, r);
             BuildMonthlyTrendSheet(wb, r);
             BuildTopPackagesSheet(wb, r);
+            if (r.PlanChanges.Any()) BuildPlanChangesSheet(wb, r);
 
             using var ms = new MemoryStream();
             wb.SaveAs(ms);
@@ -207,8 +208,8 @@ namespace GymSaaS.Services.Exports
         // ─── MONTHLY TREND SHEET ─────────────────────────────────────
         private void BuildMonthlyTrendSheet(XLWorkbook wb, ReportsViewModel r)
         {
-            var s = wb.Worksheets.Add("Monthly Trend");
-            s.Cell(1, 1).Value = "Monthly Trend (last 6 months)";
+            var s = wb.Worksheets.Add("Trend");
+            s.Cell(1, 1).Value = $"{r.TrendTitle} — {r.TrendCaption}";
             s.Range(1, 1, 1, 5).Merge();
             s.Cell(1, 1).Style.Font.Bold = true;
             s.Cell(1, 1).Style.Font.FontSize = 13;
@@ -252,6 +253,34 @@ namespace GymSaaS.Services.Exports
             }
 
             s.Columns(1, 3).AdjustToContents();
+        }
+
+        // ─── PLAN CHANGES SHEET ──────────────────────────────────────
+        private void BuildPlanChangesSheet(XLWorkbook wb, ReportsViewModel r)
+        {
+            var s = wb.Worksheets.Add("Plan Changes");
+            s.Cell(1, 1).Value = "Plan Changes (upgrades & downgrades)";
+            s.Range(1, 1, 1, 6).Merge();
+            s.Cell(1, 1).Style.Font.Bold = true;
+            s.Cell(1, 1).Style.Font.FontSize = 13;
+            s.Cell(1, 1).Style.Font.FontColor = Slate;
+
+            WriteTableHeader(s, 3, "Date", "Member", "From", "To", "Difference", "Changed By");
+            int row = 4;
+            foreach (var pc in r.PlanChanges)
+            {
+                s.Cell(row, 1).Value = pc.WhenUtc;
+                s.Cell(row, 1).Style.DateFormat.Format = "yyyy-mm-dd";
+                s.Cell(row, 2).Value = pc.MemberName.Trim();
+                s.Cell(row, 3).Value = pc.FromPackageName;
+                s.Cell(row, 4).Value = pc.ToPackageName;
+                s.Cell(row, 5).Value = pc.Amount;
+                s.Cell(row, 5).Style.NumberFormat.Format = "#,##0.00;[Red]-#,##0.00";
+                s.Cell(row, 6).Value = pc.ChangedByUserName.Trim();
+                row++;
+            }
+
+            s.Columns(1, 6).AdjustToContents();
         }
 
         // ─── HELPERS ─────────────────────────────────────────────────

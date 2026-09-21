@@ -1,4 +1,4 @@
-using GymSaaS.Models;
+﻿using GymSaaS.Models;
 using GymSaaS.Persistence;
 using GymSaaS.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -74,6 +74,11 @@ namespace GymSaaS.Controllers
                         p.MemberId,
                         p.CreatedAtUtc,
                         p.PackageNameSnapshot,
+                        p.PlanChangeAmount,
+                        // Present only when this row replaced an earlier plan.
+                        ReplacedName = p.PlanChangedFromMemberPackage != null
+                            ? p.PlanChangedFromMemberPackage.PackageNameSnapshot
+                            : null,
                         MemberName = p.Member.FirstName + " " + p.Member.LastName,
                         ByUser = p.CreatedByUser != null ? p.CreatedByUser.FirstName + " " + p.CreatedByUser.LastName : null,
                     })
@@ -83,11 +88,18 @@ namespace GymSaaS.Controllers
                 {
                     WhenUtc = p.CreatedAtUtc,
                     Category = "PACKAGE",
-                    Icon = "bi-box-seam",
+                    // A plan change reads differently from a first-time assignment.
+                    Icon = p.ReplacedName != null ? "bi-arrow-left-right" : "bi-box-seam",
                     Color = "#ff5b14",
                     Actor = (p.ByUser ?? "System").Trim(),
-                    Action = $"assigned \"{p.PackageNameSnapshot}\" to {p.MemberName.Trim()}",
-                    Detail = null,
+                    Action = p.ReplacedName != null
+                        ? $"moved {p.MemberName.Trim()} from \"{p.ReplacedName}\" to \"{p.PackageNameSnapshot}\""
+                        : $"assigned \"{p.PackageNameSnapshot}\" to {p.MemberName.Trim()}",
+                    Detail = p.ReplacedName == null || p.PlanChangeAmount == null || p.PlanChangeAmount == 0m
+                        ? null
+                        : p.PlanChangeAmount > 0m
+                            ? $"collected {p.PlanChangeAmount.Value:N2} EGP"
+                            : $"refunded {Math.Abs(p.PlanChangeAmount.Value):N2} EGP",
                     MemberId = p.MemberId,
                 }));
             }
