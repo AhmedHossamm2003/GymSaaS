@@ -13,12 +13,20 @@ namespace GymSaaS.Controllers
             _logger = logger;
         }
 
+        [Route("home")]
         public IActionResult Index()
         {
             return View();
         }
 
+        [Route("privacy")]
         public IActionResult Privacy()
+        {
+            return View();
+        }
+
+        [Route("terms")]
+        public IActionResult Terms()
         {
             return View();
         }
