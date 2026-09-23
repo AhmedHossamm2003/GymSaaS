@@ -407,7 +407,10 @@ namespace GymSaaS.Controllers
             var folder = Path.Combine(_env.WebRootPath, "uploads", "classes");
             Directory.CreateDirectory(folder);
 
-            var fileName = $"{classId}{ext}";
+            // Unique filename per upload so an updated photo gets a new URL and
+            // isn't served stale from the app's image cache. The previous file is
+            // removed via DeletePhoto() before this is called on edit.
+            var fileName = $"{classId}_{Guid.NewGuid():N}{ext}";
             var filePath = Path.Combine(folder, fileName);
 
             using var stream = new FileStream(filePath, FileMode.Create);
